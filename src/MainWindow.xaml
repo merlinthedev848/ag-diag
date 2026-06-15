@@ -1,0 +1,565 @@
+<Window x:Class="AgilicoConnectChecker.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AgilicoConnectChecker"
+        mc:Ignorable="d"
+        Title="Agilico Connect - Network Checker" 
+        Width="1024" Height="700" 
+        MinHeight="600" MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource AppBgBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- Sidebar -->
+            <ColumnDefinition Width="100"/>
+            <!-- Main Content Area -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar Navigation -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <!-- Brand Logo -->
+                    <RowDefinition Height="90"/>
+                    <!-- Navigation Menu -->
+                    <RowDefinition Height="*"/>
+                    <!-- Footer Actions -->
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Brand Logo (Agilico logo) -->
+                <Image Grid.Row="0" Source="pack://application:,,,/logo.png" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <!-- Navigation List -->
+                <StackPanel Grid.Row="1" Margin="0,20,0,0">
+                    <Button x:Name="BtnDashboard" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconDashboard}" Click="BtnDashboard_Click">
+                        <TextBlock Text="Dashboard" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnLogs" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnLogs_Click">
+                        <TextBlock Text="Logs" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnSettings" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconSettings}" Click="BtnSettings_Click">
+                        <TextBlock Text="Settings" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
+                        <TextBlock Text="Help" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Sidebar Footer -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,20">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnExit_Click">
+                        <Button.Tag>
+                            <Geometry>M16 13v-2H7V9h9V7l5 4-5 4z M3 3h8v2H5v14h6v2H3c-1.103 0-2-.897-2-2V5c0-1.103.897-2 2-2z</Geometry>
+                        </Button.Tag>
+                        <TextBlock Text="Exit" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Workspace (Header + Content) -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <!-- Top Header Bar -->
+                <RowDefinition Height="65"/>
+                <!-- Page Content -->
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="{StaticResource HeaderBgBrush}">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Title & Version Info -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Agilico Connect - Network Diagnostics" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="Environment compatibility checker for Agilico Connect Windows App" Foreground="#94a3b8" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- DND Presence Switch -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtDndStatus" Text="DND: OFF" Foreground="#94a3b8" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ToggleButton x:Name="ToggleDnd" Style="{StaticResource DndToggleStyle}" Click="ToggleDnd_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Page Tab Control (Headers hidden, programmatically switched) -->
+            <TabControl Grid.Row="1" x:Name="PageTabControl" Background="Transparent" BorderThickness="0" Padding="0" Margin="10">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                    </Style>
+                </TabControl.Resources>
+
+                <!-- TAB 1: DASHBOARD -->
+                <TabItem>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <!-- Controls & Summary -->
+                            <ColumnDefinition Width="4*"/>
+                            <!-- Test Suites Progress -->
+                            <ColumnDefinition Width="5*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left Column: Controls & Summary -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Control Card -->
+                            <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="20">
+                                    <TextBlock Text="Diagnostic Controls" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Validate firewall compatibility for incoming call setup, port preservation and packet inspection." 
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,6,0,20"/>
+
+                                    <!-- Action Buttons -->
+                                    <Grid>
+                                        <Button x:Name="BtnStart" Style="{StaticResource ActionButtonStyle}" Click="BtnStart_Click" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="START DIAGNOSTICS"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button x:Name="BtnStop" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Click="BtnStop_Click" Visibility="Collapsed" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="CANCEL TEST"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Progress Bar / Spinner -->
+                                    <Grid x:Name="ProgressArea" Margin="0,15,0,0" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Path Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="20" Height="20" Stretch="Uniform" RenderTransformOrigin="0.5,0.5" VerticalAlignment="Center">
+                                            <Path.RenderTransform>
+                                                <RotateTransform x:Name="SpinnerRotation" Angle="0"/>
+                                            </Path.RenderTransform>
+                                            <Path.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="SpinnerRotation" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Path.Triggers>
+                                        </Path>
+                                        <TextBlock x:Name="TxtProgressStatus" Grid.Column="1" Text="Running port tests..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Results Summary Card -->
+                            <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+                                <Grid Margin="20">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Text="Diagnostic Summary" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+
+                                    <!-- Default State -->
+                                    <StackPanel Grid.Row="1" x:Name="PanelSummaryDefault" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <Path Data="{StaticResource IconAlert}" Fill="{StaticResource TextMutedBrush}" Width="48" Height="48" Stretch="Uniform" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="No Diagnostics Run Yet" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Center" Margin="0,10,0,2"/>
+                                        <TextBlock Text="Click the 'Start' button above to run checks." FontSize="12" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <!-- Success State -->
+                                    <StackPanel Grid.Row="1" x:Name="PanelSummaryPass" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                                        <Path Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="60" Height="60" Stretch="Uniform" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Environment Ready" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" HorizontalAlignment="Center" Margin="0,12,0,4"/>
+                                        <TextBlock Text="Your local network setup is fully compatible with Agilico Connect. No issues were detected." 
+                                                   TextAlignment="Center" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Width="250" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <!-- Failure State -->
+                                    <StackPanel Grid.Row="1" x:Name="PanelSummaryFail" VerticalAlignment="Top" Visibility="Collapsed">
+                                        <Border Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
+                                            <StackPanel>
+                                                <TextBlock Text="Network Issue Detected" FontSize="14" FontWeight="Bold" Foreground="#dc2626"/>
+                                                <TextBlock Text="Your network environment requires attention before using Agilico Connect. Phones may fail to register or drop calls." 
+                                                           TextWrapping="Wrap" FontSize="12" Foreground="#7f1d1d" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock Text="Next Steps:" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
+                                        
+                                        <!-- Failure details -->
+                                        <TextBlock x:Name="TxtFailInstructions" Text="- Disable SIP ALG in your router settings.&#x0a;- Configure Port Preservation on your firewall.&#x0a;- Ensure UDP port 5060 and 5090 outbound are not blocked."
+                                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Right Column: Test Suites Progress -->
+                        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                            <Grid Margin="20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Text="Test Status" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,20"/>
+
+                                <!-- Test List with ScrollViewer -->
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,-10,0" Padding="0,0,10,0">
+                                    <StackPanel VerticalAlignment="Top">
+                                        <!-- Test 1: DNS & Resolution -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test1IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test1IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test1Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test1IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test1IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="DNS Domain &amp; Resolution Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test1Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 2: HTTP/HTTPS (Ports 80/443) -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test2IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test2IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test2Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test2IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test2IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="HTTP/HTTPS Outbound Web Probes" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test2Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 3: NTP Subsystem (UDP 123) -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test3IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test3IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test3Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test3IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test3IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="NTP Protocol Port Reachability" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test3Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 4: Agilico STUN Servers -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test4IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test4IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test4Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test4IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test4IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Agilico Cloud STUN Servers Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test4Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 5: Google STUN Servers -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test5IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test5IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test5Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test5IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test5IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Google Backup STUN Servers Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test5Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 6: NAT Routing & Hops Check -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test6IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test6IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test6Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test6IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test6IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="NAT Routing &amp; Gateway Hops Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test6Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 7: NAT Port Translation -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test7IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test7IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test7Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test7IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test7IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="NAT Port Randomness Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test7Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 8: SIP ALG Detection -->
+                                        <Border Padding="0,0,0,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test8IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test8IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test8Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test8IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test8IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="SIP ALG Detection (UDP Port 5060)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test8Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- TAB 2: LOGS -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <Grid Margin="20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Tab Header -->
+                            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                <TextBlock Text="Activity Logs" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                <TextBlock Text="Detailed diagnostic events for IT administrators and technical support." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
+
+                            <!-- Log Content TextBox -->
+                            <TextBox Grid.Row="1" x:Name="TxtLogs" IsReadOnly="True" 
+                                     Background="#0f172a" Foreground="#f8fafc" BorderThickness="0" 
+                                     FontFamily="Consolas" FontSize="12" Padding="12" 
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+
+                            <!-- Log Actions -->
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                                <Button x:Name="BtnClearLog" Style="{StaticResource SecondaryButtonStyle}" Content="Clear Log" Click="BtnClearLog_Click" Margin="0,0,10,0"/>
+                                <Button x:Name="BtnSaveLog" Style="{StaticResource SecondaryButtonStyle}" Content="Save Log File..." Click="BtnSaveLog_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- TAB 3: SETTINGS -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid Margin="20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Header -->
+                                <StackPanel Grid.Row="0" Margin="0,0,0,20">
+                                    <TextBlock Text="Configuration Settings" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Adjust parameters used for the environment connectivity testing." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                </StackPanel>
+
+                                <!-- Settings Fields -->
+                                <StackPanel Grid.Row="1">
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="STUN Server Host/IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtStunServer" Grid.Column="1" Padding="8,6" Text="stun.sipgate.net" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="STUN Server Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtStunPort" Grid.Column="1" Padding="8,6" Text="3478" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Local SIP Port to Test:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtLocalPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SIP ALG Target Server IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtSipAlgServer" Grid.Column="1" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,25">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SIP ALG Target Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtSipAlgPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0">
+                                        <CheckBox x:Name="ChkSimulation" Content="Enable Offline Simulation Mode (Mock Network Responses)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
+
+                <!-- TAB 4: HELP -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="20">
+                                <TextBlock Text="Troubleshooting &amp; Network Guide" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,5"/>
+                                <TextBlock Text="Understand the WebRTC-based architecture and endpoints required for Agilico Connect V5." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,20"/>
+
+                                <TextBlock Text="1. WebRTC &amp; SignalR Signalling" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
+                                <TextBlock Text="Agilico Connect V5 is a WebRTC-based softphone. It does not register via standard SIP registers on port 5060. Instead, it registers to a real-time SignalR Hub (http://v1.softsignalling.eu-j.hp2k.co.uk/Signals) over standard HTTP/HTTPS. Signalling call setup occurs over this channel."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+
+                                <TextBlock Text="2. Port Preservation &amp; NAT Type" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
+                                <TextBlock Text="WebRTC media streams are negotiated via ICE. Direct communication requires Port Preservation and a Full Cone NAT network. If Symmetric NAT is active, the media stream (RTP) may be blocked or forced to route through backup relays, causing audio setup failures or latency. Direct, preserved NAT mappings are highly recommended."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+
+                                <TextBlock Text="3. Media Server &amp; Outbound UDP" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
+                                <TextBlock Text="RTP voice and video media packets are routed to the Agilico Media Server (109.73.119.31). Outbound UDP traffic to this destination server must be allowed across the active RTP media port ranges."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+
+                                <TextBlock Text="4. SIP ALG on Port 5060" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
+                                <TextBlock Text="Even though Agilico Connect uses WebRTC/SignalR for its main signalling, firewalls with SIP ALG enabled often intercept and inspect standard SIP traffic on port 5060, corrupting packets for other local IP deskphones or SIP trunks. You must ensure 'SIP ALG' or 'SIP Helper' is disabled in your router's security configuration."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,20"/>
+
+                                <Border Background="#eff6ff" BorderBrush="#bfdbfe" BorderThickness="1" CornerRadius="6" Padding="15">
+                                    <StackPanel>
+                                        <TextBlock Text="Agilico Connect V5 Hardcoded Endpoint Ports:" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,0,8"/>
+                                        <TextBlock Text="• Signalling Gateway: http://v1.softsignalling.eu-j.hp2k.co.uk/Signals (TCP 80/443)&#x0a;• Media Server IP: 109.73.119.31 (UDP RTP ranges)&#x0a;• Presence Subsystem: http://v3.presence.eu-beta.hp2k.co.uk/Presence (TCP 80/443)&#x0a;• Rooms Subsystem: http://v1.rooms.eu-beta.hp2k.co.uk/Rooms (TCP 80/443)&#x0a;• SIP ALG Check Target: customerportal.hp2k.co.uk (UDP 5060)"
+                                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextDarkBrush}" LineHeight="18"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</Window>

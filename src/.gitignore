@@ -1,0 +1,15 @@
+# Build directories
+bin/
+obj/
+
+# Visual Studio / Rider cache & user settings
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
