@@ -74,10 +74,21 @@
             <!-- Header -->
             <Border Grid.Row="0" Background="{StaticResource HeaderBgBrush}">
                 <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
                     <!-- Title & Version Info -->
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Agilico Connect - Network Diagnostics" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock Text="Environment compatibility checker for Agilico Connect Windows App" Foreground="#94a3b8" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- DND Presence Switch -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtDndStatus" Text="DND: OFF" Foreground="#94a3b8" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ToggleButton x:Name="ToggleDnd" Style="{StaticResource DndToggleStyle}" Click="ToggleDnd_Click"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace AgilicoConnectChecker
 {
@@ -24,7 +25,7 @@ namespace AgilicoConnectChecker
         private CancellationTokenSource? _cts;
 
         // Configuration defaults from official Agilico Network Guidance
-        public string DomainToCheck { get; set; } = "customerportal.hp2k.co.uk";
+        public string DomainToCheck { get; set; } = "hp2k.co.uk";
         public string LocalSipPortStr { get; set; } = "5060";
         public string SipAlgServer { get; set; } = "customerportal.hp2k.co.uk";
         public int SipAlgPort { get; set; } = 5060;
@@ -32,6 +33,14 @@ namespace AgilicoConnectChecker
         public string StunServer { get; set; } = "stun-gb-a.hp2k.co.uk";
         public int StunPort { get; set; } = 3478;
         public bool IsSimulationMode { get; set; } = false;
+
+        // Live settings loaded from softphone registry
+        public string ServerUsername { get; set; } = "";
+        public string ClientToken { get; set; } = "";
+        public int ClientUserId { get; set; } = 0;
+        public string PresenceUrl { get; set; } = "http://v3.presence.eu-beta.hp2k.co.uk/Presence";
+        public string SignallingUrl { get; set; } = "http://v1.softsignalling.eu-j.hp2k.co.uk/Signals";
+        public string RoomsUrl { get; set; } = "http://v1.rooms.eu-beta.hp2k.co.uk/Rooms";
 
         // Google DNS servers mentioned in the guide
         private readonly string[] GoogleDnsServers = { "8.8.8.8", "8.8.4.4" };
@@ -64,17 +73,33 @@ namespace AgilicoConnectChecker
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(@"Software\DMC\WindowsSoftphone\v1\Services");
-                if (key != null)
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\DMC\WindowsSoftphone\v1"))
                 {
-                    // No longer setting specific softsignalling URLs as those are bypassed
-                    // but keeping registry check for presence of configuration
-                    Log("Registry configuration found.");
+                    if (key != null)
+                    {
+                        ServerUsername = key.GetValue("ServerUsername")?.ToString() ?? "";
+                        ClientToken = key.GetValue("ClientToken")?.ToString() ?? "";
+                        if (int.TryParse(key.GetValue("ClientUserID")?.ToString(), out int uId))
+                        {
+                            ClientUserId = uId;
+                        }
+                    }
                 }
+
+                using (var servicesKey = Registry.CurrentUser.OpenSubKey(@"Software\DMC\WindowsSoftphone\v1\Services"))
+                {
+                    if (servicesKey != null)
+                    {
+                        PresenceUrl = servicesKey.GetValue("Presence")?.ToString() ?? PresenceUrl;
+                        SignallingUrl = servicesKey.GetValue("Signalling")?.ToString() ?? SignallingUrl;
+                        RoomsUrl = servicesKey.GetValue("Rooms")?.ToString() ?? RoomsUrl;
+                    }
+                }
+                Log($"Registry configuration loaded. Username: {ServerUsername}, UserID: {ClientUserId}");
             }
-            catch
+            catch (Exception ex)
             {
-                // Fall back silently
+                Log($"Failed to load registry settings: {ex.Message}", true);
             }
         }
 
@@ -882,6 +907,57 @@ namespace AgilicoConnectChecker
             finally
             {
                 client?.Close();
+            }
+        }
+
+        public async Task<bool> SetDndStatusAsync(bool enableDnd)
+        {
+            if (string.IsNullOrEmpty(PresenceUrl) || string.IsNullOrEmpty(ClientToken))
+            {
+                Log("DND Toggle Error: Presence URL or Client Token is not configured.", true);
+                return false;
+            }
+
+            string query = $"?clientToken={ClientToken}&clientUserId={ClientUserId}";
+            string hubUrl = PresenceUrl + query;
+
+            Log($"Connecting to Presence Hub: {PresenceUrl} (UserID: {ClientUserId})...");
+
+            try
+            {
+                var connection = new HubConnectionBuilder()
+                    .WithUrl(hubUrl)
+                    .WithAutomaticReconnect()
+                    .Build();
+
+                await connection.StartAsync();
+                Log("Successfully connected to Presence Hub.");
+
+                string status = enableDnd ? "DoNotDisturb" : "Available";
+                Log($"Invoking SetStatus with value: {status}...");
+                
+                try
+                {
+                    await connection.InvokeAsync("SetStatus", status);
+                }
+                catch (Exception ex) when (ex.Message.Contains("SetStatus") || ex.Message.Contains("not found"))
+                {
+                    Log("SetStatus method not found on hub. Trying SetPresence...", true);
+                    await connection.InvokeAsync("SetPresence", status);
+                }
+
+                Log($"DND status updated on server to: {status}");
+                await connection.StopAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to toggle DND: {ex.Message}", true);
+                if (ex.InnerException != null)
+                {
+                    Log($"Details: {ex.InnerException.Message}", true);
+                }
+                return false;
             }
         }
 
