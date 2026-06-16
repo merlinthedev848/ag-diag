@@ -85,11 +85,7 @@
                         <TextBlock Text="Environment compatibility checker for Agilico Connect Windows App" Foreground="#94a3b8" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
 
-                    <!-- DND Presence Switch -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtDndStatus" Text="DND: OFF" Foreground="#94a3b8" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ToggleButton x:Name="ToggleDnd" Style="{StaticResource DndToggleStyle}" Click="ToggleDnd_Click"/>
-                    </StackPanel>
+
                 </Grid>
             </Border>
 

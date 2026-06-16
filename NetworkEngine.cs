@@ -25,9 +25,9 @@ namespace AgilicoConnectChecker
         private CancellationTokenSource? _cts;
 
         // Configuration defaults from official Agilico Network Guidance
-        public string DomainToCheck { get; set; } = "hp2k.co.uk";
+        public string DomainToCheck { get; set; } = "customerportal.hp2k.co.uk";
         public string LocalSipPortStr { get; set; } = "5060";
-        public string SipAlgServer { get; set; } = "109.73.119.38";
+        public string SipAlgServer { get; set; } = "109.73.119.31";
         public int SipAlgPort { get; set; } = 5060;
         public int LocalSipPort { get; set; } = 5060;
         public string StunServer { get; set; } = "stun-gb-a.hp2k.co.uk";
@@ -490,15 +490,26 @@ namespace AgilicoConnectChecker
             }
             else if (successCount > 0)
             {
-                Log($"Test 4: FAILED. Only {successCount}/{AgilicoStunServers.Length} Agilico STUN servers responded. All must be reachable. Failed: {string.Join(", ", failedServers)}", true);
-                UpdateProgress("Agilico STUN Servers", "Failed", $"Fail - {successCount}/{AgilicoStunServers.Length} online");
-                return false;
+                Log($"Test 4: PASSED WITH WARNINGS. Successful: {successCount}/{AgilicoStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
+                UpdateProgress("Agilico STUN Servers", "Passed", $"Pass - {successCount}/{AgilicoStunServers.Length} online");
+                return true;
             }
             else
             {
-                Log("Test 4: FAILED. All Agilico STUN servers failed to respond. Outbound UDP port 3478 is blocked or routing to Agilico is restricted.", true);
-                UpdateProgress("Agilico STUN Servers", "Failed", "Fail - All servers unreachable");
-                return false;
+                Log("All Agilico STUN servers failed to respond. Querying Google STUN as a backup check to verify port 3478 is open...");
+                var (googleOk, _, _) = await QueryStunServerAsync("stun.l.google.com", 3478, token);
+                if (googleOk)
+                {
+                    Log("Test 4: PASSED WITH WARNING. Agilico STUN servers did not reply (normal if public probes are disabled on server-side), but UDP port 3478 outbound is verified open via Google STUN.");
+                    UpdateProgress("Agilico STUN Servers", "Passed", "Pass - UDP 3478 Open (Google STUN Backup)");
+                    return true;
+                }
+                else
+                {
+                    Log("Test 4: FAILED. Agilico STUN servers and Google STUN backup failed to respond. Outbound UDP port 3478 is likely blocked.", true);
+                    UpdateProgress("Agilico STUN Servers", "Failed", "Fail - STUN query blocked");
+                    return false;
+                }
             }
         }
 
@@ -872,56 +883,6 @@ namespace AgilicoConnectChecker
             }
         }
 
-        public async Task<bool> SetDndStatusAsync(bool enableDnd)
-        {
-            if (string.IsNullOrEmpty(PresenceUrl) || string.IsNullOrEmpty(ClientToken))
-            {
-                Log("DND Toggle Error: Presence URL or Client Token is not configured.", true);
-                return false;
-            }
-
-            string query = $"?clientToken={ClientToken}&clientUserId={ClientUserId}";
-            string hubUrl = PresenceUrl + query;
-
-            Log($"Connecting to Presence Hub: {PresenceUrl} (UserID: {ClientUserId})...");
-
-            try
-            {
-                var connection = new HubConnectionBuilder()
-                    .WithUrl(hubUrl)
-                    .WithAutomaticReconnect()
-                    .Build();
-
-                await connection.StartAsync();
-                Log("Successfully connected to Presence Hub.");
-
-                string status = enableDnd ? "DoNotDisturb" : "Available";
-                Log($"Invoking SetStatus with value: {status}...");
-                
-                try
-                {
-                    await connection.InvokeAsync("SetStatus", status);
-                }
-                catch (Exception ex) when (ex.Message.Contains("SetStatus") || ex.Message.Contains("not found"))
-                {
-                    Log("SetStatus method not found on hub. Trying SetPresence...", true);
-                    await connection.InvokeAsync("SetPresence", status);
-                }
-
-                Log($"DND status updated on server to: {status}");
-                await connection.StopAsync();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log($"Failed to toggle DND: {ex.Message}", true);
-                if (ex.InnerException != null)
-                {
-                    Log($"Details: {ex.InnerException.Message}", true);
-                }
-                return false;
-            }
-        }
 
         #endregion
 

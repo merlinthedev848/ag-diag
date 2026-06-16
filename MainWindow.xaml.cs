@@ -358,27 +358,7 @@ namespace AgilicoConnectChecker
             }
         }
 
-        private async void ToggleDnd_Click(object sender, RoutedEventArgs e)
-        {
-            bool isDnd = ToggleDnd.IsChecked == true;
-            TxtDndStatus.Text = "DND: SENDING...";
-            ToggleDnd.IsEnabled = false;
 
-            bool success = await _engine.SetDndStatusAsync(isDnd);
-
-            if (success)
-            {
-                TxtDndStatus.Text = isDnd ? "DND: ON" : "DND: OFF";
-            }
-            else
-            {
-                TxtDndStatus.Text = "DND: FAILED";
-                // Revert state on failure
-                ToggleDnd.IsChecked = !isDnd;
-            }
-
-            ToggleDnd.IsEnabled = true;
-        }
 
         #endregion
     }
