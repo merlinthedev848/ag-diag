@@ -785,40 +785,34 @@ namespace AgilicoConnectChecker
                 string localIp = GetLocalIpAddress();
                 int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
 
-                string testServer = "64.28.122.110";
-                int testPort = 5060;
-
-                Log($"Resolving SIP ALG reflection server: {testServer}...");
-                var addresses = await Dns.GetHostAddressesAsync(testServer, token);
+                Log($"Resolving SIP ALG reflection server: {SipAlgServer}...");
+                var addresses = await Dns.GetHostAddressesAsync(SipAlgServer, token);
                 if (addresses.Length == 0) throw new Exception("No DNS response from reflection host.");
 
-                var endpoint = new IPEndPoint(addresses[0], testPort);
+                var endpoint = new IPEndPoint(addresses[0], SipAlgPort);
                 Log($"SIP ALG Reflection Endpoint: {endpoint.Address}:{endpoint.Port}");
 
-                // Construct a SIP INVITE request with P-AL-SA header
+                // Construct a SIP OPTIONS request to Kamailio
                 string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
                 string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
                 string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
-                
-                string obfuscatedLocalAddress = $"{localIp}:{localPort}".Replace(".", "*").Replace(":", "#");
 
                 string sipRegister =
-                    $"INVITE sip:server@{testServer} SIP/2.0\r\n" +
+                    $"OPTIONS sip:{SipAlgServer} SIP/2.0\r\n" +
                     $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
                     $"Max-Forwards: 70\r\n" +
-                    $"To: <sip:server@{testServer}>\r\n" +
+                    $"To: <sip:checker@{SipAlgServer}>\r\n" +
                     $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
                     $"Call-ID: {callId}\r\n" +
-                    $"CSeq: 1 INVITE\r\n" +
+                    $"CSeq: 1 OPTIONS\r\n" +
                     $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
                     $"User-Agent: Agilico Connect Checker\r\n" +
-                    $"P-AL-SA: {obfuscatedLocalAddress}\r\n" +
                     $"Content-Length: 0\r\n\r\n";
 
                 byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
 
-                Log($"Sending SIP INVITE payload to {testServer}:{testPort}...");
-                Log($"Embedded obfuscated local address (P-AL-SA): {obfuscatedLocalAddress}");
+                Log($"Sending SIP OPTIONS payload to {SipAlgServer}:{SipAlgPort}...");
+                Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort}");
 
                 await client.SendAsync(registerBytes, registerBytes.Length, endpoint);
 
@@ -830,41 +824,53 @@ namespace AgilicoConnectChecker
                 {
                     var result = await receiveTask;
                     string responseStr = Encoding.UTF8.GetString(result.Buffer);
-                    Log("Received SIP response. Analyzing P-AL-Result header for SIP ALG tampering...");
+                    Log("Received SIP response. Analyzing Via headers for SIP ALG tampering...");
 
                     string[] lines = responseStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                    bool algDetected = false;
-                    bool palResultFound = false;
+                    bool viaMatched = false;
+                    bool viaFound = false;
+                    bool receivedParamFound = false;
 
                     foreach (var line in lines)
                     {
-                        if (line.StartsWith("P-AL-Result:", StringComparison.OrdinalIgnoreCase))
+                        if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
                         {
-                            palResultFound = true;
+                            viaFound = true;
                             Log($"Remote returned {line}");
-                            if (line.Contains("Fail", StringComparison.OrdinalIgnoreCase))
+                            if (line.Contains($"{localIp}:{localPort}"))
                             {
-                                algDetected = true;
+                                viaMatched = true;
+                            }
+                            if (line.Contains("received=", StringComparison.OrdinalIgnoreCase))
+                            {
+                                receivedParamFound = true;
                             }
                         }
                     }
 
-                    if (algDetected)
+                    if (!viaFound)
                     {
-                        Log("Violation: Remote server detected SIP ALG modifications in transit.", true);
-                        Log("This confirms SIP ALG is actively rewriting packets on your router.", true);
+                        Log("Violation: No Via header returned. Unexpected response.", true);
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Invalid Response from Server");
+                        return false;
+                    }
+                    else if (!viaMatched)
+                    {
+                        Log("Violation: The returned Via header does NOT match the local IP/Port sent.", true);
+                        Log("This indicates SIP ALG has modified the SIP headers in transit.", true);
                         UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Header Mangled)");
                         return false;
                     }
-                    else if (!palResultFound)
+                    else if (!receivedParamFound)
                     {
-                        Log("Violation: No P-AL-Result header returned. Unexpected response.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Invalid Response from Test Server");
+                        Log("Violation: The 'received=' parameter is missing from the Via header.", true);
+                        Log("This indicates the router's SIP ALG symmetrically translated the IP to public, causing the server to omit 'received='.", true);
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Symmetric Translation Detected)");
                         return false;
                     }
                     else
                     {
-                        Log("Pass: Remote server confirmed SIP headers are intact. No SIP ALG tampering detected.");
+                        Log("Pass: 'received=' parameter is present and internal IP matches. No SIP ALG tampering detected.");
                         UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
                         return true;
                     }
