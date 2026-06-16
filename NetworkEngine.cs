@@ -798,20 +798,20 @@ namespace AgilicoConnectChecker
                 string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
 
                 string sipRegister =
-                    $"REGISTER sip:{SipAlgServer} SIP/2.0\r\n" +
+                    $"OPTIONS sip:{SipAlgServer} SIP/2.0\r\n" +
                     $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
                     $"Max-Forwards: 70\r\n" +
                     $"To: <sip:checker@{SipAlgServer}>\r\n" +
                     $"From: <sip:checker@{SipAlgServer}>;tag={tag}\r\n" +
                     $"Call-ID: {callId}\r\n" +
-                    $"CSeq: 1 REGISTER\r\n" +
+                    $"CSeq: 1 OPTIONS\r\n" +
                     $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
                     $"User-Agent: Agilico Connect Checker\r\n" +
                     $"Content-Length: 0\r\n\r\n";
 
                 byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
 
-                Log($"Sending SIP REGISTER payload to {SipAlgServer}:{SipAlgPort}...");
+                Log($"Sending SIP OPTIONS payload to {SipAlgServer}:{SipAlgPort}...");
                 Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}");
 
                 await client.SendAsync(registerBytes, registerBytes.Length, endpoint);
@@ -865,7 +865,7 @@ namespace AgilicoConnectChecker
                 }
                 else
                 {
-                    Log("Error: SIP REGISTER request timed out. No response received.", true);
+                    Log("Error: SIP OPTIONS request timed out. No response received.", true);
                     Log("This means UDP port 5060 is being dropped by the firewall, or SIP ALG is silently discarding the packets.", true);
                     UpdateProgress("SIP ALG Detection", "Failed", "Fail - Timeout (UDP 5060 Blocked)");
                     return false;
