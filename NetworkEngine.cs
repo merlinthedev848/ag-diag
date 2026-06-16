@@ -27,7 +27,7 @@ namespace AgilicoConnectChecker
         // Configuration defaults from official Agilico Network Guidance
         public string DomainToCheck { get; set; } = "hp2k.co.uk";
         public string LocalSipPortStr { get; set; } = "5060";
-        public string SipAlgServer { get; set; } = "customerportal.hp2k.co.uk";
+        public string SipAlgServer { get; set; } = "109.73.119.38";
         public int SipAlgPort { get; set; } = 5060;
         public int LocalSipPort { get; set; } = 5060;
         public string StunServer { get; set; } = "stun-gb-a.hp2k.co.uk";
@@ -329,29 +329,9 @@ namespace AgilicoConnectChecker
             bool httpOk = await TestTcpPortAsync(DomainToCheck, 80, token);
             Log($"HTTP TCP 80 to {DomainToCheck}: {(httpOk ? "OPEN" : "BLOCKED")}");
 
-            if (!httpOk)
-            {
-                Log($"Warning: Outbound TCP 80 to {DomainToCheck} failed. Testing backup host google.com...");
-                httpOk = await TestTcpPortAsync("google.com", 80, token);
-                if (httpOk)
-                {
-                    Log($"Success: Outbound TCP 80 to google.com succeeded. HTTP port 80 outbound is open, though {DomainToCheck} is unreachable.");
-                }
-            }
-
             Log($"Testing outbound TCP port 443 (HTTPS) to {DomainToCheck}...");
             bool httpsOk = await TestTcpPortAsync(DomainToCheck, 443, token);
             Log($"HTTPS TCP 443 to {DomainToCheck}: {(httpsOk ? "OPEN" : "BLOCKED")}");
-
-            if (!httpsOk)
-            {
-                Log($"Warning: Outbound TCP 443 to {DomainToCheck} failed. Testing backup host google.com...");
-                httpsOk = await TestTcpPortAsync("google.com", 443, token);
-                if (httpsOk)
-                {
-                    Log($"Success: Outbound TCP 443 to google.com succeeded. HTTPS port 443 outbound is open, though {DomainToCheck} is unreachable.");
-                }
-            }
 
             if (httpOk && httpsOk)
             {
@@ -510,26 +490,15 @@ namespace AgilicoConnectChecker
             }
             else if (successCount > 0)
             {
-                Log($"Test 4: PASSED WITH WARNINGS. Successful: {successCount}/{AgilicoStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
-                UpdateProgress("Agilico STUN Servers", "Passed", $"Pass - {successCount}/{AgilicoStunServers.Length} online");
-                return true;
+                Log($"Test 4: FAILED. Only {successCount}/{AgilicoStunServers.Length} Agilico STUN servers responded. All must be reachable. Failed: {string.Join(", ", failedServers)}", true);
+                UpdateProgress("Agilico STUN Servers", "Failed", $"Fail - {successCount}/{AgilicoStunServers.Length} online");
+                return false;
             }
             else
             {
-                Log("All Agilico STUN servers failed to respond. Querying Google STUN as a backup check to verify port 3478 is open...");
-                var (googleOk, _, _) = await QueryStunServerAsync("stun.l.google.com", 3478, token);
-                if (googleOk)
-                {
-                    Log("Test 4: PASSED WITH WARNING. Agilico STUN servers did not reply (normal if public probes are disabled on server-side), but UDP port 3478 outbound is verified open via Google STUN.");
-                    UpdateProgress("Agilico STUN Servers", "Passed", "Pass - UDP 3478 Open (Google STUN Backup)");
-                    return true;
-                }
-                else
-                {
-                    Log("Test 4: FAILED. Agilico STUN servers and Google STUN backup failed to respond. Outbound UDP port 3478 is likely blocked.", true);
-                    UpdateProgress("Agilico STUN Servers", "Failed", "Fail - STUN query blocked");
-                    return false;
-                }
+                Log("Test 4: FAILED. All Agilico STUN servers failed to respond. Outbound UDP port 3478 is blocked or routing to Agilico is restricted.", true);
+                UpdateProgress("Agilico STUN Servers", "Failed", "Fail - All servers unreachable");
+                return false;
             }
         }
 
@@ -614,9 +583,9 @@ namespace AgilicoConnectChecker
 
             if (privateHops > 1)
             {
-                Log($"Warning: Double NAT detected ({privateHops} private network devices). This violates the Single NAT recommendation in the guide. However, this is treated as a warning and won't fail the checker.");
-                UpdateProgress("NAT Routing & Hops Check", "Passed", $"Warning - Double NAT ({privateHops} hops)");
-                return true; // Pass with warnings
+                Log($"Error: Double NAT detected ({privateHops} private network devices). This violates the Single NAT recommendation in the Agilico Network Guidance.", true);
+                UpdateProgress("NAT Routing & Hops Check", "Failed", $"Fail - Double NAT ({privateHops} hops)");
+                return false;
             }
             else if (privateHops == 0)
             {
@@ -759,10 +728,10 @@ namespace AgilicoConnectChecker
 
             if (mappedPort == localPort)
             {
-                Log("Warning: The public interface NAT port is the same as the local NAT port.");
-                Log("The gateway is preserving the port (not randomizing). The Agilico Network Guidance recommends randomized ports to avoid conflicts, but port preservation will still function correctly for single clients.");
-                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Warning - Port Preserved ({mappedPort})");
-                return true; // Pass with warnings
+                Log("Error: The public interface NAT port is the exact same as the local NAT port.", true);
+                Log("The gateway is preserving the port. The Agilico Network Guidance explicitly requires randomized ports.", true);
+                UpdateProgress("NAT Port Translation (Random Port)", "Failed", $"Fail - Port Preserved ({mappedPort})");
+                return false;
             }
             else
             {
@@ -812,90 +781,83 @@ namespace AgilicoConnectChecker
                 var endpoint = new IPEndPoint(addresses[0], SipAlgPort);
                 Log($"SIP ALG Reflection Endpoint: {endpoint.Address}:{endpoint.Port}");
 
-                // Construct a mock SIP INVITE with randomized call ID
+                // Construct a SIP REGISTER request to detect ALG interference
                 string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
                 string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
                 string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
 
-                string sipInvite =
-                    $"INVITE sip:ping@{SipAlgServer}:{SipAlgPort} SIP/2.0\r\n" +
+                string sipRegister =
+                    $"REGISTER sip:{SipAlgServer} SIP/2.0\r\n" +
                     $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
                     $"Max-Forwards: 70\r\n" +
-                    $"To: <sip:ping@{SipAlgServer}:{SipAlgPort}>\r\n" +
-                    $"From: <sip:checker@hp2k.co.uk>;tag={tag}\r\n" +
+                    $"To: <sip:checker@{SipAlgServer}>\r\n" +
+                    $"From: <sip:checker@{SipAlgServer}>;tag={tag}\r\n" +
                     $"Call-ID: {callId}\r\n" +
-                    $"CSeq: 1 INVITE\r\n" +
+                    $"CSeq: 1 REGISTER\r\n" +
                     $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
                     $"User-Agent: Agilico Connect Checker\r\n" +
                     $"Content-Length: 0\r\n\r\n";
 
-                byte[] inviteBytes = Encoding.UTF8.GetBytes(sipInvite);
-                string localCrc = Crc32.ComputeHex(inviteBytes);
+                byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
 
-                Log($"Local packet checksum (CRC32): {localCrc}");
-                Log("Sending packet to reflection server...");
+                Log($"Sending SIP REGISTER payload to {SipAlgServer}:{SipAlgPort}...");
+                Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}");
 
-                await client.SendAsync(inviteBytes, inviteBytes.Length, endpoint);
+                await client.SendAsync(registerBytes, registerBytes.Length, endpoint);
 
                 var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(2500, token);
+                var delayTask = Task.Delay(3000, token);
 
                 var completed = await Task.WhenAny(receiveTask, delayTask);
                 if (completed == receiveTask)
                 {
                     var result = await receiveTask;
-                    Log("Received response from reflection server.");
-
                     string responseStr = Encoding.UTF8.GetString(result.Buffer);
+                    Log("Received SIP response. Analyzing headers for SIP ALG tampering...");
+
                     string[] lines = responseStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                    string? remoteCrc = null;
+                    bool viaMatched = false;
+                    bool viaFound = false;
 
                     foreach (var line in lines)
                     {
-                        if (line.StartsWith("X-CSREQ:", StringComparison.OrdinalIgnoreCase))
+                        if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
                         {
-                            remoteCrc = line.Substring(8).Trim();
-                            break;
+                            viaFound = true;
+                            Log($"Remote returned Via: {line}");
+                            if (line.Contains($"{localIp}:{localPort}"))
+                            {
+                                viaMatched = true;
+                            }
                         }
                     }
 
-                    if (remoteCrc == null)
+                    if (viaFound && !viaMatched)
                     {
-                        Log("Error: Reflection server responded, but did not include the X-CSREQ header.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Reflector header missing");
+                        Log("Violation: The returned Via header does NOT match the local IP/Port sent.", true);
+                        Log("This indicates SIP ALG has modified the SIP headers in transit.", true);
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Header Mangled)");
                         return false;
                     }
-
-                    Log($"Remote checksum returned: {remoteCrc}");
-
-                    if (remoteCrc.Equals(localCrc, StringComparison.OrdinalIgnoreCase))
+                    else if (responseStr.Contains("Server: SIP ALG") || responseStr.Contains("ALG"))
                     {
-                        Log("Pass: Checksums match! No intermediate modification or ALG header mangling detected.");
-                        UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
-                        return true;
+                        Log("Violation: Response identifies as originating from a SIP ALG.", true);
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Responded Directly");
+                        return false;
                     }
                     else
                     {
-                        Log("Violation: Checksums MISMATCH! An intermediate firewall or router modified the SIP headers in transit.", true);
-                        Log("This confirms SIP ALG (SIP Application Layer Gateway) is active and mangling packets.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled");
-                        return false;
+                        Log("Pass: Response received and headers are intact. No SIP ALG tampering detected.");
+                        UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
+                        return true;
                     }
                 }
                 else
                 {
-                    if (SipAlgServer == "customerportal.hp2k.co.uk" && SipAlgPort == 5060)
-                    {
-                        Log("Warning: Timeout waiting for reflection response. (Note: The default Agilico portal does not run a UDP SIP reflection server, so this timeout is expected and does not indicate a network issue).");
-                        UpdateProgress("SIP ALG Detection", "Passed", "Pass - Timeout (No Reflector Active)");
-                        return true;
-                    }
-                    else
-                    {
-                        Log("Warning: Timeout waiting for reflection response from custom server. Ensure the reflection server is online and UDP 5060 outbound/inbound is permitted.");
-                        UpdateProgress("SIP ALG Detection", "Passed", "Pass - Timeout (Custom Reflector Offline)");
-                        return true;
-                    }
+                    Log("Error: SIP REGISTER request timed out. No response received.", true);
+                    Log("This means UDP port 5060 is being dropped by the firewall, or SIP ALG is silently discarding the packets.", true);
+                    UpdateProgress("SIP ALG Detection", "Failed", "Fail - Timeout (UDP 5060 Blocked)");
+                    return false;
                 }
             }
             catch (Exception ex)
