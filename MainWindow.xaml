@@ -49,14 +49,17 @@
                     <Button x:Name="BtnTraceroute" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconTraceroute}" Click="BtnTraceroute_Click" Visibility="Collapsed">
                         <TextBlock Text="Traceroute" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
+                    <Button x:Name="BtnPcap" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnPcap_Click" Visibility="Collapsed">
+                        <TextBlock Text="PCAP" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
                     <Button x:Name="BtnLogs" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnLogs_Click" Visibility="Collapsed">
                         <TextBlock Text="Logs" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
-                    <Button x:Name="BtnSettings" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconSettings}" Click="BtnSettings_Click" Visibility="Collapsed">
-                        <TextBlock Text="Settings" FontSize="11" FontWeight="SemiBold"/>
-                    </Button>
                     <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
                         <TextBlock Text="Results" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnSettings" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconSettings}" Click="BtnSettings_Click" Visibility="Collapsed">
+                        <TextBlock Text="Settings" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                 </StackPanel>
 
@@ -184,6 +187,8 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
                                         <!-- Status -->
@@ -203,8 +208,16 @@
                                         <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TxtLocalGateway" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
 
                                         <!-- DNS -->
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="DNS Servers:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
-                                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtLocalDns" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="DNS Servers:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtLocalDns" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+
+                                        <!-- Download Speed -->
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Download Speed:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="TxtLocalDownloadSpeed" Text="Not Tested" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"/>
+
+                                        <!-- Upload Speed -->
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Upload Speed:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="1" x:Name="TxtLocalUploadSpeed" Text="Not Tested" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,0"/>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -479,7 +492,7 @@
                                         </Border>
 
                                         <!-- Test 8: SIP ALG Detection -->
-                                        <Border Padding="0,0,0,5">
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -707,7 +720,6 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -750,41 +762,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- Speed Test Panel -->
-                        <Border x:Name="PanelSpeedTest" Grid.Row="1" Style="{StaticResource CardStyle}" Margin="10,0,10,10" Visibility="Collapsed">
-                            <Grid Margin="20">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <Path x:Name="SpeedTestSpinner" Grid.Column="0" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentGreenBrush}" Width="24" Height="24" Stretch="Uniform" RenderTransformOrigin="0.5,0.5" Margin="0,0,15,0">
-                                    <Path.RenderTransform>
-                                        <RotateTransform Angle="0"/>
-                                    </Path.RenderTransform>
-                                    <Path.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetName="SpeedTestSpinner" Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Path.Triggers>
-                                </Path>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="TxtSpeedTestStatus" Text="Running Connection Speed Test prior to Ping Tracking..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                    <TextBlock x:Name="TxtSpeedTestDetails" Text="Measuring download/upload speed to/from Agilico customer portal..." FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
-                                </StackPanel>
-
-                                <TextBlock x:Name="TxtSpeedTestResults" Grid.Column="2" Text="" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" VerticalAlignment="Center"/>
-                            </Grid>
-                        </Border>
-
                         <!-- Metrics Row -->
-                        <Grid Grid.Row="2" Margin="0,0,0,0">
+                        <Grid Grid.Row="1" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -835,7 +814,7 @@
                         </Grid>
 
                         <!-- Graph and Table area -->
-                        <Grid Grid.Row="3">
+                        <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="2*"/>
                                 <ColumnDefinition Width="1*"/>
@@ -918,109 +897,6 @@
                     </Grid>
                 </TabItem>
 
-                <!-- TAB 3: LOGS -->
-                <TabItem>
-                    <Border Style="{StaticResource CardStyle}">
-                        <Grid Margin="20">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <!-- Tab Header -->
-                            <StackPanel Grid.Row="0" Margin="0,0,0,15">
-                                <TextBlock Text="Activity Logs" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
-                                <TextBlock Text="Detailed diagnostic events for IT administrators and technical support." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                            </StackPanel>
-
-                            <!-- Log Content TextBox -->
-                            <TextBox Grid.Row="1" x:Name="TxtLogs" IsReadOnly="True" 
-                                     Background="#0f172a" Foreground="#f8fafc" BorderThickness="0" 
-                                     FontFamily="Consolas" FontSize="12" Padding="12" 
-                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
-
-                            <!-- Log Actions -->
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                                <Button x:Name="BtnClearLog" Style="{StaticResource SecondaryButtonStyle}" Content="Clear Log" Click="BtnClearLog_Click" Margin="0,0,10,0"/>
-                                <Button x:Name="BtnSaveLog" Style="{StaticResource SecondaryButtonStyle}" Content="Save Log File..." Click="BtnSaveLog_Click"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </TabItem>
-
-                <!-- TAB 3: SETTINGS -->
-                <TabItem>
-                    <Border Style="{StaticResource CardStyle}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <Grid Margin="20">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Header -->
-                                <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                                    <TextBlock Text="Configuration Settings" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
-                                    <TextBlock Text="Adjust parameters used for the environment connectivity testing." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                                </StackPanel>
-
-                                <!-- Settings Fields -->
-                                <StackPanel Grid.Row="1">
-                                    <Grid Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="STUN Server Host/IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtStunServer" Grid.Column="1" Padding="8,6" Text="stun.sipgate.net" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="STUN Server Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtStunPort" Grid.Column="1" Padding="8,6" Text="3478" BorderBrush="{StaticResource BorderLightBrush}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Local SIP Port to Test:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtLocalPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="SIP ALG Target Server IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtSipAlgServer" Grid.Column="1" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,25">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="SIP ALG Target Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtSipAlgPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
-                                    </Grid>
-
-                                    <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0">
-                                        <CheckBox x:Name="ChkSimulation" Content="Enable Offline Simulation Mode (Mock Network Responses)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                    </Border>
-                                </StackPanel>
-                            </Grid>
-                        </ScrollViewer>
-                    </Border>
-                </TabItem>
-
                 <!-- TAB 5: TRACEROUTE -->
                 <TabItem>
                     <Border Style="{StaticResource CardStyle}">
@@ -1088,6 +964,133 @@
                                     <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="100" />
                                 </DataGrid.Columns>
                             </DataGrid>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- TAB 4: PCAP -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <Grid Margin="20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Tab Header & Description -->
+                            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                <TextBlock Text="Packet Capture Service (PCAP)" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                <TextBlock Text="The packet capture utility monitors diagnostic network protocols in real-time to analyze compatibility and identify communication bottlenecks." 
+                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <!-- Content Area explaining PCAP and showing stats -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3*"/>
+                                    <ColumnDefinition Width="2*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Details & Protocols Card -->
+                                <Border Grid.Column="0" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,1,0" Padding="0,0,20,0" Margin="0,0,20,0">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel>
+                                            <TextBlock Text="How Packet Capture Works" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="When packet capture is started, the utility monitors network traffic. It is capable of capturing raw IP packets on the network interface. You can filter the capture to a specific host IP address, or capture the entire network interface." 
+                                                       TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+
+                                            <TextBlock Text="Monitored Protocols &amp; Ports:" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,8"/>
+                                            <TextBlock Text="• DNS (UDP 53): Domain resolution for service addresses.&#x0a;• HTTP/HTTPS (TCP 80/443): API probes and connectivity tests.&#x0a;• NTP (UDP 123): Time synchronization verification.&#x0a;• STUN (UDP 3478): NAT discovery and firewall binding probes.&#x0a;• SIP ALG (UDP 5060): Session initiation protocol tampering detection.&#x0a;• RTP (UDP Dynamic): Media stream quality simulation (jitter &amp; loss)."
+                                                       TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+                                            
+                                            <TextBlock Text="Use the PCAP log file to diagnose packet drop, port rewriting, or deep packet inspection (DPI) interference with your IT department or firewalls administrator." 
+                                                       TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" FontStyle="Italic" LineHeight="18"/>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Border>
+
+                                <!-- Real-time Stats & Controls Card -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="10,0,0,0">
+                                    <TextBlock Text="Packet Capture Control" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,15"/>
+
+                                    <!-- Filter Input -->
+                                    <StackPanel Margin="0,0,0,15">
+                                        <TextBlock Text="Filter IP Address (Optional):" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtPcapFilterIp" Padding="8,6" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                        <TextBlock Text="Leave blank to capture all network traffic." FontSize="10" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Start/Stop Capture Button -->
+                                    <Button x:Name="BtnTogglePcap" Style="{StaticResource ActionButtonStyle}" Click="BtnTogglePcap_Click" Margin="0,0,0,15">
+                                        <TextBlock x:Name="TxtTogglePcap" Text="START CAPTURE"/>
+                                    </Button>
+
+                                    <!-- Download PCAP Button -->
+                                    <Button x:Name="BtnDownloadPcapLog" Style="{StaticResource SecondaryButtonStyle}" Click="BtnDownloadPcap_Click" Visibility="Collapsed" Margin="0,0,0,20">
+                                        <TextBlock Text="DOWNLOAD PCAP FILE"/>
+                                    </Button>
+
+                                    <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0">
+                                        <TextBlock Text="Capture Metrics" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+                                    </Border>
+
+                                    <!-- Captured Packets -->
+                                    <Border Background="#f8fafc" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                                        <Grid>
+                                            <TextBlock Text="Captured Packets:" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtPcapPackets" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentBlueBrush}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Data Size -->
+                                    <Border Background="#f8fafc" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                                        <Grid>
+                                            <TextBlock Text="Data Size:" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtPcapSize" Text="0 Bytes" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Recording Duration -->
+                                    <Border Background="#f8fafc" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,0">
+                                        <Grid>
+                                            <TextBlock Text="Duration:" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TxtPcapDuration" Text="0.0s" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- TAB 3: LOGS -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <Grid Margin="20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Tab Header -->
+                            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                <TextBlock Text="Activity Logs" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                <TextBlock Text="Detailed diagnostic events for IT administrators and technical support." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
+
+                            <!-- Log Content TextBox -->
+                            <TextBox Grid.Row="1" x:Name="TxtLogs" IsReadOnly="True" 
+                                     Background="#0f172a" Foreground="#f8fafc" BorderThickness="0" 
+                                     FontFamily="Consolas" FontSize="12" Padding="12" 
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+
+                            <!-- Log Actions -->
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                                <Button x:Name="BtnClearLog" Style="{StaticResource SecondaryButtonStyle}" Content="Clear Log" Click="BtnClearLog_Click" Margin="0,0,10,0"/>
+                                <Button x:Name="BtnSaveLog" Style="{StaticResource SecondaryButtonStyle}" Content="Save Log File..." Click="BtnSaveLog_Click"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </TabItem>
@@ -1267,6 +1270,78 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
+                
+                <!-- TAB 7: SETTINGS -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid Margin="20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Header -->
+                                <StackPanel Grid.Row="0" Margin="0,0,0,20">
+                                    <TextBlock Text="Configuration Settings" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Adjust parameters used for the environment connectivity testing." FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                </StackPanel>
+
+                                <!-- Settings Fields -->
+                                <StackPanel Grid.Row="1">
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="STUN Server Host/IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtStunServer" Grid.Column="1" Padding="8,6" Text="stun.sipgate.net" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="STUN Server Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtStunPort" Grid.Column="1" Padding="8,6" Text="3478" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Local SIP Port to Test:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtLocalPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SIP ALG Target Server IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtSipAlgServer" Grid.Column="1" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,25">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SIP ALG Target Port:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtSipAlgPort" Grid.Column="1" Padding="8,6" Text="5060" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                    </Grid>
+
+                                    <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0">
+                                        <CheckBox x:Name="ChkSimulation" Content="Enable Offline Simulation Mode (Mock Network Responses)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
                         </ScrollViewer>
                     </Border>
                 </TabItem>

@@ -25,6 +25,8 @@ namespace AgilicoConnectChecker
         private CancellationTokenSource? _traceCts;
         private readonly ObservableCollection<TraceHop> _traceHops = new();
         private CancellationTokenSource? _speedTestCts;
+        private readonly System.Windows.Threading.DispatcherTimer _pcapTimer;
+        private bool _isManualCapturing = false;
 
         public MainWindow()
         {
@@ -34,6 +36,10 @@ namespace AgilicoConnectChecker
             _lanDevices = new ObservableCollection<LanDevice>();
             _pingTracker = new PingTracker();
             _pingLogs = new ObservableCollection<PingResult>();
+            
+            _pcapTimer = new System.Windows.Threading.DispatcherTimer();
+            _pcapTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _pcapTimer.Tick += PcapTimer_Tick;
             
             // Wire up engine events
             _engine.OnLog += Engine_OnLog;
@@ -48,7 +54,7 @@ namespace AgilicoConnectChecker
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnLogs, BtnSettings, BtnHelp };
+            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnPcap, BtnLogs, BtnHelp, BtnSettings };
             GridLanDevices.ItemsSource = _lanDevices;
             GridPingLogs.ItemsSource = _pingLogs;
             GridTraceHops.ItemsSource = _traceHops;
@@ -70,6 +76,9 @@ namespace AgilicoConnectChecker
 
             // Trigger firewall permission prompt on load so it doesn't block running tests
             _engine.TriggerFirewallPrompt();
+
+            // Run connection speed test at startup
+            _ = RunStartupSpeedTestAsync();
         }
 
         #region Navigation
@@ -86,6 +95,17 @@ namespace AgilicoConnectChecker
 
             activeButton.Background = (Brush)FindResource("SidebarItemHoverBrush");
             SetStripeVisibility(activeButton, Visibility.Visible);
+
+            // Manage PCAP stats real-time polling
+            if (index == 4)
+            {
+                UpdatePcapStats();
+                _pcapTimer.Start();
+            }
+            else
+            {
+                _pcapTimer.Stop();
+            }
         }
 
         private void SetStripeVisibility(Button button, Visibility visibility)
@@ -102,17 +122,21 @@ namespace AgilicoConnectChecker
         private void BtnDashboard_Click(object sender, RoutedEventArgs e) => SelectTab(0, BtnDashboard);
         private void BtnNetScan_Click(object sender, RoutedEventArgs e) => SelectTab(1, BtnNetScan);
         private void BtnPingTrack_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnPingTrack);
-        private void BtnTraceroute_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnTraceroute);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnSettings);
+        private void BtnTraceroute_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnTraceroute);
+        private void BtnPcap_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnPcap);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnLogs);
         private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnHelp);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnSettings);
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _engine.Cancel();
             _pingTracker.Stop();
+            _pcapTimer.Stop();
             _lanScanCts?.Cancel();
             _lanScanCts?.Dispose();
+            _speedTestCts?.Cancel();
+            _speedTestCts?.Dispose();
         }
 
         #endregion
@@ -493,7 +517,7 @@ namespace AgilicoConnectChecker
             @"^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$",
             System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        private async void BtnStartPingTrack_Click(object sender, RoutedEventArgs e)
+        private void BtnStartPingTrack_Click(object sender, RoutedEventArgs e)
         {
             var target = TxtPingTarget.Text.Trim();
             if (string.IsNullOrWhiteSpace(target))
@@ -529,47 +553,14 @@ namespace AgilicoConnectChecker
             _pingLogs.Clear();
             ResetPingUIStats();
 
-            // Run Speed Test
-            PanelSpeedTest.Visibility = Visibility.Visible;
-            SpeedTestSpinner.Visibility = Visibility.Visible;
-            TxtSpeedTestStatus.Text = "Running Connection Speed Test prior to Ping Tracking...";
-            TxtSpeedTestResults.Text = "";
-
-            try
-            {
-                _speedTestCts?.Cancel();
-                _speedTestCts?.Dispose();
-                _speedTestCts = new CancellationTokenSource();
-                var token = _speedTestCts.Token;
-
-                var (downloadMbps, uploadMbps) = await RunSpeedTestAsync(token);
-                
-                TxtSpeedTestResults.Text = $"Download: {downloadMbps} Mbps  |  Upload: {uploadMbps} Mbps";
-                TxtSpeedTestStatus.Text = "Speed Test Completed";
-            }
-            catch (Exception)
-            {
-                TxtSpeedTestResults.Text = "Failed/Skipped";
-                TxtSpeedTestStatus.Text = "Speed Test Cancelled or Failed";
-            }
-            finally
-            {
-                SpeedTestSpinner.Visibility = Visibility.Collapsed;
-            }
-
             // Start Ping Tracker
             _pingTracker.Start(target, intervalMs);
         }
 
         private void BtnStopPingTrack_Click(object sender, RoutedEventArgs e)
         {
-            _speedTestCts?.Cancel();
-            _speedTestCts?.Dispose();
-            _speedTestCts = null;
-
             _pingTracker.Stop();
             RestorePingControlUI();
-            PanelSpeedTest.Visibility = Visibility.Collapsed;
         }
 
         private void RestorePingControlUI()
@@ -1056,6 +1047,7 @@ namespace AgilicoConnectChecker
                 BtnNetScan.Visibility = Visibility.Collapsed;
                 BtnPingTrack.Visibility = Visibility.Collapsed;
                 BtnTraceroute.Visibility = Visibility.Collapsed;
+                BtnPcap.Visibility = Visibility.Collapsed;
                 BtnLogs.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
                 
@@ -1117,6 +1109,7 @@ namespace AgilicoConnectChecker
                 BtnNetScan.Visibility = Visibility.Visible;
                 BtnPingTrack.Visibility = Visibility.Visible;
                 BtnTraceroute.Visibility = Visibility.Visible;
+                BtnPcap.Visibility = Visibility.Visible;
                 BtnLogs.Visibility = Visibility.Visible;
                 BtnSettings.Visibility = Visibility.Visible;
                 MessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1124,6 +1117,101 @@ namespace AgilicoConnectChecker
         }
 
         #endregion
+
+        private void BtnTogglePcap_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isManualCapturing)
+            {
+                // Stop Capture
+                _engine.Pcap.Stop();
+                _isManualCapturing = false;
+                TxtTogglePcap.Text = "START CAPTURE";
+                BtnTogglePcap.Background = (Brush)FindResource("AccentGreenBrush");
+                TxtPcapFilterIp.IsEnabled = true;
+
+                // Show download button if packets were captured
+                if (_engine.Pcap.PacketCount > 0)
+                {
+                    BtnDownloadPcapLog.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    BtnDownloadPcapLog.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                // Start Capture
+                string filterIp = TxtPcapFilterIp.Text.Trim();
+                if (!string.IsNullOrEmpty(filterIp))
+                {
+                    // Validate IP address
+                    if (!System.Net.IPAddress.TryParse(filterIp, out _))
+                    {
+                        MessageBox.Show("Please enter a valid IP address to filter by, or leave it blank.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+
+                _engine.Pcap.Start(string.IsNullOrEmpty(filterIp) ? null : filterIp);
+                _isManualCapturing = true;
+                TxtTogglePcap.Text = "STOP CAPTURE";
+                BtnTogglePcap.Background = (Brush)FindResource("AccentRedBrush");
+                TxtPcapFilterIp.IsEnabled = false;
+                BtnDownloadPcapLog.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void PcapTimer_Tick(object? sender, EventArgs e)
+        {
+            UpdatePcapStats();
+        }
+
+        private void UpdatePcapStats()
+        {
+            var pcap = _engine.Pcap;
+            TxtPcapPackets.Text = pcap.PacketCount.ToString("N0");
+            
+            long bytes = pcap.TotalBytes;
+            if (bytes < 1024)
+                TxtPcapSize.Text = $"{bytes} Bytes";
+            else if (bytes < 1024 * 1024)
+                TxtPcapSize.Text = $"{(bytes / 1024.0):F1} KB";
+            else
+                TxtPcapSize.Text = $"{(bytes / (1024.0 * 1024.0)):F2} MB";
+
+            TxtPcapDuration.Text = $"{pcap.DurationSeconds:F1}s";
+        }
+
+        private async Task RunStartupSpeedTestAsync()
+        {
+            TxtLocalDownloadSpeed.Text = "Testing...";
+            TxtLocalUploadSpeed.Text = "Testing...";
+            TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextMutedBrush");
+            TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextMutedBrush");
+
+            try
+            {
+                _speedTestCts?.Cancel();
+                _speedTestCts?.Dispose();
+                _speedTestCts = new CancellationTokenSource();
+                var token = _speedTestCts.Token;
+
+                var (downloadMbps, uploadMbps) = await RunSpeedTestAsync(token);
+
+                TxtLocalDownloadSpeed.Text = $"{downloadMbps} Mbps";
+                TxtLocalUploadSpeed.Text = $"{uploadMbps} Mbps";
+                TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+                TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+            }
+            catch (Exception)
+            {
+                TxtLocalDownloadSpeed.Text = "Skipped/Failed";
+                TxtLocalUploadSpeed.Text = "Skipped/Failed";
+                TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
+                TxtLocalUploadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
+            }
+        }
     }
 
     public class TraceHop
