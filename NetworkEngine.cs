@@ -608,7 +608,7 @@ namespace AgilicoConnectChecker
                 // Scoring System
                 int totalPossible = 0;
                 int totalEarned = 0;
-                int[] weights = new int[] { 15, 15, 5, 15, 5, 5, 5, 15, 15, 10 };
+                int[] weights = new int[] { 15, 15, 5, 0, 5, 5, 5, 15, 15, 10 };
                 bool[] results = new bool[] { dnsPass, httpPass, ntpPass, agilicoStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, signalRPass };
 
                 for (int i = 0; i < 10; i++)
@@ -1015,24 +1015,23 @@ namespace AgilicoConnectChecker
                 }
             }
 
-            if (successCount == AgilicoStunServers.Length)
-            {
-                Log("Test 4: PASSED. All Agilico STUN servers responded successfully.");
-                UpdateProgress("Agilico STUN Servers", "Passed", "Pass - All 4 servers online");
+                // Agilico STUN is informational only. Always return true to avoid point deduction.
+                if (successCount == AgilicoStunServers.Length)
+                {
+                    Log("Test 4: PASSED. All Agilico STUN servers responded successfully.");
+                    UpdateProgress("Agilico STUN Servers", "Passed", "Pass - All 4 servers online");
+                }
+                else if (successCount > 0)
+                {
+                    Log($"Test 4: Successful: {successCount}/{AgilicoStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
+                    UpdateProgress("Agilico STUN Servers", "Passed", $"Pass - {successCount}/{AgilicoStunServers.Length} online");
+                }
+                else
+                {
+                    Log("Test 4: INFO. All Agilico STUN servers failed to respond (expected due to server-side firewall). Egress is verified via Google Backup STUN.");
+                    UpdateProgress("Agilico STUN Servers", "Passed", "Informational - Agilico STUN unreachable (firewalled)");
+                }
                 return true;
-            }
-            else if (successCount > 0)
-            {
-                Log($"Test 4: PASSED WITH WARNINGS. Successful: {successCount}/{AgilicoStunServers.Length}. Failed: {string.Join(", ", failedServers)}");
-                UpdateProgress("Agilico STUN Servers", "Passed", $"Pass - {successCount}/{AgilicoStunServers.Length} online");
-                return true;
-            }
-            else
-            {
-                Log("Test 4: FAILED. All Agilico STUN servers failed to respond. Outbound UDP port 3478 may be blocked, or Agilico STUN servers are unreachable.", true);
-                UpdateProgress("Agilico STUN Servers", "Failed", "Fail - Agilico STUN servers unreachable");
-                return false;
-            }
         }
 
         private async Task<bool> RunGoogleStunTestsAsync(CancellationToken token)
@@ -1596,14 +1595,14 @@ namespace AgilicoConnectChecker
             // Path C: Google STUN High Port (UDP 19302)
             var pathC = await RunSingleRtpPathCheckAsync("Path C (Google STUN 19302)", "stun.l.google.com", 19302, "STUN", token);
             
-            bool allPassed = pathA.pass && pathB.pass && pathC.pass;
+            bool allPassed = pathA.pass && pathC.pass; // Exclude Path B because Agilico STUN is firewalled
             
-            double maxLoss = Math.Max(pathA.loss, Math.Max(pathB.loss, pathC.loss));
-            double maxJitter = Math.Max(pathA.jitter, Math.Max(pathB.jitter, pathC.jitter));
+            double maxLoss = Math.Max(pathA.loss, pathC.loss);
+            double maxJitter = Math.Max(pathA.jitter, pathC.jitter);
 
             Log("RTP Quality Summary:");
             Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
-            Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")}");
+            Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")} (Informational only)");
             Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.1}ms, RTT={pathC.avgRtt:0.1}ms - {(pathC.pass ? "PASS" : "FAIL")}");
 
             if (allPassed)
@@ -1616,12 +1615,11 @@ namespace AgilicoConnectChecker
             {
                 string reasons = "";
                 if (!pathA.pass) reasons += "SIP 5060 failure; ";
-                if (!pathB.pass) reasons += "Agilico STUN 3478 failure; ";
                 if (!pathC.pass) reasons += "Google STUN 19302 failure; ";
 
                 Log($"Violation: Media stream checks failed: {reasons.TrimEnd(';', ' ')}", true);
                 
-                string detailMsg = $"Fail - Media path issues: • SIP 5060: {(pathA.pass ? "OK" : $"{pathA.loss:0}% loss")} • Agilico STUN: {(pathB.pass ? "OK" : "No response")} • Google STUN: {(pathC.pass ? "OK" : "No response")}";
+                string detailMsg = $"Fail - Media path issues: • SIP 5060: {(pathA.pass ? "OK" : $"{pathA.loss:0}% loss")} • Google STUN: {(pathC.pass ? "OK" : "No response")}";
                 UpdateProgress("RTP Jitter/Loss Check", "Failed", detailMsg);
                 return false;
             }

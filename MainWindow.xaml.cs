@@ -390,6 +390,7 @@ namespace AgilicoConnectChecker
                 bool anyFailed = false;
                 for (int i = 0; i < testDetails.Length; i++)
                 {
+                    if (i == 3) continue; // Skip Test 4 (Agilico STUN is hidden and informational only)
                     bool failed = testDetails[i].Text.Contains("Fail");
                     resultCards[i].Visibility = failed ? Visibility.Visible : Visibility.Collapsed;
                     if (failed)
