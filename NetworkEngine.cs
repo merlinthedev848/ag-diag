@@ -290,6 +290,7 @@ namespace AgilicoConnectChecker
             public string SubnetMask { get; set; } = "-";
             public string Gateway { get; set; } = "-";
             public string DnsServers { get; set; } = "-";
+            public string Vlan { get; set; } = "Untagged";
             public bool IsOk { get; set; } = false;
         }
 
@@ -343,6 +344,7 @@ namespace AgilicoConnectChecker
                         info.SubnetMask = maskStr;
                         info.Gateway = string.Join(", ", gateways);
                         info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
+                        info.Vlan = GetInterfaceVlanId(ni.Id);
                         info.IsOk = true;
                         return info; 
                     }
@@ -357,11 +359,57 @@ namespace AgilicoConnectChecker
                         info.SubnetMask = maskStr;
                         info.Gateway = gateways.Count > 0 ? string.Join(", ", gateways) : "None";
                         info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
+                        info.Vlan = GetInterfaceVlanId(ni.Id);
                     }
                 }
             }
             catch { }
             return info;
+        }
+
+        private static string GetInterfaceVlanId(string interfaceGuid)
+        {
+            try
+            {
+                using (var classKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}"))
+                {
+                    if (classKey != null)
+                    {
+                        string cleanGuid = interfaceGuid.Trim('{', '}');
+                        foreach (var subKeyName in classKey.GetSubKeyNames())
+                        {
+                            if (subKeyName.Length != 4) continue;
+                            using (var subKey = classKey.OpenSubKey(subKeyName))
+                            {
+                                if (subKey == null) continue;
+                                var instanceId = subKey.GetValue("NetCfgInstanceId") as string;
+                                if (instanceId != null && string.Equals(instanceId.Trim('{', '}'), cleanGuid, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    string[] vlanValueNames = { "VlanID", "*VlanID", "VLAN_ID", "VlanId", "VLANID" };
+                                    foreach (var valName in vlanValueNames)
+                                    {
+                                        var val = subKey.GetValue(valName);
+                                        if (val != null)
+                                        {
+                                            string vlanStr = val.ToString()?.Trim() ?? "";
+                                            if (!string.IsNullOrEmpty(vlanStr) && vlanStr != "0" && vlanStr != "1")
+                                            {
+                                                return vlanStr;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Silently ignore registry access permissions issues or other exceptions
+            }
+            return "Untagged";
         }
 
         public bool CheckLocalConnectivityBeforeTest(string testName)
