@@ -141,8 +141,6 @@
                                                 <TextBlock Text="CANCEL TEST"/>
                                             </StackPanel>
                                         </Button>
-
-                                        <Button x:Name="BtnDownloadPcap" Style="{StaticResource SecondaryButtonStyle}" Click="BtnDownloadPcap_Click" Content="Download PCAP" Visibility="Collapsed" Padding="15,10"/>
                                     </StackPanel>
 
                                     <!-- Progress Bar / Spinner -->

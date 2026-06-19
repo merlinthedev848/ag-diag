@@ -201,7 +201,6 @@ namespace AgilicoConnectChecker
             // Update Controls UI
             BtnStart.Visibility = Visibility.Collapsed;
             BtnStop.Visibility = Visibility.Visible;
-            BtnDownloadPcap.Visibility = Visibility.Collapsed;
             ProgressArea.Visibility = Visibility.Visible;
             TxtProgressStatus.Text = "Initializing...";
             
@@ -377,7 +376,6 @@ namespace AgilicoConnectChecker
             Dispatcher.Invoke(() =>
             {
                 RestoreControlButtons();
-                BtnDownloadPcap.Visibility = Visibility.Visible;
 
                 PanelSummaryDefault.Visibility = Visibility.Collapsed;
 
