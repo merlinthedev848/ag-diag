@@ -12,6 +12,12 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
+    <Authors>Chris Kendall</Authors>
+    <Company>Agilico</Company>
+    <Product>Agilico Connect Checker</Product>
+    <Copyright>Copyright © 2026 Agilico. All rights reserved.</Copyright>
+    <Description>Environment compatibility checker for Agilico Connect Windows App.</Description>
   </PropertyGroup>
 
   <ItemGroup>
