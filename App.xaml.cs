@@ -45,7 +45,7 @@ public partial class App : Application
             }
 
             Console.WriteLine();
-            Console.WriteLine("Agilico Connect Checker - Silent Mode Started");
+            Console.WriteLine("Agilico Network Diagnostic Tool - Silent Mode Started");
 
             var engine = new NetworkEngine();
             

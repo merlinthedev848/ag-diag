@@ -58,6 +58,8 @@ namespace AgilicoConnectChecker
 
         public void Start(bool startRawSniffer = false, string? ipFilter = null)
         {
+            Stop();
+
             lock (_lock)
             {
                 _outputStream.SetLength(0);
@@ -307,14 +309,7 @@ namespace AgilicoConnectChecker
                     var socket = _rawSocket;
                     if (socket == null) break;
 
-                    var task = socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None);
-                    var completedTask = await Task.WhenAny(task, Task.Delay(-1, token));
-                    if (completedTask != task)
-                    {
-                        break; // Cancelled
-                    }
-
-                    int bytesReceived = await task;
+                    int bytesReceived = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, token);
                     if (bytesReceived <= 0) continue;
 
                     byte[] ipPacket = new byte[bytesReceived];

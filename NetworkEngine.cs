@@ -459,9 +459,8 @@ namespace AgilicoConnectChecker
         {
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
-            Pcap.Start();
 
-            Log("Starting Agilico Connect Checker diagnostics...");
+            Log("Starting Agilico Network Diagnostic Tool...");
             Log("=================================================================");
             Log($"Timestamp:         {DateTime.Now}");
             Log($"OS Version:        {Environment.OSVersion}");
@@ -485,7 +484,7 @@ namespace AgilicoConnectChecker
                     Log("Test 1: Skipped by user selection.");
                     UpdateProgress("DNS Domain & Resolution Check", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 2: HTTP/HTTPS (Ports 80/443) Web Requests
                 bool httpPass = true;
@@ -498,7 +497,7 @@ namespace AgilicoConnectChecker
                     Log("Test 2: Skipped by user selection.");
                     UpdateProgress("HTTP/HTTPS Outbound Probes", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 3: NTP Subsystem (UDP Port 123)
                 bool ntpPass = true;
@@ -511,7 +510,7 @@ namespace AgilicoConnectChecker
                     Log("Test 3: Skipped by user selection.");
                     UpdateProgress("NTP Subsystem (UDP 123)", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 4: Agilico STUN Servers (UDP Port 3478)
                 bool agilicoStunPass = true;
@@ -524,7 +523,7 @@ namespace AgilicoConnectChecker
                     Log("Test 4: Skipped by user selection.");
                     UpdateProgress("Agilico STUN Servers", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 5: Google STUN Servers (UDP Port 3478)
                 bool googleStunPass = true;
@@ -537,7 +536,7 @@ namespace AgilicoConnectChecker
                     Log("Test 5: Skipped by user selection.");
                     UpdateProgress("Google STUN Servers", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 6: NAT Routing & Hops Check
                 bool natHopsPass = true;
@@ -550,7 +549,7 @@ namespace AgilicoConnectChecker
                     Log("Test 6: Skipped by user selection.");
                     UpdateProgress("NAT Routing & Hops Check", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 7: NAT Port Randomness Check
                 bool natPortPass = true;
@@ -563,7 +562,7 @@ namespace AgilicoConnectChecker
                     Log("Test 7: Skipped by user selection.");
                     UpdateProgress("NAT Port Randomness Check", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 8: SIP ALG Detection (UDP Port 5060)
                 bool sipAlgPass = true;
@@ -576,7 +575,7 @@ namespace AgilicoConnectChecker
                     Log("Test 8: Skipped by user selection.");
                     UpdateProgress("SIP ALG Detection", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 9: Advanced SIP Media (RTP) Quality Simulation
                 bool rtpQualityPass = true;
@@ -589,7 +588,7 @@ namespace AgilicoConnectChecker
                     Log("Test 9: Skipped by user selection.");
                     UpdateProgress("RTP Jitter/Loss Check", "Skipped", "Skipped by user");
                 }
-                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+                if (token.IsCancellationRequested) return false;
 
                 // Test 10: Inbound Signalling & Presence (WebSockets / SignalR)
                 bool signalRPass = true;
@@ -629,20 +628,17 @@ namespace AgilicoConnectChecker
                              : "Some network checks FAILED or generated Warnings. Please review the recommendations.");
                 Log($"Weighted Diagnostics Score: {score}/100");
 
-                Pcap.Stop();
                 OnComplete?.Invoke(allPassed, score);
                 return allPassed;
             }
             catch (OperationCanceledException)
             {
                 Log("Diagnostics cancelled by user.");
-                Pcap.Stop();
                 return false;
             }
             catch (Exception ex)
             {
                 Log($"Critical error during diagnostics: {ex.Message}", true);
-                Pcap.Stop();
                 OnComplete?.Invoke(false, 0);
                 return false;
             }
@@ -1331,7 +1327,7 @@ namespace AgilicoConnectChecker
                     $"Call-ID: {callId}\r\n" +
                     $"CSeq: 1 OPTIONS\r\n" +
                     $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                    $"User-Agent: Agilico Connect Checker\r\n" +
+                    $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
                     $"Content-Length: 0\r\n\r\n";
 
                 byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
@@ -1484,7 +1480,7 @@ namespace AgilicoConnectChecker
                             $"Call-ID: {callId}\r\n" +
                             $"CSeq: {i + 1} OPTIONS\r\n" +
                             $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                            $"User-Agent: Agilico Connect Checker\r\n" +
+                            $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
                             $"Content-Length: 0\r\n\r\n";
                         payload = Encoding.UTF8.GetBytes(sipOptions);
                     }

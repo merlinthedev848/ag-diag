@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:AgilicoConnectChecker"
         mc:Ignorable="d"
-        Title="Agilico Connect - Network Checker" 
+        Title="Agilico Network Diagnostic Tool" 
         Icon="logo.png"
         Width="1024" Height="860" 
         MinHeight="760" MinWidth="900"
@@ -88,7 +88,7 @@
 
                     <!-- Title & Version Info -->
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Agilico Connect - Network Diagnostics" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="Agilico Network Diagnostic Tool" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
                         <TextBlock Text="Environment compatibility checker for Agilico Connect Windows App" Foreground="#94a3b8" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
 
