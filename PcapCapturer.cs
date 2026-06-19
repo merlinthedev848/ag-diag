@@ -56,7 +56,7 @@ namespace AgilicoConnectChecker
             _outputStream = new MemoryStream();
         }
 
-        public void Start(string? ipFilter = null)
+        public void Start(bool startRawSniffer = false, string? ipFilter = null)
         {
             lock (_lock)
             {
@@ -68,7 +68,10 @@ namespace AgilicoConnectChecker
                 _ipFilter = ipFilter;
                 _isWriting = true;
 
-                StartRawSocketSniffer();
+                if (startRawSniffer)
+                {
+                    StartRawSocketSniffer();
+                }
             }
         }
 
@@ -269,7 +272,7 @@ namespace AgilicoConnectChecker
                 string localIp = GetLocalIpAddress();
                 if (localIp == "127.0.0.1" || string.IsNullOrEmpty(localIp))
                 {
-                    return;
+                    throw new InvalidOperationException("No active local IP address found to bind packet sniffer.");
                 }
 
                 _rawSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.IP);
@@ -284,9 +287,13 @@ namespace AgilicoConnectChecker
 
                 _captureTask = Task.Run(() => CaptureLoopAsync(token), token);
             }
-            catch (Exception ex)
+            catch (SocketException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Raw socket capture not started (non-admin or not supported): {ex.Message}");
+                if (ex.SocketErrorCode == SocketError.AccessDenied || ex.ErrorCode == 10013)
+                {
+                    throw new UnauthorizedAccessException("Administrative privileges are required to perform raw packet capture on Windows. Please run the application as Administrator.", ex);
+                }
+                throw;
             }
         }
 

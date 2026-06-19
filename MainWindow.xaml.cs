@@ -1149,11 +1149,22 @@ namespace AgilicoConnectChecker
                     }
                 }
 
-                _engine.Pcap.Start(string.IsNullOrEmpty(filterIp) ? null : filterIp);
-                _isManualCapturing = true;
-                TxtTogglePcap.Text = "STOP CAPTURE";
-                BtnTogglePcap.Background = (Brush)FindResource("AccentRedBrush");
-                TxtPcapFilterIp.IsEnabled = false;
+                try
+                {
+                    _engine.Pcap.Start(true, string.IsNullOrEmpty(filterIp) ? null : filterIp);
+                    _isManualCapturing = true;
+                    TxtTogglePcap.Text = "STOP CAPTURE";
+                    BtnTogglePcap.Background = (Brush)FindResource("AccentRedBrush");
+                    TxtPcapFilterIp.IsEnabled = false;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    MessageBox.Show(ex.Message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to start packet capture: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
