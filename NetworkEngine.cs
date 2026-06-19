@@ -751,7 +751,7 @@ namespace AgilicoConnectChecker
             {
                 Log($"Querying Google DNS server {dnsServer} for domain '{hostname}'...");
                 var serverIp = IPAddress.Parse(dnsServer);
-                using var client = new UdpClient();
+                using var client = new UdpClient(0);
                 client.Client.SendTimeout = 2000;
                 client.Client.ReceiveTimeout = 2000;
 
@@ -949,7 +949,7 @@ namespace AgilicoConnectChecker
                 if (addresses.Length == 0) return false;
                 var endPoint = new IPEndPoint(addresses[0], 123);
 
-                using var client = new UdpClient();
+                using var client = new UdpClient(0);
                 client.Client.SendTimeout = 2000;
                 client.Client.ReceiveTimeout = 2000;
 
@@ -1744,10 +1744,6 @@ namespace AgilicoConnectChecker
         private async Task<(bool ok, string msg)> TestSingleSignalRHubAsync(string hubName, string baseUrl, CancellationToken token)
         {
             string url = baseUrl;
-            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            {
-                url = "https://" + url.Substring(7);
-            }
 
             if (!string.IsNullOrEmpty(ClientToken))
             {
