@@ -16,7 +16,7 @@ namespace AgilicoConnectChecker
     {
         public delegate void LogHandler(string message, bool isError = false);
         public delegate void ProgressHandler(string testName, string status, string details);
-        public delegate void TestCompleteHandler(bool success);
+        public delegate void TestCompleteHandler(bool success, int score);
 
         public event LogHandler? OnLog;
         public event ProgressHandler? OnProgress;
@@ -34,6 +34,12 @@ namespace AgilicoConnectChecker
         public int StunPort { get; set; } = 3478;
         public bool IsSimulationMode { get; set; } = false;
 
+        // Selected tests to run (index 0 to 9)
+        public bool[] SelectedTests { get; set; } = new bool[10] { true, true, true, true, true, true, true, true, true, true };
+
+        // Packet Capture Service
+        public PcapCapturer Pcap { get; } = new PcapCapturer();
+
         // Live settings loaded from softphone registry
         public string ServerUsername { get; set; } = "";
         public string ClientToken { get; set; } = "";
@@ -41,6 +47,9 @@ namespace AgilicoConnectChecker
         public string PresenceUrl { get; set; } = "http://v3.presence.eu-beta.hp2k.co.uk/Presence";
         public string SignallingUrl { get; set; } = "http://v1.softsignalling.eu-j.hp2k.co.uk/Signals";
         public string RoomsUrl { get; set; } = "http://v1.rooms.eu-beta.hp2k.co.uk/Rooms";
+
+        public bool HasLocalConnectivityIssue { get; private set; } = false;
+        public string LocalConnectivityIssueReason { get; private set; } = "";
 
         // Google DNS servers mentioned in the guide
         private readonly string[] GoogleDnsServers = { "8.8.8.8", "8.8.4.4" };
@@ -103,6 +112,269 @@ namespace AgilicoConnectChecker
             }
         }
 
+        private async Task RunEnvironmentScanAsync(CancellationToken token)
+        {
+            Log("=================================================================");
+            Log("ENVIRONMENT & NETWORK ADAPTER SCAN");
+            Log("=================================================================");
+
+            if (!string.IsNullOrEmpty(ServerUsername))
+            {
+                bool hasToken = !string.IsNullOrEmpty(ClientToken);
+                Log($"Registry credentials: Username={ServerUsername}, UserID={ClientUserId}, AuthTokenPresent={hasToken}");
+            }
+            else
+            {
+                Log("Registry credentials: None found. Softphone may not be registered.");
+            }
+
+            try
+            {
+                bool procFound = false;
+                foreach (var proc in System.Diagnostics.Process.GetProcesses())
+                {
+                    string name = proc.ProcessName.ToLower();
+                    if (name.Contains("agilico") || name.Contains("softphone") || name.Contains("dmc"))
+                    {
+                        Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
+                        procFound = true;
+                    }
+                }
+                if (!procFound) Log("Active Softphone Process: No running softphone processes detected.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error scanning processes: {ex.Message}");
+            }
+
+            try
+            {
+                Log("Scanning network adapters for DHCP, IP and gateway configuration...");
+                var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                int upAdapters = 0;
+                int validConfiguredAdapters = 0;
+                var issueReasons = new List<string>();
+
+                foreach (var ni in interfaces)
+                {
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                        continue;
+
+                    string adapterName = ni.Name;
+                    string adapterDesc = ni.Description;
+                    Log($"Adapter: '{adapterName}' ({adapterDesc})");
+                    Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {(ni.Speed / 1000000.0):0} Mbps");
+
+                    if (ni.OperationalStatus != OperationalStatus.Up)
+                    {
+                        Log($"  [INFO] Adapter is offline/disconnected.");
+                        continue;
+                    }
+
+                    upAdapters++;
+                    var props = ni.GetIPProperties();
+                    
+                    bool isDhcpEnabled = false;
+                    try
+                    {
+                        var ipv4Props = props.GetIPv4Properties();
+                        if (ipv4Props != null) isDhcpEnabled = ipv4Props.IsDhcpEnabled;
+                    }
+                    catch { }
+
+                    Log($"  DHCP Configuration: {(isDhcpEnabled ? "Enabled (Dynamic IP)" : "Disabled (Static IP)")}");
+
+                    var dhcpServers = new List<string>();
+                    foreach (var dhcp in props.DhcpServerAddresses) dhcpServers.Add(dhcp.ToString());
+                    if (isDhcpEnabled && dhcpServers.Count > 0) Log($"  DHCP Server: {string.Join(", ", dhcpServers)}");
+
+                    var gateways = new List<string>();
+                    foreach (var gw in props.GatewayAddresses) gateways.Add(gw.Address.ToString());
+                    Log($"  Default Gateway: {(gateways.Count > 0 ? string.Join(", ", gateways) : "NONE (No connection to router)")}");
+
+                    var ipv4Addresses = new List<string>();
+                    bool hasApipa = false;
+                    bool hasZeroIp = false;
+
+                    foreach (var addr in props.UnicastAddresses)
+                    {
+                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            string ipStr = addr.Address.ToString();
+                            ipv4Addresses.Add(ipStr);
+                            if (ipStr.StartsWith("169.254")) hasApipa = true;
+                            if (ipStr == "0.0.0.0") hasZeroIp = true;
+                        }
+                    }
+
+                    Log($"  IP Addresses: {(ipv4Addresses.Count > 0 ? string.Join(", ", ipv4Addresses) : "None assigned")}");
+
+                    var dnsServers = new List<string>();
+                    foreach (var dns in props.DnsAddresses) dnsServers.Add(dns.ToString());
+                    Log($"  DNS Servers: {(dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "NONE configured")}");
+
+                    string descLower = adapterDesc.ToLower();
+                    string nameLower = adapterName.ToLower();
+                    bool isVpn = nameLower.Contains("vpn") || nameLower.Contains("tap") || nameLower.Contains("tun") || nameLower.Contains("globalprotect") || 
+                        nameLower.Contains("cisco") || nameLower.Contains("anyconnect") || nameLower.Contains("fortinet") || nameLower.Contains("forticlient") || 
+                        nameLower.Contains("wireguard") || nameLower.Contains("tailscale") || nameLower.Contains("zerotier") || nameLower.Contains("checkpoint") || 
+                        nameLower.Contains("sonicwall") || nameLower.Contains("pulse") || descLower.Contains("vpn") || descLower.Contains("tap") || 
+                        descLower.Contains("tun") || descLower.Contains("virtual adapter") || descLower.Contains("fortinet") || descLower.Contains("globalprotect");
+
+                    if (isVpn)
+                    {
+                        Log($"  [WARNING] Active VPN/Virtual adapter detected. Active VPNs can introduce routing overhead, packet loss, and MTU issues.", true);
+                    }
+
+                    if (hasApipa)
+                    {
+                        string msg = $"Adapter '{adapterName}' has a self-assigned APIPA IP address ({string.Join(", ", ipv4Addresses)}). DHCP server failed to assign an IP address. Check local router connection.";
+                        Log($"  [CRITICAL] {msg}", true);
+                        issueReasons.Add(msg);
+                    }
+                    else if (hasZeroIp || ipv4Addresses.Count == 0)
+                    {
+                        string msg = $"Adapter '{adapterName}' has no valid IP address assigned (0.0.0.0 or empty). Check physical cable or Wi-Fi router connection.";
+                        Log($"  [CRITICAL] {msg}", true);
+                        issueReasons.Add(msg);
+                    }
+                    else if (gateways.Count == 0 && !isVpn)
+                    {
+                        string msg = $"Adapter '{adapterName}' is active but has no Default Gateway configured. It cannot route traffic to the internet or Agilico portal.";
+                        Log($"  [CRITICAL] {msg}", true);
+                        issueReasons.Add(msg);
+                    }
+                    else if (dnsServers.Count == 0 && !isVpn)
+                    {
+                        string msg = $"Adapter '{adapterName}' has no DNS servers configured. Domain resolution will fail.";
+                        Log($"  [CRITICAL] {msg}", true);
+                        issueReasons.Add(msg);
+                    }
+                    else
+                    {
+                        if (!isVpn) validConfiguredAdapters++;
+                    }
+                }
+
+                if (upAdapters == 0)
+                {
+                    HasLocalConnectivityIssue = true;
+                    LocalConnectivityIssueReason = "All network adapters are offline/disconnected. Check your network cables or Wi-Fi status.";
+                    Log($"[CRITICAL] {LocalConnectivityIssueReason}", true);
+                }
+                else if (validConfiguredAdapters == 0)
+                {
+                    HasLocalConnectivityIssue = true;
+                    LocalConnectivityIssueReason = issueReasons.Count > 0 ? string.Join(" | ", issueReasons) : "No network adapter has a valid IP address, Gateway, and DNS server configuration to connect to the router/internet.";
+                    Log($"[CRITICAL] Local connectivity issue: {LocalConnectivityIssueReason}", true);
+                }
+                else
+                {
+                    HasLocalConnectivityIssue = false;
+                    LocalConnectivityIssueReason = "";
+                    Log($"Network scan completed. Found {validConfiguredAdapters} active, correctly configured physical network adapter(s).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error scanning adapters: {ex.Message}");
+            }
+            Log("=================================================================");
+            Log("");
+        }
+
+        public class LocalNetworkInfo
+        {
+            public string Status { get; set; } = "Disconnected";
+            public string IpAddress { get; set; } = "-";
+            public string SubnetMask { get; set; } = "-";
+            public string Gateway { get; set; } = "-";
+            public string DnsServers { get; set; } = "-";
+            public bool IsOk { get; set; } = false;
+        }
+
+        public LocalNetworkInfo GetLocalNetworkInfo()
+        {
+            var info = new LocalNetworkInfo();
+            try
+            {
+                var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                foreach (var ni in interfaces)
+                {
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
+
+                    var props = ni.GetIPProperties();
+                    var gateways = new List<string>();
+                    foreach (var gw in props.GatewayAddresses) gateways.Add(gw.Address.ToString());
+
+                    string ipStr = "";
+                    string maskStr = "";
+                    foreach (var addr in props.UnicastAddresses)
+                    {
+                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            ipStr = addr.Address.ToString();
+                            maskStr = addr.IPv4Mask?.ToString() ?? "";
+                            break;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(ipStr)) continue;
+
+                    bool isApipa = ipStr.StartsWith("169.254");
+                    bool isZero = ipStr == "0.0.0.0";
+                    
+                    var dnsServers = new List<string>();
+                    foreach (var dns in props.DnsAddresses) dnsServers.Add(dns.ToString());
+
+                    string desc = ni.Description.ToLower();
+                    string name = ni.Name.ToLower();
+                    bool isVpn = name.Contains("vpn") || name.Contains("tap") || name.Contains("tun") || name.Contains("globalprotect") || 
+                        name.Contains("cisco") || name.Contains("anyconnect") || name.Contains("fortinet") || name.Contains("forticlient") || 
+                        name.Contains("wireguard") || name.Contains("tailscale") || name.Contains("zerotier") || name.Contains("checkpoint") || 
+                        name.Contains("sonicwall") || name.Contains("pulse") || desc.Contains("vpn") || desc.Contains("tap") || 
+                        desc.Contains("tun") || desc.Contains("virtual adapter") || desc.Contains("fortinet") || desc.Contains("globalprotect");
+
+                    if (!isApipa && !isZero && gateways.Count > 0)
+                    {
+                        info.Status = isVpn ? "Connected (VPN Active)" : "Connected";
+                        info.IpAddress = ipStr;
+                        info.SubnetMask = maskStr;
+                        info.Gateway = string.Join(", ", gateways);
+                        info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
+                        info.IsOk = true;
+                        return info; 
+                    }
+                    
+                    if (!info.IsOk)
+                    {
+                        if (isApipa) info.Status = "No Router Connection (APIPA)";
+                        else if (isZero) info.Status = "No IP Address (0.0.0.0)";
+                        else info.Status = "Connected (No Gateway)";
+                        
+                        info.IpAddress = ipStr;
+                        info.SubnetMask = maskStr;
+                        info.Gateway = gateways.Count > 0 ? string.Join(", ", gateways) : "None";
+                        info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
+                    }
+                }
+            }
+            catch { }
+            return info;
+        }
+
+        public bool CheckLocalConnectivityBeforeTest(string testName)
+        {
+            if (HasLocalConnectivityIssue)
+            {
+                Log($"Skipping '{testName}' due to local network connectivity failure.");
+                UpdateProgress(testName, "Failed", "Skipped - Local network failure");
+                return true;
+            }
+            return false;
+        }
+
         public string GetLocalIpAddress()
         {
             try
@@ -135,10 +407,11 @@ namespace AgilicoConnectChecker
             OnProgress?.Invoke(testName, status, details);
         }
 
-        public async Task RunDiagnosticsAsync()
+        public async Task<bool> RunDiagnosticsAsync()
         {
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
+            Pcap.Start();
 
             Log("Starting Agilico Connect Checker diagnostics...");
             Log("=================================================================");
@@ -151,50 +424,179 @@ namespace AgilicoConnectChecker
 
             try
             {
+                await RunEnvironmentScanAsync(token);
+
                 // Test 1: DNS Domain Resolution & Google DNS
-                bool dnsPass = await RunDnsTestsAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool dnsPass = true;
+                if (SelectedTests[0])
+                {
+                    dnsPass = await RunDnsTestsAsync(token);
+                }
+                else
+                {
+                    Log("Test 1: Skipped by user selection.");
+                    UpdateProgress("DNS Domain & Resolution Check", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 2: HTTP/HTTPS (Ports 80/443) Web Requests
-                bool httpPass = await RunHttpHttpsTestsAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool httpPass = true;
+                if (SelectedTests[1])
+                {
+                    httpPass = await RunHttpHttpsTestsAsync(token);
+                }
+                else
+                {
+                    Log("Test 2: Skipped by user selection.");
+                    UpdateProgress("HTTP/HTTPS Outbound Probes", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 3: NTP Subsystem (UDP Port 123)
-                bool ntpPass = await RunNtpTestAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool ntpPass = true;
+                if (SelectedTests[2])
+                {
+                    ntpPass = await RunNtpTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 3: Skipped by user selection.");
+                    UpdateProgress("NTP Subsystem (UDP 123)", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 4: Agilico STUN Servers (UDP Port 3478)
-                bool agilicoStunPass = await RunAgilicoStunTestsAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool agilicoStunPass = true;
+                if (SelectedTests[3])
+                {
+                    agilicoStunPass = await RunAgilicoStunTestsAsync(token);
+                }
+                else
+                {
+                    Log("Test 4: Skipped by user selection.");
+                    UpdateProgress("Agilico STUN Servers", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 5: Google STUN Servers (UDP Port 3478)
-                bool googleStunPass = await RunGoogleStunTestsAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool googleStunPass = true;
+                if (SelectedTests[4])
+                {
+                    googleStunPass = await RunGoogleStunTestsAsync(token);
+                }
+                else
+                {
+                    Log("Test 5: Skipped by user selection.");
+                    UpdateProgress("Google STUN Servers", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 6: NAT Routing & Hops Check
-                bool natHopsPass = await RunNatHopsTestAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool natHopsPass = true;
+                if (SelectedTests[5])
+                {
+                    natHopsPass = await RunNatHopsTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 6: Skipped by user selection.");
+                    UpdateProgress("NAT Routing & Hops Check", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 7: NAT Port Randomness Check
-                bool natPortPass = await RunNatPortRandomnessTestAsync(token);
-                if (token.IsCancellationRequested) return;
+                bool natPortPass = true;
+                if (SelectedTests[6])
+                {
+                    natPortPass = await RunNatPortRandomnessTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 7: Skipped by user selection.");
+                    UpdateProgress("NAT Port Randomness Check", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
                 // Test 8: SIP ALG Detection (UDP Port 5060)
-                bool sipAlgPass = await RunSipAlgTestAsync(token);
+                bool sipAlgPass = true;
+                if (SelectedTests[7])
+                {
+                    sipAlgPass = await RunSipAlgTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 8: Skipped by user selection.");
+                    UpdateProgress("SIP ALG Detection", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
 
-                bool allPassed = dnsPass && httpPass && ntpPass && agilicoStunPass && googleStunPass && natHopsPass && natPortPass && sipAlgPass;
+                // Test 9: Advanced SIP Media (RTP) Quality Simulation
+                bool rtpQualityPass = true;
+                if (SelectedTests[8])
+                {
+                    rtpQualityPass = await RunRtpQualityTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 9: Skipped by user selection.");
+                    UpdateProgress("RTP Jitter/Loss Check", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) { Pcap.Stop(); return false; }
+
+                // Test 10: Inbound Signalling & Presence (WebSockets / SignalR)
+                bool signalRPass = true;
+                if (SelectedTests[9])
+                {
+                    signalRPass = await RunSignalRConnectivityTestAsync(token);
+                }
+                else
+                {
+                    Log("Test 10: Skipped by user selection.");
+                    UpdateProgress("Inbound Signalling & Presence (WebSockets)", "Skipped", "Skipped by user");
+                }
+
+                bool allPassed = dnsPass && httpPass && ntpPass && agilicoStunPass && googleStunPass && natHopsPass && natPortPass && sipAlgPass && rtpQualityPass && signalRPass;
+                
+                // Scoring System
+                int totalPossible = 0;
+                int totalEarned = 0;
+                int[] weights = new int[] { 15, 15, 5, 15, 5, 5, 5, 15, 15, 10 };
+                bool[] results = new bool[] { dnsPass, httpPass, ntpPass, agilicoStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, signalRPass };
+
+                for (int i = 0; i < 10; i++)
+                {
+                    if (SelectedTests[i])
+                    {
+                        totalPossible += weights[i];
+                        if (results[i])
+                        {
+                            totalEarned += weights[i];
+                        }
+                    }
+                }
+
+                int score = totalPossible > 0 ? (int)Math.Round((double)totalEarned / totalPossible * 100) : 100;
+
                 Log(allPassed ? "All network checks PASSED! Your firewall configuration is fully compliant with the Agilico Network Guidance." 
                              : "Some network checks FAILED or generated Warnings. Please review the recommendations.");
-                OnComplete?.Invoke(allPassed);
+                Log($"Weighted Diagnostics Score: {score}/100");
+
+                Pcap.Stop();
+                OnComplete?.Invoke(allPassed, score);
+                return allPassed;
             }
             catch (OperationCanceledException)
             {
                 Log("Diagnostics cancelled by user.");
+                Pcap.Stop();
+                return false;
             }
             catch (Exception ex)
             {
                 Log($"Critical error during diagnostics: {ex.Message}", true);
-                OnComplete?.Invoke(false);
+                Pcap.Stop();
+                OnComplete?.Invoke(false, 0);
+                return false;
             }
         }
 
@@ -202,54 +604,95 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunDnsTestsAsync(CancellationToken token)
         {
-            UpdateProgress("DNS Domain & Resolution", "Running", "Resolving domain customerportal.hp2k.co.uk...");
+            if (CheckLocalConnectivityBeforeTest("DNS Domain & Resolution Check")) return false;
+            UpdateProgress("DNS Domain & Resolution Check", "Running", "Resolving Agilico service domains...");
             Log("Test 1: Verifying DNS Resolution and Google DNS availability...");
-
-            bool domainResolved = false;
-            try
-            {
-                Log($"Resolving domain '{DomainToCheck}' using default DNS...");
-                var ips = await Dns.GetHostAddressesAsync(DomainToCheck, token);
-                if (ips.Length > 0)
-                {
-                    Log($"Success: Resolved '{DomainToCheck}' to: {string.Join(", ", (object[])ips)}");
-                    domainResolved = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"Error: Failed to resolve '{DomainToCheck}' via default DNS: {ex.Message}", true);
-            }
 
             if (IsSimulationMode)
             {
                 Thread.Sleep(800);
-                UpdateProgress("DNS Domain & Resolution", "Passed", "Pass - DNS resolving correctly");
+                UpdateProgress("DNS Domain & Resolution Check", "Passed", "Pass - DNS resolving correctly");
                 return true;
             }
 
-            // Verify Google DNS Servers from the guide (8.8.8.8 and 8.8.4.4)
+            string[] domains = {
+                DomainToCheck,
+                "stun-gb-a.hp2k.co.uk",
+                "stun-gb-b.hp2k.co.uk",
+                "stun-eu-a.hp2k.co.uk",
+                "stun-eu-b.hp2k.co.uk",
+                "v3.presence.eu-beta.hp2k.co.uk",
+                "v1.softsignalling.eu-j.hp2k.co.uk",
+                "v1.rooms.eu-beta.hp2k.co.uk",
+                "stun.l.google.com"
+            };
+
+            int resolvedCount = 0;
+            int criticalFailedCount = 0;
+            var failedDomains = new List<string>();
+
+            foreach (var domain in domains)
+            {
+                if (token.IsCancellationRequested) return false;
+                try
+                {
+                    Log($"Resolving domain '{domain}' using default DNS...");
+                    var ips = await Dns.GetHostAddressesAsync(domain, token);
+                    if (ips.Length > 0)
+                    {
+                        Log($"Success: Resolved '{domain}' to: {string.Join(", ", (object[])ips)}");
+                        resolvedCount++;
+                    }
+                    else
+                    {
+                        Log($"Error: Resolved '{domain}' to 0 IP addresses.", true);
+                        failedDomains.Add(domain);
+                        if (domain == DomainToCheck || domain.Contains("presence") || domain.Contains("signalling") || domain.Contains("rooms"))
+                        {
+                            criticalFailedCount++;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error: Failed to resolve '{domain}' via default DNS: {ex.Message}", true);
+                    failedDomains.Add(domain);
+                    if (domain == DomainToCheck || domain.Contains("presence") || domain.Contains("signalling") || domain.Contains("rooms"))
+                    {
+                        criticalFailedCount++;
+                    }
+                }
+            }
+
+
+
+            // Verify Google DNS Servers from the guide (8.8.8.8 and 8.8.4.4) for the main portal
             bool dns1Ok = await QueryDnsServerAsync("8.8.8.8", DomainToCheck, token);
             bool dns2Ok = await QueryDnsServerAsync("8.8.4.4", DomainToCheck, token);
 
-            if (domainResolved)
+            if (criticalFailedCount == 0)
             {
-                if (dns1Ok && dns2Ok)
+                if (failedDomains.Count > 0)
                 {
-                    Log("Test 1: PASSED. Domain resolves correctly, and Google DNS servers are reachable.");
-                    UpdateProgress("DNS Domain & Resolution", "Passed", "Pass - DNS & Google DNS Active");
+                    Log($"Test 1: PASSED WITH WARNINGS. Critical domains resolved, but backup/STUN domains failed: {string.Join(", ", failedDomains)}");
+                    UpdateProgress("DNS Domain & Resolution Check", "Passed", $"Pass - Resolved {resolvedCount}/{domains.Length} domains");
+                }
+                else if (dns1Ok && dns2Ok)
+                {
+                    Log("Test 1: PASSED. All domains resolve correctly, and Google DNS servers are reachable.");
+                    UpdateProgress("DNS Domain & Resolution Check", "Passed", "Pass - DNS & Google DNS Active");
                 }
                 else
                 {
-                    Log("Test 1: PASSED WITH WARNINGS. Domain resolves correctly via default local DNS, but direct outbound queries to Google DNS (8.8.8.8/8.8.4.4) failed. This is common if your network blocks outbound UDP port 53 to external DNS resolvers. Local DNS resolution is working.");
-                    UpdateProgress("DNS Domain & Resolution", "Passed", "Pass - Resolving via default DNS (Google DNS blocked)");
+                    Log("Test 1: PASSED WITH WARNINGS. Domains resolve correctly via default local DNS, but direct outbound queries to Google DNS (8.8.8.8/8.8.4.4) failed (possible port 53 UDP egress block).");
+                    UpdateProgress("DNS Domain & Resolution Check", "Passed", "Pass - DNS Active (Google DNS blocked)");
                 }
                 return true;
             }
             else
             {
-                Log($"Test 1: FAILED. DNS resolution is completely unavailable. Domain Resolved: False, Google DNS 8.8.8.8: {(dns1Ok ? "OK" : "Failed")}, Google DNS 8.8.4.4: {(dns2Ok ? "OK" : "Failed")}", true);
-                UpdateProgress("DNS Domain & Resolution", "Failed", "Fail - DNS resolution failed");
+                Log($"Test 1: FAILED. Critical service domains failed to resolve: {string.Join(", ", failedDomains)}. Google DNS 8.8.8.8: {(dns1Ok ? "OK" : "Failed")}, Google DNS 8.8.4.4: {(dns2Ok ? "OK" : "Failed")}", true);
+                UpdateProgress("DNS Domain & Resolution Check", "Failed", $"Fail - {criticalFailedCount} critical domains failed");
                 return false;
             }
         }
@@ -267,7 +710,9 @@ namespace AgilicoConnectChecker
                 // Build a minimal standard DNS Query Packet (RFC 1035)
                 var query = new List<byte>();
                 // Header (12 bytes)
-                query.AddRange(new byte[] { 0x12, 0x34 }); // Transaction ID
+                byte[] txId = new byte[2];
+                Random.Shared.NextBytes(txId);
+                query.AddRange(txId); // Transaction ID
                 query.AddRange(new byte[] { 0x01, 0x00 }); // Flags: Standard query, Recursion desired
                 query.AddRange(new byte[] { 0x00, 0x01 }); // Questions: 1
                 query.AddRange(new byte[] { 0x00, 0x00 }); // Answer RRs: 0
@@ -289,6 +734,9 @@ namespace AgilicoConnectChecker
                 var data = query.ToArray();
                 var endpoint = new IPEndPoint(serverIp, 53);
 
+                // Record sent packet
+                Pcap.RecordPacket(data, GetLocalIpAddress(), ((IPEndPoint)client.Client.LocalEndPoint!).Port, dnsServer, 53, true);
+
                 await client.SendAsync(data, data.Length, endpoint);
                 var receiveTask = client.ReceiveAsync(token).AsTask();
                 var delayTask = Task.Delay(2000, token);
@@ -297,7 +745,9 @@ namespace AgilicoConnectChecker
                 if (completed == receiveTask)
                 {
                     var result = await receiveTask;
-                    if (result.Buffer.Length > 12 && result.Buffer[0] == 0x12 && result.Buffer[1] == 0x34)
+                    // Record received packet
+                    Pcap.RecordPacket(result.Buffer, dnsServer, 53, GetLocalIpAddress(), ((IPEndPoint)client.Client.LocalEndPoint!).Port, true);
+                    if (result.Buffer.Length > 12 && result.Buffer[0] == txId[0] && result.Buffer[1] == txId[1])
                     {
                         Log($"Google DNS {dnsServer} responded successfully to domain check.");
                         return true;
@@ -315,38 +765,62 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunHttpHttpsTestsAsync(CancellationToken token)
         {
-            UpdateProgress("HTTP/HTTPS Outbound Probes", "Running", "Testing web ports...");
-            Log("Test 2: Probing HTTP/HTTPS outbound connectivity...");
+            if (CheckLocalConnectivityBeforeTest("HTTP/HTTPS Outbound Probes")) return false;
+            UpdateProgress("HTTP/HTTPS Outbound Probes", "Running", "Testing web connection and TLS handshake...");
+            Log("Test 2: Probing HTTP/HTTPS outbound connectivity & SSL/TLS handshake...");
 
             if (IsSimulationMode)
             {
                 Thread.Sleep(800);
-                UpdateProgress("HTTP/HTTPS Outbound Probes", "Passed", "Pass - TCP 80/443 Outbound Open");
+                UpdateProgress("HTTP/HTTPS Outbound Probes", "Passed", "Pass - HTTP/HTTPS Verified (TLS Succeeded)");
                 return true;
             }
 
-            Log($"Testing outbound TCP port 80 (HTTP) to {DomainToCheck}...");
-            bool httpOk = await TestTcpPortAsync(DomainToCheck, 80, token);
-            Log($"HTTP TCP 80 to {DomainToCheck}: {(httpOk ? "OPEN" : "BLOCKED")}");
+            string httpUrl = $"http://{DomainToCheck}";
+            string httpsUrl = $"https://{DomainToCheck}";
 
-            Log($"Testing outbound TCP port 443 (HTTPS) to {DomainToCheck}...");
-            bool httpsOk = await TestTcpPortAsync(DomainToCheck, 443, token);
-            Log($"HTTPS TCP 443 to {DomainToCheck}: {(httpsOk ? "OPEN" : "BLOCKED")}");
+            Log($"Testing HTTP web request to {httpUrl}...");
+            var httpResult = await TestHttpEndpointAsync(httpUrl, token);
+            Log($"HTTP to {DomainToCheck}: {(httpResult.ok ? "SUCCESS" : "FAILED")} ({httpResult.msg})");
 
-            if (httpOk && httpsOk)
+            Log($"Testing HTTPS web request (including TLS handshake) to {httpsUrl}...");
+            var httpsResult = await TestHttpEndpointAsync(httpsUrl, token);
+            Log($"HTTPS to {DomainToCheck}: {(httpsResult.ok ? "SUCCESS" : "FAILED")} ({httpsResult.msg})");
+
+            if (httpResult.ok && httpsResult.ok)
             {
-                Log("Test 2: PASSED. Outbound HTTP/HTTPS ports (80/443) are verified open.");
-                UpdateProgress("HTTP/HTTPS Outbound Probes", "Passed", "Pass - TCP 80/443 Outbound Open");
+                Log("Test 2: PASSED. Outbound HTTP/HTTPS web requests and SSL/TLS handshakes are verified.");
+                UpdateProgress("HTTP/HTTPS Outbound Probes", "Passed", "Pass - HTTP/HTTPS Verified (TLS Succeeded)");
                 return true;
             }
             else
             {
-                string failedPorts = "";
-                if (!httpOk) failedPorts += "TCP 80 ";
-                if (!httpsOk) failedPorts += "TCP 443";
-                Log($"Test 2: FAILED. Blocked outbound ports: {failedPorts}", true);
-                UpdateProgress("HTTP/HTTPS Outbound Probes", "Failed", $"Fail - {failedPorts.Trim()} Blocked");
+                string failed = "";
+                if (!httpResult.ok) failed += $"HTTP (Error: {httpResult.msg}) ";
+                if (!httpsResult.ok) failed += $"HTTPS (Error: {httpsResult.msg})";
+                Log($"Test 2: FAILED. Web connection failures: {failed.Trim()}", true);
+                UpdateProgress("HTTP/HTTPS Outbound Probes", "Failed", "Fail - SSL/TLS Handshake or Connection Blocked");
                 return false;
+            }
+        }
+
+        private async Task<(bool ok, string msg)> TestHttpEndpointAsync(string url, CancellationToken token)
+        {
+            try
+            {
+                using var handler = new HttpClientHandler();
+                using var client = new HttpClient(handler);
+                client.Timeout = TimeSpan.FromSeconds(5);
+                
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                return (true, $"Success (Status: {(int)response.StatusCode} {response.ReasonPhrase})");
+            }
+            catch (Exception ex)
+            {
+                var inner = ex;
+                while (inner.InnerException != null) inner = inner.InnerException;
+                return (false, inner.Message);
             }
         }
 
@@ -374,6 +848,7 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunNtpTestAsync(CancellationToken token)
         {
+            if (CheckLocalConnectivityBeforeTest("NTP Subsystem (UDP 123)")) return false;
             UpdateProgress("NTP Subsystem (UDP 123)", "Running", "Querying NTP time server...");
             Log("Test 3: Checking UDP port 123 (NTP) outbound transmission...");
 
@@ -430,6 +905,12 @@ namespace AgilicoConnectChecker
                 client.Client.SendTimeout = 2000;
                 client.Client.ReceiveTimeout = 2000;
 
+                string localIp = GetLocalIpAddress();
+                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
+
+                // Record sent packet
+                Pcap.RecordPacket(ntpData, localIp, localPort, endPoint.Address.ToString(), 123, true);
+
                 await client.SendAsync(ntpData, ntpData.Length, endPoint);
                 var receiveTask = client.ReceiveAsync(token).AsTask();
                 var delayTask = Task.Delay(2000, token);
@@ -438,7 +919,10 @@ namespace AgilicoConnectChecker
                 if (completed == receiveTask)
                 {
                     var result = await receiveTask;
-                    return result.Buffer.Length >= 48;
+                    // Record received packet
+                    Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), 123, localIp, localPort, true);
+                    // Validate: length >= 48 and Mode field (bits 0-2 of byte 0) == 4 (server)
+                    return result.Buffer.Length >= 48 && (result.Buffer[0] & 0x07) == 4;
                 }
                 return false;
             }
@@ -450,7 +934,8 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunAgilicoStunTestsAsync(CancellationToken token)
         {
-            UpdateProgress("Agilico STUN Servers", "Running", "Querying Agilico STUN hosts...");
+            if (CheckLocalConnectivityBeforeTest("Agilico STUN Servers")) return false;
+            UpdateProgress("Agilico STUN Servers", "Running", "Querying primary and secondary STUN...");
             Log("Test 4: Querying Agilico Cloud STUN Servers...");
 
             if (IsSimulationMode)
@@ -496,26 +981,16 @@ namespace AgilicoConnectChecker
             }
             else
             {
-                Log("All Agilico STUN servers failed to respond. Querying Google STUN as a backup check to verify port 3478 is open...");
-                var (googleOk, _, _) = await QueryStunServerAsync("stun.l.google.com", 3478, token);
-                if (googleOk)
-                {
-                    Log("Test 4: PASSED WITH WARNING. Agilico STUN servers did not reply (normal if public probes are disabled on server-side), but UDP port 3478 outbound is verified open via Google STUN.");
-                    UpdateProgress("Agilico STUN Servers", "Passed", "Pass - UDP 3478 Open (Google STUN Backup)");
-                    return true;
-                }
-                else
-                {
-                    Log("Test 4: FAILED. Agilico STUN servers and Google STUN backup failed to respond. Outbound UDP port 3478 is likely blocked.", true);
-                    UpdateProgress("Agilico STUN Servers", "Failed", "Fail - STUN query blocked");
-                    return false;
-                }
+                Log("Test 4: FAILED. All Agilico STUN servers failed to respond. Outbound UDP port 3478 may be blocked, or Agilico STUN servers are unreachable.", true);
+                UpdateProgress("Agilico STUN Servers", "Failed", "Fail - Agilico STUN servers unreachable");
+                return false;
             }
         }
 
         private async Task<bool> RunGoogleStunTestsAsync(CancellationToken token)
         {
-            UpdateProgress("Google STUN Servers", "Running", "Querying Google STUN hosts...");
+            if (CheckLocalConnectivityBeforeTest("Google STUN Servers")) return false;
+            UpdateProgress("Google STUN Servers", "Running", "Querying Google backup STUN...");
             Log("Test 5: Querying Google STUN Servers...");
 
             if (IsSimulationMode)
@@ -563,7 +1038,8 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunNatHopsTestAsync(CancellationToken token)
         {
-            UpdateProgress("NAT Routing & Hops Check", "Running", "Checking local range...");
+            if (CheckLocalConnectivityBeforeTest("NAT Routing & Hops Check")) return false;
+            UpdateProgress("NAT Routing & Hops Check", "Running", "Tracing route to default gateway...");
             Log("Test 6: Checking local addressing and counting NAT router hops...");
 
             string localIpStr = GetLocalIpAddress();
@@ -668,7 +1144,8 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunNatPortRandomnessTestAsync(CancellationToken token)
         {
-            UpdateProgress("NAT Port Translation (Random Port)", "Running", "Analyzing local to public port mapping...");
+            if (CheckLocalConnectivityBeforeTest("NAT Port Translation (Random Port)")) return false;
+            UpdateProgress("NAT Port Translation (Random Port)", "Running", "Checking port preservation...");
             Log("Test 7: Evaluating NAT port translation...");
             Log("Guideline: 'The public interface NAT port should be random and not be the same as the local NAT port.'");
 
@@ -754,7 +1231,8 @@ namespace AgilicoConnectChecker
 
         private async Task<bool> RunSipAlgTestAsync(CancellationToken token)
         {
-            UpdateProgress("SIP ALG Detection", "Running", "Sending UDP 5060 probe invite...");
+            if (CheckLocalConnectivityBeforeTest("SIP ALG Detection")) return false;
+            UpdateProgress("SIP ALG Detection", "Running", "Checking for SIP inspection engines...");
             Log("Test 8: Probing for SIP ALG / packet modification on UDP 5060...");
 
             if (IsSimulationMode)
@@ -814,6 +1292,9 @@ namespace AgilicoConnectChecker
                 Log($"Sending SIP OPTIONS payload to {SipAlgServer}:{SipAlgPort}...");
                 Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort}");
 
+                // Record sent packet
+                Pcap.RecordPacket(registerBytes, localIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
+
                 await client.SendAsync(registerBytes, registerBytes.Length, endpoint);
 
                 var receiveTask = client.ReceiveAsync(token).AsTask();
@@ -823,7 +1304,18 @@ namespace AgilicoConnectChecker
                 if (completed == receiveTask)
                 {
                     var result = await receiveTask;
+                    // Record received packet
+                    Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, localIp, localPort, true);
                     string responseStr = Encoding.UTF8.GetString(result.Buffer);
+
+                    // Validate response is for our request by checking Call-ID
+                    if (!responseStr.Contains(callId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log("Warning: Received SIP response with mismatched Call-ID. Ignoring stale response.");
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Uncorrelated SIP Response");
+                        return false;
+                    }
+
                     Log("Received SIP response. Analyzing Via headers for SIP ALG tampering...");
 
                     string[] lines = responseStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -895,6 +1387,198 @@ namespace AgilicoConnectChecker
             }
         }
 
+        private async Task<(int sent, int received, double loss, double jitter, double avgRtt, bool pass)> RunSingleRtpPathCheckAsync(
+            string pathName, string targetHost, int targetPort, string payloadType, CancellationToken token)
+        {
+            Log($"Starting path check: {pathName} ({targetHost}:{targetPort}) via {payloadType}...");
+            int numPackets = 100;
+            int packetDelayMs = 20; // 50 pps
+            int packetsReceived = 0;
+            var rtts = new List<double>();
+            
+            UdpClient? client = null;
+            try
+            {
+                client = new UdpClient(0);
+                client.Client.SendTimeout = 1000;
+                client.Client.ReceiveTimeout = 1000;
+
+                var ipAddresses = await Dns.GetHostAddressesAsync(targetHost, token);
+                if (ipAddresses.Length == 0)
+                {
+                    Log($"  [{pathName}] DNS resolution failed.", true);
+                    return (numPackets, 0, 100.0, 0, 0, false);
+                }
+
+                var endpoint = new IPEndPoint(ipAddresses[0], targetPort);
+                string localIp = GetLocalIpAddress();
+                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
+
+                for (int i = 0; i < numPackets; i++)
+                {
+                    if (token.IsCancellationRequested) return (numPackets, 0, 100.0, 0, 0, false);
+
+                    byte[] payload;
+                    byte[] transactionId = new byte[12];
+                    string callId = string.Empty;
+
+                    if (payloadType == "SIP")
+                    {
+                        string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
+                        string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
+                        callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
+                        
+                        string sipOptions =
+                            $"OPTIONS sip:{targetHost} SIP/2.0\r\n" +
+                            $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
+                            $"Max-Forwards: 70\r\n" +
+                            $"To: <sip:checker@{targetHost}>\r\n" +
+                            $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
+                            $"Call-ID: {callId}\r\n" +
+                            $"CSeq: {i + 1} OPTIONS\r\n" +
+                            $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
+                            $"User-Agent: Agilico Connect Checker\r\n" +
+                            $"Content-Length: 0\r\n\r\n";
+                        payload = Encoding.UTF8.GetBytes(sipOptions);
+                    }
+                    else // STUN
+                    {
+                        new Random().NextBytes(transactionId);
+                        payload = BuildStunRequest(transactionId, false, false);
+                    }
+
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    Pcap.RecordPacket(payload, localIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
+                    await client.SendAsync(payload, payload.Length, endpoint);
+
+                    try
+                    {
+                        using var perPacketCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        perPacketCts.CancelAfter(500); // 500ms timeout per packet
+                        
+                        var result = await client.ReceiveAsync(perPacketCts.Token).AsTask();
+                        watch.Stop();
+                        Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, localIp, localPort, true);
+                        
+                        bool valid = false;
+                        if (payloadType == "SIP")
+                        {
+                            // Validate SIP response contains our Call-ID
+                            string sipResp = Encoding.UTF8.GetString(result.Buffer);
+                            valid = sipResp.Contains(callId, StringComparison.OrdinalIgnoreCase);
+                        }
+                        else
+                        {
+                            valid = ValidateStunResponse(result.Buffer, transactionId);
+                        }
+
+                        if (valid)
+                        {
+                            packetsReceived++;
+                            rtts.Add(watch.Elapsed.TotalMilliseconds);
+                        }
+                    }
+                    catch (OperationCanceledException) { /* Timeout — packet lost */ }
+                    catch { /* Other error — packet lost */ }
+
+                    await Task.Delay(packetDelayMs, token);
+                }
+
+                int packetsLost = numPackets - packetsReceived;
+                double lossPercent = (double)packetsLost / numPackets * 100.0;
+                double avgRtt = 0;
+                double jitter = 0;
+
+                if (packetsReceived > 0)
+                {
+                    double sumRtt = 0;
+                    foreach (var r in rtts) sumRtt += r;
+                    avgRtt = sumRtt / rtts.Count;
+
+                    if (rtts.Count > 1)
+                    {
+                        double sumJitter = 0;
+                        for (int i = 1; i < rtts.Count; i++)
+                        {
+                            sumJitter += Math.Abs(rtts[i] - rtts[i - 1]);
+                        }
+                        jitter = sumJitter / (rtts.Count - 1);
+                    }
+                }
+
+                Log($"  [{pathName}] Sent: {numPackets}, Recv: {packetsReceived}, Loss: {lossPercent:0.0}%, Jitter: {jitter:0.1}ms, RTT: {avgRtt:0.1}ms");
+                
+                bool pass = (lossPercent <= 5.0) && (jitter <= 30.0) && (packetsReceived > 0);
+                return (numPackets, packetsReceived, lossPercent, jitter, avgRtt, pass);
+            }
+            catch (Exception ex)
+            {
+                Log($"  [{pathName}] Failed with error: {ex.Message}", true);
+                return (numPackets, 0, 100.0, 0, 0, false);
+            }
+            finally
+            {
+                client?.Close();
+            }
+        }
+
+        private async Task<bool> RunRtpQualityTestAsync(CancellationToken token)
+        {
+            if (CheckLocalConnectivityBeforeTest("RTP Jitter/Loss Check")) return false;
+            UpdateProgress("RTP Jitter/Loss Check", "Running", "Simulating G.711 media paths...");
+            Log("Test 9: Advanced SIP Media (RTP) Quality Simulation...");
+            Log("Running three test streams to verify standard SIP ports, Agilico STUN, and Google WebRTC STUN (high port 19302)...");
+
+            if (IsSimulationMode)
+            {
+                Thread.Sleep(1500);
+                Log("[Simulation] Packet Loss: 0%, Jitter: 5ms");
+                UpdateProgress("RTP Jitter/Loss Check", "Passed", "Pass - Excellent Quality (0% loss, 5ms jitter)");
+                return true;
+            }
+
+            // Path A: SIP ALG (UDP 5060)
+            var pathA = await RunSingleRtpPathCheckAsync("Path A (SIP Port 5060)", SipAlgServer, SipAlgPort, "SIP", token);
+            if (token.IsCancellationRequested) return false;
+
+            // Path B: Agilico STUN (UDP 3478)
+            var pathB = await RunSingleRtpPathCheckAsync("Path B (Agilico STUN 3478)", "stun-gb-a.hp2k.co.uk", 3478, "STUN", token);
+            if (token.IsCancellationRequested) return false;
+
+            // Path C: Google STUN High Port (UDP 19302)
+            var pathC = await RunSingleRtpPathCheckAsync("Path C (Google STUN 19302)", "stun.l.google.com", 19302, "STUN", token);
+            
+            bool allPassed = pathA.pass && pathB.pass && pathC.pass;
+            
+            double maxLoss = Math.Max(pathA.loss, Math.Max(pathB.loss, pathC.loss));
+            double maxJitter = Math.Max(pathA.jitter, Math.Max(pathB.jitter, pathC.jitter));
+
+            Log("RTP Quality Summary:");
+            Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
+            Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")}");
+            Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.1}ms, RTT={pathC.avgRtt:0.1}ms - {(pathC.pass ? "PASS" : "FAIL")}");
+
+            if (allPassed)
+            {
+                Log("Pass: Packet loss and jitter on all paths are within VoIP limits.");
+                UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Media paths OK (SIP 5060: {pathA.loss:0}% loss, Agilico STUN: {pathB.loss:0}% loss, Google STUN: {pathC.loss:0}% loss)");
+                return true;
+            }
+            else
+            {
+                string reasons = "";
+                if (!pathA.pass) reasons += "SIP 5060 failure; ";
+                if (!pathB.pass) reasons += "Agilico STUN 3478 failure; ";
+                if (!pathC.pass) reasons += "Google STUN 19302 failure; ";
+
+                Log($"Violation: Media stream checks failed: {reasons.TrimEnd(';', ' ')}", true);
+                
+                string detailMsg = $"Fail - Media path issues: • SIP 5060: {(pathA.pass ? "OK" : $"{pathA.loss:0}% loss")} • Agilico STUN: {(pathB.pass ? "OK" : "No response")} • Google STUN: {(pathC.pass ? "OK" : "No response")}";
+                UpdateProgress("RTP Jitter/Loss Check", "Failed", detailMsg);
+                return false;
+            }
+        }
+
 
         #endregion
 
@@ -917,6 +1601,12 @@ namespace AgilicoConnectChecker
                 new Random().NextBytes(transactionId);
                 byte[] stunRequest = BuildStunRequest(transactionId, changeIp: false, changePort: false);
 
+                string localIp = GetLocalIpAddress();
+                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
+
+                // Record sent packet
+                Pcap.RecordPacket(stunRequest, localIp, localPort, endPoint.Address.ToString(), port, true);
+
                 await client.SendAsync(stunRequest, stunRequest.Length, endPoint);
 
                 var receiveTask = client.ReceiveAsync(token).AsTask();
@@ -926,6 +1616,8 @@ namespace AgilicoConnectChecker
                 if (completed == receiveTask)
                 {
                     var result = await receiveTask;
+                    // Record received packet
+                    Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), port, localIp, localPort, true);
                     if (ValidateStunResponse(result.Buffer, transactionId))
                     {
                         var (ip, mPort) = ParseStunResponse(result.Buffer);
@@ -999,6 +1691,140 @@ namespace AgilicoConnectChecker
             }
 
             return true;
+        }
+
+        private async Task<(bool ok, string msg)> TestSingleSignalRHubAsync(string hubName, string baseUrl, CancellationToken token)
+        {
+            string url = baseUrl;
+            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = "https://" + url.Substring(7);
+            }
+
+            if (!string.IsNullOrEmpty(ClientToken))
+            {
+                url += $"?clientToken={ClientToken}&clientUserId={ClientUserId}";
+                Log($"[{hubName}] Attempting connection with registry credentials (token masked)...");
+            }
+            else
+            {
+                Log($"[{hubName}] Attempting connection without credentials...");
+            }
+
+            HubConnection? connection = null;
+            try
+            {
+                connection = new HubConnectionBuilder()
+                    .WithUrl(url, options =>
+                    {
+                        options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+                    })
+                    .WithAutomaticReconnect()
+                    .Build();
+
+                var connectTask = connection.StartAsync(token);
+                var timeoutTask = Task.Delay(5000, token);
+
+                if (await Task.WhenAny(connectTask, timeoutTask) == connectTask)
+                {
+                    await connectTask; // Throws if failed
+                    if (connection.State == HubConnectionState.Connected)
+                    {
+                        Log($"[{hubName}] Handshake succeeded. Verifying connection stability...");
+                        Log($"[DPI Checker] [{hubName}] Starting 2.5-second WebSocket stability monitor to detect DPI/firewall connection termination.");
+                        
+                        bool connectionDropped = false;
+                        for (int i = 1; i <= 25; i++)
+                        {
+                            if (token.IsCancellationRequested) break;
+                            await Task.Delay(100, token);
+                            
+                            if (i % 5 == 0)
+                            {
+                                Log($"[DPI Checker] [{hubName}] Connection remains active. ({(i * 100)}ms monitored)");
+                            }
+
+                            if (connection.State != HubConnectionState.Connected)
+                            {
+                                connectionDropped = true;
+                                break;
+                            }
+                        }
+
+                        if (connectionDropped)
+                        {
+                            Log($"[DPI Checker] [{hubName}] Connection DROPPED after handshake. This is typical of Deep Packet Inspection (DPI) firewalls blocking WebSocket traffic.", true);
+                            return (false, "Connection dropped after handshake (possible DPI blocking)");
+                        }
+                        else
+                        {
+                            Log($"[DPI Checker] [{hubName}] Persistent WebSocket connection is STABLE after 2.5s monitor.");
+                            return (true, "Stable connection established");
+                        }
+                    }
+                    else
+                    {
+                        return (false, $"Handshake completed but state is {connection.State}");
+                    }
+                }
+                else
+                {
+                    return (false, "Connection timed out after 5 seconds");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+            finally
+            {
+                if (connection != null)
+                {
+                    try { await connection.StopAsync(token); } catch { }
+                    try { await connection.DisposeAsync(); } catch { }
+                }
+            }
+        }
+
+        private async Task<bool> RunSignalRConnectivityTestAsync(CancellationToken token)
+        {
+            if (CheckLocalConnectivityBeforeTest("Inbound Signalling & Presence")) return false;
+            UpdateProgress("Inbound Signalling & Presence", "Running", "Verifying hub WebSocket connections...");
+            Log("Test 10: Verifying persistent inbound connections (WebSockets / SignalR)...");
+            Log("Checking Signalling, Presence, and Rooms hubs with 2.5-second stability monitoring...");
+
+            var signallingResult = await TestSingleSignalRHubAsync("Signalling Hub", SignallingUrl, token);
+            if (token.IsCancellationRequested) return false;
+
+            var presenceResult = await TestSingleSignalRHubAsync("Presence Hub", PresenceUrl, token);
+            if (token.IsCancellationRequested) return false;
+
+            var roomsResult = await TestSingleSignalRHubAsync("Rooms Hub", RoomsUrl, token);
+
+            bool allPassed = signallingResult.ok && presenceResult.ok && roomsResult.ok;
+
+            Log("SignalR/WebSocket Connection Summary:");
+            Log($"  Signalling Hub ({SignallingUrl}): {(signallingResult.ok ? "PASS" : "FAIL - " + signallingResult.msg)}");
+            Log($"  Presence Hub ({PresenceUrl}): {(presenceResult.ok ? "PASS" : "FAIL - " + presenceResult.msg)}");
+            Log($"  Rooms Hub ({RoomsUrl}): {(roomsResult.ok ? "PASS" : "FAIL - " + roomsResult.msg)}");
+
+            if (allPassed)
+            {
+                UpdateProgress("Inbound Signalling & Presence", "Pass", "WebSocket connection succeeded");
+                Log("Test 10: PASSED. All persistent inbound WebSocket connections are permitted and stable.");
+                return true;
+            }
+            else
+            {
+                string failedHubs = "";
+                if (!signallingResult.ok) failedHubs += "Signalling; ";
+                if (!presenceResult.ok) failedHubs += "Presence; ";
+                if (!roomsResult.ok) failedHubs += "Rooms; ";
+
+                UpdateProgress("Inbound Signalling & Presence", "Fail", $"Fail - {failedHubs.TrimEnd(';', ' ')} blocked/dropped");
+                Log($"Test 10: FAILED. Persistent inbound WebSocket connections are failing: {failedHubs.TrimEnd(';', ' ')}", true);
+                return false;
+            }
         }
 
         private (IPAddress? ip, int port) ParseStunResponse(byte[] response)

@@ -9,6 +9,7 @@
         Width="1024" Height="700" 
         MinHeight="600" MinWidth="900"
         WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing"
         Background="{StaticResource AppBgBrush}">
 
     <Grid>
@@ -32,33 +33,35 @@
                 </Grid.RowDefinitions>
 
                 <!-- Brand Logo (Agilico logo) -->
-                <Image Grid.Row="0" Source="pack://application:,,,/logo.png" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Image Grid.Row="0" Source="pack://application:,,,/logo.png" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center" Cursor="Hand" MouseUp="ImgLogo_MouseUp"/>
 
                 <!-- Navigation List -->
                 <StackPanel Grid.Row="1" Margin="0,20,0,0">
                     <Button x:Name="BtnDashboard" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconDashboard}" Click="BtnDashboard_Click">
                         <TextBlock Text="Dashboard" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
-                    <Button x:Name="BtnLogs" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnLogs_Click">
+                    <Button x:Name="BtnNetScan" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconRJ45}" Click="BtnNetScan_Click" Visibility="Collapsed">
+                        <TextBlock Text="Net Scan" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnPingTrack" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconPingTrack}" Click="BtnPingTrack_Click" Visibility="Collapsed">
+                        <TextBlock Text="Ping Track" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnTraceroute" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconTraceroute}" Click="BtnTraceroute_Click" Visibility="Collapsed">
+                        <TextBlock Text="Traceroute" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnLogs" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnLogs_Click" Visibility="Collapsed">
                         <TextBlock Text="Logs" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
-                    <Button x:Name="BtnSettings" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconSettings}" Click="BtnSettings_Click">
+                    <Button x:Name="BtnSettings" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconSettings}" Click="BtnSettings_Click" Visibility="Collapsed">
                         <TextBlock Text="Settings" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                     <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
-                        <TextBlock Text="Help" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock Text="Results" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                 </StackPanel>
 
-                <!-- Sidebar Footer -->
-                <StackPanel Grid.Row="2" Margin="0,0,0,20">
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnExit_Click">
-                        <Button.Tag>
-                            <Geometry>M16 13v-2H7V9h9V7l5 4-5 4z M3 3h8v2H5v14h6v2H3c-1.103 0-2-.897-2-2V5c0-1.103.897-2 2-2z</Geometry>
-                        </Button.Tag>
-                        <TextBlock Text="Exit" FontSize="11" FontWeight="SemiBold"/>
-                    </Button>
-                </StackPanel>
+                <!-- Sidebar Footer (empty) -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,20"/>
             </Grid>
         </Border>
 
@@ -111,6 +114,7 @@
                         <Grid Grid.Column="0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
@@ -122,19 +126,21 @@
                                                TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,6,0,20"/>
 
                                     <!-- Action Buttons -->
-                                    <Grid>
-                                        <Button x:Name="BtnStart" Style="{StaticResource ActionButtonStyle}" Click="BtnStart_Click" HorizontalAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="BtnStart" Style="{StaticResource ActionButtonStyle}" Click="BtnStart_Click" Margin="0,0,10,0">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="START DIAGNOSTICS"/>
                                             </StackPanel>
                                         </Button>
 
-                                        <Button x:Name="BtnStop" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Click="BtnStop_Click" Visibility="Collapsed" HorizontalAlignment="Left">
+                                        <Button x:Name="BtnStop" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Click="BtnStop_Click" Visibility="Collapsed" Margin="0,0,10,0">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="CANCEL TEST"/>
                                             </StackPanel>
                                         </Button>
-                                    </Grid>
+
+                                        <Button x:Name="BtnDownloadPcap" Style="{StaticResource SecondaryButtonStyle}" Click="BtnDownloadPcap_Click" Content="Download PCAP" Visibility="Collapsed" Padding="15,10"/>
+                                    </StackPanel>
 
                                     <!-- Progress Bar / Spinner -->
                                     <Grid x:Name="ProgressArea" Margin="0,15,0,0" Visibility="Collapsed">
@@ -161,8 +167,50 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Results Summary Card -->
+                            <!-- Local Network Adapter Status Card -->
                             <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="20">
+                                    <TextBlock Text="Local Network Status" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Basic IP Configuration" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,12"/>
+                                    
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Status -->
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Status:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TxtLocalStatus" Text="Detecting..." Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"/>
+
+                                        <!-- IP -->
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="IP Address:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TxtLocalIp" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
+
+                                        <!-- Subnet -->
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Subnet Mask:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TxtLocalSubnet" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
+
+                                        <!-- Gateway -->
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Default Gateway:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TxtLocalGateway" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
+
+                                        <!-- DNS -->
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="DNS Servers:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtLocalDns" Text="-" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,0" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Results Summary Card -->
+                            <Border Grid.Row="2" Style="{StaticResource CardStyle}">
                                 <Grid Margin="20">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -182,6 +230,7 @@
                                     <StackPanel Grid.Row="1" x:Name="PanelSummaryPass" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
                                         <Path Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="60" Height="60" Stretch="Uniform" HorizontalAlignment="Center"/>
                                         <TextBlock Text="Environment Ready" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" HorizontalAlignment="Center" Margin="0,12,0,4"/>
+                                        <TextBlock x:Name="TxtScorePass" Text="Score: 100/100" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                                         <TextBlock Text="Your local network setup is fully compatible with Agilico Connect. No issues were detected." 
                                                    TextAlignment="Center" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Width="250" HorizontalAlignment="Center"/>
                                     </StackPanel>
@@ -190,7 +239,14 @@
                                     <StackPanel Grid.Row="1" x:Name="PanelSummaryFail" VerticalAlignment="Top" Visibility="Collapsed">
                                         <Border Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,15">
                                             <StackPanel>
-                                                <TextBlock Text="Network Issue Detected" FontSize="14" FontWeight="Bold" Foreground="#dc2626"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                     </Grid.ColumnDefinitions>
+                                                     <TextBlock Grid.Column="0" Text="Network Issue Detected" FontSize="14" FontWeight="Bold" Foreground="#dc2626"/>
+                                                     <TextBlock Grid.Column="1" x:Name="TxtScoreFail" Text="Score: 0/100" FontSize="14" FontWeight="Bold" Foreground="#dc2626"/>
+                                                 </Grid>
                                                 <TextBlock Text="Your network environment requires attention before using Agilico Connect. Phones may fail to register or drop calls." 
                                                            TextWrapping="Wrap" FontSize="12" Foreground="#7f1d1d" Margin="0,4,0,0"/>
                                             </StackPanel>
@@ -224,19 +280,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest1" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test1IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test1IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test1IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="DNS Domain &amp; Resolution Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test1Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -248,19 +309,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest2" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test2IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test2IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test2IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="HTTP/HTTPS Outbound Web Probes" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test2Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -272,19 +338,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest3" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test3IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test3IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test3IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="NTP Protocol Port Reachability" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test3Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -296,19 +367,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest4" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test4IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test4IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test4IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="Agilico Cloud STUN Servers Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test4Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -320,19 +396,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest5" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test5IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test5IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test5IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="Google Backup STUN Servers Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test5Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -344,19 +425,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest6" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test6IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test6IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test6IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="NAT Routing &amp; Gateway Hops Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test6Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -368,19 +454,24 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest7" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test7IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test7IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test7IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="NAT Port Randomness Check" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test7Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                 </StackPanel>
@@ -392,21 +483,84 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest8" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
 
                                                 <!-- Status Icon -->
-                                                <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test8IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test8IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test8IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                 </Grid>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock Text="SIP ALG Detection (UDP Port 5060)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                     <TextBlock x:Name="Test8Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 9: RTP Jitter/Loss Check -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest9" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test9IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test9IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test9Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test9IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test9IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test9IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Advanced SIP Media (RTP) Quality Simulation" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test9Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Test 10: Inbound Signalling & Presence (WebSockets) -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTest10" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="Test10IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="Test10IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test10Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test10IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test10IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test10IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Inbound Signalling &amp; Presence (WebSockets)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="Test10Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -417,7 +571,354 @@
                     </Grid>
                 </TabItem>
 
-                <!-- TAB 2: LOGS -->
+                <!-- TAB 2: NET SCAN -->
+                <TabItem>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Area -->
+                        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="10,0,10,10">
+                            <Grid Margin="20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Local Network LAN Scanner" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Discovers all active devices connected to the local subnet using ICMP ping and ARP resolution." 
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,6,0,0"/>
+                                </StackPanel>
+
+                                <Button x:Name="BtnStartLanScan" Grid.Column="1" Style="{StaticResource ActionButtonStyle}" Click="BtnStartLanScan_Click" VerticalAlignment="Center" Padding="20,10">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="SCAN NETWORK"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Results DataGrid -->
+                        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="10,0,10,10">
+                            <Grid Margin="20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Progress Area -->
+                                <StackPanel Grid.Row="0" x:Name="PanelLanScanProgress" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,15">
+                                    <Path Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="20" Height="20" Stretch="Uniform" RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <RotateTransform x:Name="LanSpinnerRotation" Angle="0"/>
+                                        </Path.RenderTransform>
+                                        <Path.Triggers>
+                                            <EventTrigger RoutedEvent="Loaded">
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="LanSpinnerRotation" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </EventTrigger>
+                                        </Path.Triggers>
+                                    </Path>
+                                    <TextBlock x:Name="TxtLanScanProgress" Text="Scanning subnet (0/254)..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- DataGrid -->
+                                <DataGrid Grid.Row="1" x:Name="GridLanDevices" AutoGenerateColumns="False" IsReadOnly="True" 
+                                          GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="35">
+                                    <DataGrid.Resources>
+                                        <Style TargetType="DataGridColumnHeader">
+                                            <Setter Property="Background" Value="#f1f5f9"/>
+                                            <Setter Property="Foreground" Value="#64748b"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Padding" Value="10,8"/>
+                                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                            <Setter Property="BorderBrush" Value="#e2e8f0"/>
+                                        </Style>
+                                        <Style TargetType="DataGridCell">
+                                            <Setter Property="Padding" Value="10,0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="DataGridCell">
+                                                        <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                                                            <ContentPresenter VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                        <Style x:Key="SelectableCellTextBox" TargetType="TextBox">
+                                            <Setter Property="IsReadOnly" Value="True"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource AncestorType=DataGridCell}, Path=Foreground}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="TextBox">
+                                                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </DataGrid.Resources>
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="IP Address" Width="1.5*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding IpAddress, Mode=OneWay}" Style="{StaticResource SelectableCellTextBox}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="MAC Address" Width="1.5*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBox Text="{Binding MacAddress, Mode=OneWay}" Style="{StaticResource SelectableCellTextBox}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="2*" />
+                                        <DataGridTextColumn Header="Manufacturer (OUI)" Binding="{Binding Manufacturer}" Width="2*" />
+                                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" >
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#10b981"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- TAB: PING TRACK -->
+                <TabItem>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header / Controls Card -->
+                        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="10,0,10,10">
+                            <Grid Margin="20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Ping Track (Connectivity Monitor)" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock Text="Continuously monitors packet latency, jitter, and packet loss to a target host over time." 
+                                               TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,6,0,0"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Target Host:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,8,0"/>
+                                    <TextBox x:Name="TxtPingTarget" Width="150" Padding="8,6" Text="8.8.8.8" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}" VerticalAlignment="Center" Margin="0,0,15,0"/>
+
+                                    <TextBlock Text="Interval:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,8,0"/>
+                                    <ComboBox x:Name="ComboPingInterval" Width="120" VerticalAlignment="Center" Margin="0,0,15,0">
+                                        <ComboBoxItem Content="1.0 Second" Tag="1000" IsSelected="True"/>
+                                        <ComboBoxItem Content="2.5 Seconds" Tag="2500"/>
+                                        <ComboBoxItem Content="5.0 Seconds" Tag="5000"/>
+                                        <ComboBoxItem Content="10.0 Seconds" Tag="10000"/>
+                                    </ComboBox>
+
+                                    <Button x:Name="BtnStartPingTrack" Style="{StaticResource ActionButtonStyle}" Click="BtnStartPingTrack_Click" Padding="15,10" Margin="0,0,10,0">
+                                        <TextBlock Text="START TRACKING"/>
+                                    </Button>
+
+                                    <Button x:Name="BtnStopPingTrack" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Click="BtnStopPingTrack_Click" Padding="15,10" Margin="0,0,10,0" Visibility="Collapsed">
+                                        <TextBlock Text="STOP"/>
+                                    </Button>
+
+                                    <Button x:Name="BtnDownloadPingLog" Style="{StaticResource SecondaryButtonStyle}" Content="Download Log" Click="BtnDownloadPingLog_Click" Padding="15,9"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Speed Test Panel -->
+                        <Border x:Name="PanelSpeedTest" Grid.Row="1" Style="{StaticResource CardStyle}" Margin="10,0,10,10" Visibility="Collapsed">
+                            <Grid Margin="20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <Path x:Name="SpeedTestSpinner" Grid.Column="0" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentGreenBrush}" Width="24" Height="24" Stretch="Uniform" RenderTransformOrigin="0.5,0.5" Margin="0,0,15,0">
+                                    <Path.RenderTransform>
+                                        <RotateTransform Angle="0"/>
+                                    </Path.RenderTransform>
+                                    <Path.Triggers>
+                                        <EventTrigger RoutedEvent="Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="SpeedTestSpinner" Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Path.Triggers>
+                                </Path>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtSpeedTestStatus" Text="Running Connection Speed Test prior to Ping Tracking..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    <TextBlock x:Name="TxtSpeedTestDetails" Text="Measuring download/upload speed to/from Agilico customer portal..." FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                                </StackPanel>
+
+                                <TextBlock x:Name="TxtSpeedTestResults" Grid.Column="2" Text="" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Metrics Row -->
+                        <Grid Grid.Row="2" Margin="0,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Current Latency -->
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="15,10">
+                                    <TextBlock Text="Current Latency" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock x:Name="TxtPingCurrent" Text="0 ms" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentBlueBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Average Latency -->
+                            <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="15,10">
+                                    <TextBlock Text="Average Latency" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock x:Name="TxtPingAverage" Text="0 ms" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Min / Max -->
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="15,10">
+                                    <TextBlock Text="Min / Max Latency" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock x:Name="TxtPingMinMax" Text="0 / 0 ms" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Jitter -->
+                            <Border Grid.Column="3" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="15,10">
+                                    <TextBlock Text="Jitter" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock x:Name="TxtPingJitter" Text="0 ms" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Packet Loss -->
+                            <Border Grid.Column="4" Style="{StaticResource CardStyle}">
+                                <StackPanel Margin="15,10">
+                                    <TextBlock Text="Packet Loss" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock x:Name="TxtPingLoss" Text="0.0%" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Graph and Table area -->
+                        <Grid Grid.Row="3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="1*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Graph Card -->
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <Grid Margin="15">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <TextBlock Grid.Row="0" Text="Latency History (Last 60 Pings)" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+                                    
+                                    <!-- Graph Container -->
+                                    <Border Grid.Row="1" Background="#0f172a" CornerRadius="4" Padding="1">
+                                        <Canvas x:Name="PingGraphCanvas" SizeChanged="PingGraphCanvas_SizeChanged" ClipToBounds="True" Background="Transparent"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Scrolling Log List Card -->
+                            <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                                <Grid Margin="15">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Text="Live Activity" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+
+                                    <DataGrid Grid.Row="1" x:Name="GridPingLogs" AutoGenerateColumns="False" IsReadOnly="True" 
+                                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="28" FontSize="11">
+                                        <DataGrid.Resources>
+                                            <Style TargetType="DataGridColumnHeader">
+                                                <Setter Property="Background" Value="#f1f5f9"/>
+                                                <Setter Property="Foreground" Value="#64748b"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                <Setter Property="Padding" Value="6,4"/>
+                                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                <Setter Property="BorderBrush" Value="#e2e8f0"/>
+                                            </Style>
+                                            <Style TargetType="DataGridCell">
+                                                <Setter Property="Padding" Value="6,0"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="DataGridCell">
+                                                            <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                                                                <ContentPresenter VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </DataGrid.Resources>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="Auto" />
+                                            <DataGridTextColumn Header="Latency" Binding="{Binding LatencyDisplay}" Width="*" />
+                                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        <Style.Triggers>
+                                                            <Trigger Property="Text" Value="Success">
+                                                                <Setter Property="Foreground" Value="#10b981"/>
+                                                            </Trigger>
+                                                            <Trigger Property="Text" Value="TimedOut">
+                                                                <Setter Property="Foreground" Value="#ef4444"/>
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- TAB 3: LOGS -->
                 <TabItem>
                     <Border Style="{StaticResource CardStyle}">
                         <Grid Margin="20">
@@ -520,33 +1021,247 @@
                     </Border>
                 </TabItem>
 
-                <!-- TAB 4: HELP -->
+                <!-- TAB 5: TRACEROUTE -->
+                <TabItem>
+                    <Border Style="{StaticResource CardStyle}">
+                        <Grid Margin="20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition x:Name="TraceGridRow" Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                <TextBlock Text="Trace Route Tool" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                <TextBlock Text="Trace the route and hops taken by packets to reach a destination host." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1" Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <TextBlock Text="Target Host:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="TxtTraceTarget" Width="200" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button x:Name="BtnStartTrace" Style="{StaticResource ActionButtonStyle}" Click="BtnStartTrace_Click" Padding="20,10" Margin="0,0,10,0">
+                                        <TextBlock Text="START TRACEROUTE"/>
+                                    </Button>
+                                    <Button x:Name="BtnStopTrace" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Click="BtnStopTrace_Click" Padding="20,10" Visibility="Collapsed">
+                                        <TextBlock Text="STOP"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <DataGrid Grid.Row="2" x:Name="GridTraceHops" AutoGenerateColumns="False" IsReadOnly="True" 
+                                      GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="28" FontSize="11">
+                                <DataGrid.Resources>
+                                    <Style TargetType="DataGridColumnHeader">
+                                        <Setter Property="Background" Value="#f1f5f9"/>
+                                        <Setter Property="Foreground" Value="#64748b"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Padding" Value="6,4"/>
+                                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                        <Setter Property="BorderBrush" Value="#e2e8f0"/>
+                                    </Style>
+                                    <Style TargetType="DataGridCell">
+                                        <Setter Property="Padding" Value="6,0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="DataGridCell">
+                                                    <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                                                        <ContentPresenter VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGrid.Resources>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Hop" Binding="{Binding HopNumber}" Width="50" />
+                                    <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="150" />
+                                    <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="*" />
+                                    <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="100" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- TAB 6: RESULTS -->
                 <TabItem>
                     <Border Style="{StaticResource CardStyle}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="20">
-                                <TextBlock Text="Troubleshooting &amp; Network Guide" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,5"/>
-                                <TextBlock Text="Understand the WebRTC-based architecture and endpoints required for Agilico Connect V5." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,20"/>
+                                <TextBlock Text="Diagnostic Results" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,5"/>
+                                <TextBlock Text="Only tests requiring attention are shown below. Passed tests are hidden." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,20"/>
 
-                                <TextBlock Text="1. WebRTC &amp; SignalR Signalling" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
-                                <TextBlock Text="Agilico Connect V5 is a WebRTC-based softphone. It does not register via standard SIP registers on port 5060. Instead, it registers to a real-time SignalR Hub (http://v1.softsignalling.eu-j.hp2k.co.uk/Signals) over standard HTTP/HTTPS. Signalling call setup occurs over this channel."
-                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+                                <!-- Default: no results yet -->
+                                <StackPanel x:Name="PanelResultsDefault" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,40">
+                                    <Path Data="{StaticResource IconAlert}" Fill="{StaticResource TextMutedBrush}" Width="48" Height="48" Stretch="Uniform" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="No Results Available" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Center" Margin="0,10,0,2"/>
+                                    <TextBlock Text="Run diagnostics from the Dashboard to see results here." FontSize="12" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                </StackPanel>
 
-                                <TextBlock Text="2. Port Preservation &amp; NAT Type" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
-                                <TextBlock Text="WebRTC media streams are negotiated via ICE. Direct communication requires Port Preservation and a Full Cone NAT network. If Symmetric NAT is active, the media stream (RTP) may be blocked or forced to route through backup relays, causing audio setup failures or latency. Direct, preserved NAT mappings are highly recommended."
-                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+                                <!-- All passed -->
+                                <StackPanel x:Name="PanelResultsAllPass" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,40">
+                                    <Path Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="60" Height="60" Stretch="Uniform" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="All Tests Passed" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentGreenBrush}" HorizontalAlignment="Center" Margin="0,12,0,4"/>
+                                    <TextBlock Text="No issues were detected. Your network is fully compatible with Agilico Connect." 
+                                               TextAlignment="Center" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Width="300" HorizontalAlignment="Center"/>
+                                </StackPanel>
 
-                                <TextBlock Text="3. Media Server &amp; Outbound UDP" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
-                                <TextBlock Text="RTP voice and video media packets are routed to the Agilico Media Server (109.73.119.31). Outbound UDP traffic to this destination server must be allowed across the active RTP media port ranges."
-                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,15"/>
+                                <!-- Dynamic failed results container -->
+                                <StackPanel x:Name="PanelResultsFailed" Visibility="Collapsed">
+                                    <Border x:Name="Result1Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 1: DNS Domain &amp; Resolution" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result1Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Check your DNS server settings. Ensure Google DNS (8.8.8.8 / 8.8.4.4) or your corporate DNS can resolve Agilico service domains." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/dns-resolution" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
 
-                                <TextBlock Text="4. SIP ALG on Port 5060" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,10,0,4"/>
-                                <TextBlock Text="Even though Agilico Connect uses WebRTC/SignalR for its main signalling, firewalls with SIP ALG enabled often intercept and inspect standard SIP traffic on port 5060, corrupting packets for other local IP deskphones or SIP trunks. You must ensure 'SIP ALG' or 'SIP Helper' is disabled in your router's security configuration."
-                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" LineHeight="18" Margin="0,0,0,20"/>
+                                    <Border x:Name="Result2Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 2: HTTP/HTTPS Outbound" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result2Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Outbound TCP port 80 or 443 is blocked. Ensure web requests to customerportal.hp2k.co.uk are allowed through your firewall or proxy." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/outbound-http-probes" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
 
-                                <Border Background="#eff6ff" BorderBrush="#bfdbfe" BorderThickness="1" CornerRadius="6" Padding="15">
+                                    <Border x:Name="Result3Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 3: NTP Time Sync" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result3Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Outbound UDP port 123 (NTP) is blocked. Clients must be able to synchronise time for authentication and call setup." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/ntp-time-sync" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result4Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 4: Agilico STUN Servers" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result4Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Agilico STUN servers (UDP port 3478) are unreachable. Check outbound UDP firewall rules." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/stun-configuration" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result5Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 5: Google STUN Servers" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result5Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Google backup STUN servers (UDP port 3478) failed to respond. This may indicate broad UDP blocking." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/google-stun-backup" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result6Card" Visibility="Collapsed" Background="#fff7ed" BorderBrush="#fed7aa" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="⚠️ Test 6: NAT Routing &amp; Hops" FontSize="13" FontWeight="Bold" Foreground="#c2410c"/>
+                                            <TextBlock x:Name="Result6Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Double NAT detected. This can cause intermittent call drops and one-way audio. Simplify your network topology to a single NAT gateway." 
+                                                       FontSize="12" Foreground="#7c2d12" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/double-nat-issues" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result7Card" Visibility="Collapsed" Background="#fff7ed" BorderBrush="#fed7aa" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="⚠️ Test 7: NAT Port Randomness" FontSize="13" FontWeight="Bold" Foreground="#c2410c"/>
+                                            <TextBlock x:Name="Result7Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ NAT port preservation is active. Random/non-preserved NAT ports are recommended for reliable WebRTC ICE negotiation." 
+                                                       FontSize="12" Foreground="#7c2d12" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/nat-port-preservation" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result8Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 8: SIP ALG Detection" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result8Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ SIP ALG is active or UDP port 5060 is blocked. Disable 'SIP ALG' or 'SIP Helper' in your router/firewall security settings." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/disabling-sip-alg" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result9Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 9: RTP Media Quality" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result9Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Severe packet loss or jitter detected on the media path. Check QoS settings, bandwidth utilisation, and ensure UDP traffic is prioritised." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/rtp-quality-voip" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="Result10Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="❌ Test 10: WebSocket Signalling" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock x:Name="Result10Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
+                                            <TextBlock Text="→ Persistent WebSocket connections to Agilico SignalR hubs are failing. Ensure your proxy/DPI allows WebSocket upgrades on TCP 80/443." 
+                                                       FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
+                                            <TextBlock Margin="0,6,0,0">
+                                                <Hyperlink NavigateUri="https://support.agilico.co.uk/kb/articles/signalr-websockets-connection" RequestNavigate="Hyperlink_RequestNavigate">
+                                                    Read troubleshooting article
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Reference: Endpoint Ports -->
+                                <Border Background="#eff6ff" BorderBrush="#bfdbfe" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,20,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="Agilico Connect V5 Hardcoded Endpoint Ports:" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Agilico Connect V5 Endpoint Reference:" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,0,8"/>
                                         <TextBlock Text="• Signalling Gateway: http://v1.softsignalling.eu-j.hp2k.co.uk/Signals (TCP 80/443)&#x0a;• Media Server IP: 109.73.119.31 (UDP RTP ranges)&#x0a;• Presence Subsystem: http://v3.presence.eu-beta.hp2k.co.uk/Presence (TCP 80/443)&#x0a;• Rooms Subsystem: http://v1.rooms.eu-beta.hp2k.co.uk/Rooms (TCP 80/443)&#x0a;• SIP ALG Check Target: customerportal.hp2k.co.uk (UDP 5060)"
                                                    TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextDarkBrush}" LineHeight="18"/>
                                     </StackPanel>

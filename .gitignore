@@ -13,3 +13,8 @@ obj/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Temp and build files
+build_lite/
+build_standalone/
+test_run.log
