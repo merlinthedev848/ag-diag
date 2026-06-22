@@ -153,10 +153,16 @@ namespace AgilicoConnectChecker
 
         private void ResetTestStatuses()
         {
-            for (int i = 1; i <= 10; i++)
-            {
-                UpdateTestUI(i, "pending", "Pending");
-            }
+            if (ChkTest1 != null) UpdateTestUI(1, ChkTest1.IsChecked == true ? "pending" : "skipped", ChkTest1.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest2 != null) UpdateTestUI(2, ChkTest2.IsChecked == true ? "pending" : "skipped", ChkTest2.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest3 != null) UpdateTestUI(3, ChkTest3.IsChecked == true ? "pending" : "skipped", ChkTest3.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest4 != null) UpdateTestUI(4, ChkTest4.IsChecked == true ? "pending" : "skipped", ChkTest4.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest5 != null) UpdateTestUI(5, ChkTest5.IsChecked == true ? "pending" : "skipped", ChkTest5.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest6 != null) UpdateTestUI(6, ChkTest6.IsChecked == true ? "pending" : "skipped", ChkTest6.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest7 != null) UpdateTestUI(7, ChkTest7.IsChecked == true ? "pending" : "skipped", ChkTest7.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest8 != null) UpdateTestUI(8, ChkTest8.IsChecked == true ? "pending" : "skipped", ChkTest8.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest9 != null) UpdateTestUI(9, ChkTest9.IsChecked == true ? "pending" : "skipped", ChkTest9.IsChecked == true ? "Pending" : "Skipped by user");
+            if (ChkTest10 != null) UpdateTestUI(10, ChkTest10.IsChecked == true ? "pending" : "skipped", ChkTest10.IsChecked == true ? "Pending" : "Skipped by user");
 
             PanelSummaryPass.Visibility = Visibility.Collapsed;
             PanelSummaryFail.Visibility = Visibility.Collapsed;
