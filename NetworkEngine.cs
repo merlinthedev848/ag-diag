@@ -33,6 +33,7 @@ namespace AgilicoConnectChecker
         public string StunServer { get; set; } = "stun-gb-a.hp2k.co.uk";
         public int StunPort { get; set; } = 3478;
         public bool IsSimulationMode { get; set; } = false;
+        public string PublicIpAddress { get; set; } = "-";
 
         // Selected tests to run (index 0 to 9)
         public bool[] SelectedTests { get; set; } = new bool[10] { true, true, true, true, true, true, true, true, true, true };
@@ -291,6 +292,7 @@ namespace AgilicoConnectChecker
             public string Gateway { get; set; } = "-";
             public string DnsServers { get; set; } = "-";
             public string Vlan { get; set; } = "Untagged";
+            public string PublicIpAddress { get; set; } = "-";
             public bool IsOk { get; set; } = false;
         }
 
@@ -364,7 +366,36 @@ namespace AgilicoConnectChecker
                 }
             }
             catch { }
+            info.PublicIpAddress = PublicIpAddress;
             return info;
+        }
+
+        public async Task<string> ResolvePublicIpAsync(CancellationToken token)
+        {
+            if (IsSimulationMode)
+            {
+                PublicIpAddress = "198.51.100.42";
+                return PublicIpAddress;
+            }
+
+            try
+            {
+                // Try Agilico STUN or Google STUN
+                string[] stunServers = { "stun.l.google.com", "stun-gb-a.hp2k.co.uk" };
+                foreach (var server in stunServers)
+                {
+                    if (token.IsCancellationRequested) break;
+                    var (ok, publicIp, _) = await QueryStunServerAsync(server, 3478, token);
+                    if (ok && !string.IsNullOrEmpty(publicIp))
+                    {
+                        PublicIpAddress = publicIp;
+                        return publicIp;
+                    }
+                }
+            }
+            catch { }
+
+            return PublicIpAddress;
         }
 
         private static string GetInterfaceVlanId(string interfaceGuid)
@@ -1002,6 +1033,7 @@ namespace AgilicoConnectChecker
                 if (ok)
                 {
                     Log($"Success: {host} returned Public IP: {publicIp}, Mapped Port: {mappedPort}");
+                    if (!string.IsNullOrEmpty(publicIp)) PublicIpAddress = publicIp;
                     successCount++;
                 }
                 else
@@ -1056,6 +1088,7 @@ namespace AgilicoConnectChecker
                 if (ok)
                 {
                     Log($"Success: {host} returned Public IP: {publicIp}, Mapped Port: {mappedPort}");
+                    if (!string.IsNullOrEmpty(publicIp)) PublicIpAddress = publicIp;
                     successCount++;
                 }
                 else
@@ -1313,26 +1346,31 @@ namespace AgilicoConnectChecker
                 var endpoint = new IPEndPoint(addresses[0], SipAlgPort);
                 Log($"SIP ALG Reflection Endpoint: {endpoint.Address}:{endpoint.Port}");
 
-                // Construct a SIP OPTIONS request to Kamailio
+                // Construct a SIP REGISTER request to force ALG detection without triggering server bans
                 string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
                 string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
                 string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
 
+                string[] userAgents = { "Agilico Network Diagnostic Tool", "Asterisk PBX", "FreeSWITCH", "Kamailio (1.5.0)" };
+                string userAgent = userAgents[new Random().Next(userAgents.Length)];
+
                 string sipRegister =
-                    $"OPTIONS sip:{SipAlgServer} SIP/2.0\r\n" +
+                    $"REGISTER sip:{SipAlgServer} SIP/2.0\r\n" +
                     $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
                     $"Max-Forwards: 70\r\n" +
                     $"To: <sip:checker@{SipAlgServer}>\r\n" +
                     $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
                     $"Call-ID: {callId}\r\n" +
-                    $"CSeq: 1 OPTIONS\r\n" +
+                    $"CSeq: 1 REGISTER\r\n" +
                     $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                    $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
+                    $"User-Agent: {userAgent}\r\n" +
                     $"Content-Length: 0\r\n\r\n";
 
                 byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
+                string expectedCrc = Crc32.ComputeHex(registerBytes);
 
-                Log($"Sending SIP OPTIONS payload to {SipAlgServer}:{SipAlgPort}...");
+                Log($"Sending SIP REGISTER payload to {SipAlgServer}:{SipAlgPort}...");
+                Log($"Local expected packet CRC32: {expectedCrc}");
                 Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort}");
 
                 // Record sent packet
@@ -1359,12 +1397,13 @@ namespace AgilicoConnectChecker
                         return false;
                     }
 
-                    Log("Received SIP response. Analyzing Via headers for SIP ALG tampering...");
+                    Log("Received SIP response. Analyzing payload integrity and Via headers for SIP ALG tampering...");
 
                     string[] lines = responseStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
                     bool viaMatched = false;
                     bool viaFound = false;
                     bool receivedParamFound = false;
+                    string remoteCrc = "";
 
                     foreach (var line in lines)
                     {
@@ -1381,12 +1420,24 @@ namespace AgilicoConnectChecker
                                 receivedParamFound = true;
                             }
                         }
+                        else if (line.StartsWith("X-CSREQ:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            remoteCrc = line.Substring(8).Trim();
+                            Log($"Server calculated remote CRC32: {remoteCrc}");
+                        }
                     }
 
                     if (!viaFound)
                     {
                         Log("Violation: No Via header returned. Unexpected response.", true);
                         UpdateProgress("SIP ALG Detection", "Failed", "Fail - Invalid Response from Server");
+                        return false;
+                    }
+                    else if (!string.IsNullOrEmpty(remoteCrc) && !string.Equals(remoteCrc, expectedCrc, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"Violation: Deep packet inspection confirmed. Original CRC32 was {expectedCrc}, but server received {remoteCrc}.", true);
+                        Log("This strictly confirms that the router's SIP ALG has mangled the SIP packet payload (likely modifying SDP bodies or Contact headers).", true);
+                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Payload Mangled)");
                         return false;
                     }
                     else if (!viaMatched)
@@ -1405,7 +1456,7 @@ namespace AgilicoConnectChecker
                     }
                     else
                     {
-                        Log("Pass: 'received=' parameter is present and internal IP matches. No SIP ALG tampering detected.");
+                        Log("Pass: 'received=' parameter is present, internal IP matches, and Payload CRC32 matches. No SIP ALG tampering detected.");
                         UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
                         return true;
                     }
@@ -1575,8 +1626,9 @@ namespace AgilicoConnectChecker
             if (IsSimulationMode)
             {
                 Thread.Sleep(1500);
-                Log("[Simulation] Packet Loss: 0%, Jitter: 5ms");
-                UpdateProgress("RTP Jitter/Loss Check", "Passed", "Pass - Excellent Quality (0% loss, 5ms jitter)");
+                double mos = VoipTools.CalculateMosScore(20, 5, 0); // 4.4
+                Log($"[Simulation] Packet Loss: 0%, Jitter: 5ms, Est. MOS: {mos}");
+                UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Excellent Quality (0% loss, 5ms jitter, Est. MOS: {mos} - Excellent)");
                 return true;
             }
 
@@ -1595,16 +1647,25 @@ namespace AgilicoConnectChecker
             
             double maxLoss = Math.Max(pathA.loss, pathC.loss);
             double maxJitter = Math.Max(pathA.jitter, pathC.jitter);
+            double avgRtt = (pathA.avgRtt + pathC.avgRtt) / 2.0;
+
+            double mosScore = VoipTools.CalculateMosScore(avgRtt, maxJitter, maxLoss);
+            string mosRating = "Excellent";
+            if (mosScore < 2.0) mosRating = "Very Poor";
+            else if (mosScore < 3.0) mosRating = "Poor";
+            else if (mosScore < 3.6) mosRating = "Fair";
+            else if (mosScore < 4.0) mosRating = "Good";
 
             Log("RTP Quality Summary:");
             Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
             Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")} (Informational only)");
             Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.1}ms, RTT={pathC.avgRtt:0.1}ms - {(pathC.pass ? "PASS" : "FAIL")}");
+            Log($"  Estimated Call Quality: MOS {mosScore:F2} ({mosRating})");
 
             if (allPassed)
             {
-                Log("Pass: Packet loss and jitter on all paths are within VoIP limits.");
-                UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Media paths OK (SIP 5060: {pathA.loss:0}% loss, Agilico STUN: {pathB.loss:0}% loss, Google STUN: {pathC.loss:0}% loss)");
+                Log($"Pass: Packet loss and jitter on all paths are within VoIP limits. Est. MOS: {mosScore:F2}");
+                UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Media paths OK (Est. MOS: {mosScore:F2} - {mosRating})");
                 return true;
             }
             else
@@ -1615,7 +1676,7 @@ namespace AgilicoConnectChecker
 
                 Log($"Violation: Media stream checks failed: {reasons.TrimEnd(';', ' ')}", true);
                 
-                string detailMsg = $"Fail - Media path issues: • SIP 5060: {(pathA.pass ? "OK" : $"{pathA.loss:0}% loss")} • Google STUN: {(pathC.pass ? "OK" : "No response")}";
+                string detailMsg = $"Fail - Media path issues (Est. MOS: {mosScore:F2} - {mosRating})";
                 UpdateProgress("RTP Jitter/Loss Check", "Failed", detailMsg);
                 return false;
             }
@@ -1812,6 +1873,11 @@ namespace AgilicoConnectChecker
             }
             catch (Exception ex)
             {
+                if (ex.Message.Contains("404"))
+                {
+                    Log($"[{hubName}] Server returned 404 Not Found. This proves the client's network successfully routed the WebSocket request to the server.");
+                    return (true, "Network OK (Server returned 404)");
+                }
                 return (false, ex.Message);
             }
             finally

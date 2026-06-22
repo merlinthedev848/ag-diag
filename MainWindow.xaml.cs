@@ -27,6 +27,9 @@ namespace AgilicoConnectChecker
         private CancellationTokenSource? _speedTestCts;
         private readonly System.Windows.Threading.DispatcherTimer _pcapTimer;
         private bool _isManualCapturing = false;
+        private readonly ObservableCollection<SrvRecord> _srvRecords = new();
+        private readonly ObservableCollection<PortProbeResult> _portProbeResults = new();
+        private CancellationTokenSource? _portProbeCts;
 
         public MainWindow()
         {
@@ -54,10 +57,12 @@ namespace AgilicoConnectChecker
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnPcap, BtnHelp, BtnLogs, BtnSettings };
+            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnPcap, BtnHelp, BtnLogs, BtnSettings, BtnVoipTools };
             GridLanDevices.ItemsSource = _lanDevices;
             GridPingLogs.ItemsSource = _pingLogs;
             GridTraceHops.ItemsSource = _traceHops;
+            GridSrvRecords.ItemsSource = _srvRecords;
+            GridPortProber.ItemsSource = _portProbeResults;
             
             // Initialize view
             SelectTab(0, BtnDashboard);
@@ -127,6 +132,7 @@ namespace AgilicoConnectChecker
         private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnHelp);
         private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnLogs);
         private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnSettings);
+        private void BtnVoipTools_Click(object sender, RoutedEventArgs e) => SelectTab(8, BtnVoipTools);
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -137,6 +143,8 @@ namespace AgilicoConnectChecker
             _lanScanCts?.Dispose();
             _speedTestCts?.Cancel();
             _speedTestCts?.Dispose();
+            _portProbeCts?.Cancel();
+            _portProbeCts?.Dispose();
         }
 
         #endregion
@@ -163,6 +171,21 @@ namespace AgilicoConnectChecker
             TxtLocalGateway.Text = info.Gateway;
             TxtLocalDns.Text = info.DnsServers;
             TxtLocalVlan.Text = info.Vlan;
+            TxtPublicIp.Text = info.PublicIpAddress;
+
+            // Fetch public IP in background if it's currently not detected
+            if (info.PublicIpAddress == "-" || info.PublicIpAddress == "Unknown" || info.PublicIpAddress == "Detecting...")
+            {
+                TxtPublicIp.Text = "Detecting...";
+                _ = Task.Run(async () =>
+                {
+                    string pubIp = await _engine.ResolvePublicIpAsync(CancellationToken.None);
+                    Dispatcher.Invoke(() =>
+                    {
+                        TxtPublicIp.Text = pubIp;
+                    });
+                });
+            }
 
             if (info.Status.Contains("No ") || info.Status.Contains("Disconnected"))
             {
@@ -376,6 +399,7 @@ namespace AgilicoConnectChecker
             Dispatcher.Invoke(() =>
             {
                 RestoreControlButtons();
+                RefreshLocalNetworkInfo();
 
                 PanelSummaryDefault.Visibility = Visibility.Collapsed;
 
@@ -1055,6 +1079,7 @@ namespace AgilicoConnectChecker
                 BtnTraceroute.Visibility = Visibility.Collapsed;
                 BtnPcap.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
+                BtnVoipTools.Visibility = Visibility.Collapsed;
                 
                 if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6)
                 {
@@ -1117,6 +1142,7 @@ namespace AgilicoConnectChecker
                 BtnPcap.Visibility = Visibility.Visible;
                 BtnLogs.Visibility = Visibility.Visible;
                 BtnSettings.Visibility = Visibility.Visible;
+                BtnVoipTools.Visibility = Visibility.Visible;
                 MessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
@@ -1217,6 +1243,274 @@ namespace AgilicoConnectChecker
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
             }
         }
+
+        #region VoIP and Advanced IT Tools
+
+        private async void BtnResolveSrv_Click(object sender, RoutedEventArgs e)
+        {
+            var domain = TxtSrvDomain.Text.Trim();
+            var serviceItem = CbSrvService.SelectedItem as ComboBoxItem;
+            var service = serviceItem?.Content?.ToString() ?? "_sip._udp";
+
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                MessageBox.Show("Please enter a valid domain to resolve.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            BtnResolveSrv.IsEnabled = false;
+            BtnResolveSrv.Content = "RESOLVING...";
+            _srvRecords.Clear();
+
+            try
+            {
+                var records = await VoipTools.ResolveSrvAsync(service, domain);
+                foreach (var rec in records)
+                {
+                    _srvRecords.Add(rec);
+                }
+
+                if (records.Count == 0)
+                {
+                    MessageBox.Show("No DNS SRV records found for the specified domain and service.", "Results", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to resolve SRV records: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnResolveSrv.IsEnabled = true;
+                BtnResolveSrv.Content = "RESOLVE SRV";
+            }
+        }
+
+        private void CbPortProfile_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+        }
+
+        private async void BtnStartPortProbe_Click(object sender, RoutedEventArgs e)
+        {
+            BtnStartPortProbe.IsEnabled = false;
+            BtnStartPortProbe.Content = "PROBING...";
+            _portProbeResults.Clear();
+
+            _portProbeCts?.Cancel();
+            _portProbeCts?.Dispose();
+            _portProbeCts = new CancellationTokenSource();
+            var token = _portProbeCts.Token;
+
+            var profileItem = CbPortProfile.SelectedItem as ComboBoxItem;
+            var profileName = profileItem?.Content?.ToString() ?? "Agilico Connect Profile";
+
+            try
+            {
+                List<(string target, int port, string serviceName, string protocol)> probes = new();
+
+                if (profileName.Contains("Agilico"))
+                {
+                    probes.Add(("customerportal.hp2k.co.uk", 80, "Web Portal HTTP", "TCP"));
+                    probes.Add(("customerportal.hp2k.co.uk", 443, "Web Portal HTTPS", "TCP"));
+                    probes.Add(("stun-gb-a.hp2k.co.uk", 3478, "STUN Service Primary", "UDP"));
+                    probes.Add(("customerportal.hp2k.co.uk", 5060, "SIP UDP Signaling", "UDP"));
+                    probes.Add(("customerportal.hp2k.co.uk", 5061, "Secure SIP TLS Signaling", "UDP"));
+                    probes.Add(("uk.pool.ntp.org", 123, "NTP Time Server", "UDP"));
+                }
+                else if (profileName.Contains("3CX"))
+                {
+                    var target3cx = ShowInputDialog("3CX Server Target", "Enter FQDN or IP of your 3CX Phone System:", "company.3cx.co.uk");
+                    if (string.IsNullOrEmpty(target3cx))
+                    {
+                        RestorePortProbeBtn();
+                        return;
+                    }
+                    probes.Add((target3cx, 5060, "SIP TCP Signaling", "TCP"));
+                    probes.Add((target3cx, 5060, "SIP UDP Signaling", "UDP"));
+                    probes.Add((target3cx, 5061, "Secure SIP TLS Signaling", "TCP"));
+                    probes.Add((target3cx, 5090, "3CX Tunnel (TCP)", "TCP"));
+                    probes.Add((target3cx, 5090, "3CX Tunnel (UDP)", "UDP"));
+                    probes.Add((target3cx, 443, "Web Client / Provisioning", "TCP"));
+                    probes.Add((target3cx, 5015, "3CX System Management", "TCP"));
+                }
+                else if (profileName.Contains("Microsoft Teams"))
+                {
+                    probes.Add(("sip.pstnhub.microsoft.com", 5061, "Teams SIP TLS Primary", "TCP"));
+                    probes.Add(("sip2.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 1", "TCP"));
+                    probes.Add(("sip3.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 2", "TCP"));
+                    probes.Add(("world.tr.teams.microsoft.com", 3478, "Teams Media STUN 3478", "UDP"));
+                    probes.Add(("world.tr.teams.microsoft.com", 3479, "Teams Media STUN 3479", "UDP"));
+                    probes.Add(("world.tr.teams.microsoft.com", 3480, "Teams Media STUN 3480", "UDP"));
+                    probes.Add(("world.tr.teams.microsoft.com", 3481, "Teams Media STUN 3481", "UDP"));
+                }
+                else // Custom Port Range
+                {
+                    var customTarget = ShowInputDialog("Custom Probe Target", "Enter target host (IP or FQDN):", "8.8.8.8");
+                    if (string.IsNullOrEmpty(customTarget))
+                    {
+                        RestorePortProbeBtn();
+                        return;
+                    }
+                    var customPortsStr = ShowInputDialog("Custom Ports", "Enter comma-separated ports with protocol (e.g. TCP 80, UDP 53, TCP 443):", "TCP 80, UDP 53");
+                    if (string.IsNullOrEmpty(customPortsStr))
+                    {
+                        RestorePortProbeBtn();
+                        return;
+                    }
+
+                    var parts = customPortsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var part in parts)
+                    {
+                        var trimmed = part.Trim();
+                        var tokens = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (tokens.Length == 2)
+                        {
+                            var proto = tokens[0].ToUpper();
+                            if ((proto == "TCP" || proto == "UDP") && int.TryParse(tokens[1], out int p) && p > 0 && p <= 65535)
+                            {
+                                probes.Add((customTarget, p, $"Custom Service {proto}", proto));
+                            }
+                        }
+                        else if (tokens.Length == 1 && int.TryParse(tokens[0], out int p) && p > 0 && p <= 65535)
+                        {
+                            probes.Add((customTarget, p, "Custom Service TCP", "TCP"));
+                        }
+                    }
+
+                    if (probes.Count == 0)
+                    {
+                        MessageBox.Show("No valid ports parsed. Format should be: Protocol Port (e.g., TCP 80).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        RestorePortProbeBtn();
+                        return;
+                    }
+                }
+
+                // Run all probes concurrently and stream results to UI
+                var probeTasks = new List<Task<PortProbeResult>>();
+                foreach (var p in probes)
+                {
+                    if (p.protocol == "TCP")
+                    {
+                        probeTasks.Add(VoipTools.ProbeTcpPortAsync(p.target, p.port, p.serviceName, token));
+                    }
+                    else
+                    {
+                        probeTasks.Add(VoipTools.ProbeUdpPortAsync(p.target, p.port, p.serviceName, token));
+                    }
+                }
+
+                while (probeTasks.Count > 0)
+                {
+                    var completedTask = await Task.WhenAny(probeTasks);
+                    probeTasks.Remove(completedTask);
+
+                    var res = await completedTask;
+                    Dispatcher.Invoke(() => _portProbeResults.Add(res));
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error running port probes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                RestorePortProbeBtn();
+            }
+        }
+
+        private void RestorePortProbeBtn()
+        {
+            BtnStartPortProbe.IsEnabled = true;
+            BtnStartPortProbe.Content = "PROBE PORTS";
+        }
+
+        private string? ShowInputDialog(string title, string instruction, string defaultValue = "")
+        {
+            var textBox = new TextBox { Margin = new Thickness(10), Width = 250, Text = defaultValue, Padding = new Thickness(5), VerticalAlignment = VerticalAlignment.Center };
+            var okButton = new Button { Content = "OK", IsDefault = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
+            var cancelButton = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
+            
+            var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(10) };
+            buttonPanel.Children.Add(okButton);
+            buttonPanel.Children.Add(cancelButton);
+
+            var mainPanel = new StackPanel { Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
+            mainPanel.Children.Add(new TextBlock { Text = instruction, Foreground = Brushes.White, Margin = new Thickness(10), FontSize = 13, FontWeight = FontWeights.SemiBold });
+            mainPanel.Children.Add(textBox);
+            mainPanel.Children.Add(buttonPanel);
+
+            var dialog = new Window
+            {
+                Title = title,
+                Content = mainPanel,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow,
+                Background = new SolidColorBrush(Color.FromRgb(30, 41, 59))
+            };
+
+            okButton.Click += (s, ev) =>
+            {
+                dialog.DialogResult = true;
+                dialog.Close();
+            };
+
+            cancelButton.Click += (s, ev) =>
+            {
+                dialog.DialogResult = false;
+                dialog.Close();
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                return textBox.Text.Trim();
+            }
+            return null;
+        }
+
+        private void TestRow_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is Border border && border.Child is Grid grid)
+            {
+                foreach (var child in grid.Children)
+                {
+                    if (child is CheckBox chk)
+                    {
+                        chk.IsChecked = !chk.IsChecked;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void ChkSelectAll_Checked(object sender, RoutedEventArgs e)
+        {
+            SetAllCheckboxes(true);
+        }
+
+        private void ChkSelectAll_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SetAllCheckboxes(false);
+        }
+
+        private void SetAllCheckboxes(bool isChecked)
+        {
+            if (ChkTest1 != null) ChkTest1.IsChecked = isChecked;
+            if (ChkTest2 != null) ChkTest2.IsChecked = isChecked;
+            if (ChkTest3 != null) ChkTest3.IsChecked = isChecked;
+            if (ChkTest4 != null) ChkTest4.IsChecked = isChecked;
+            if (ChkTest5 != null) ChkTest5.IsChecked = isChecked;
+            if (ChkTest6 != null) ChkTest6.IsChecked = isChecked;
+            if (ChkTest7 != null) ChkTest7.IsChecked = isChecked;
+            if (ChkTest8 != null) ChkTest8.IsChecked = isChecked;
+            if (ChkTest9 != null) ChkTest9.IsChecked = isChecked;
+            if (ChkTest10 != null) ChkTest10.IsChecked = isChecked;
+        }
+
+        #endregion
     }
 
     public class TraceHop
