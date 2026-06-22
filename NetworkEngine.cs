@@ -957,8 +957,26 @@ namespace AgilicoConnectChecker
             if (ntpOk)
             {
                 Log($"Test 3: PASSED. Outbound UDP port 123 (NTP) is open and receiving replies.");
-                Log($"NTP Server reported time: {detectedTime?.ToString("yyyy-MM-dd HH:mm:ss UTC")}");
-                UpdateProgress("NTP Subsystem (UDP 123)", "Passed", $"Pass - Time: {detectedTime?.ToString("HH:mm:ss UTC")}");
+                if (detectedTime.HasValue)
+                {
+                    try
+                    {
+                        var ukZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+                        var ukTime = TimeZoneInfo.ConvertTimeFromUtc(detectedTime.Value, ukZone);
+                        Log($"NTP Server reported time: {ukTime.ToString("yyyy-MM-dd HH:mm:ss")} (UK Time)");
+                        UpdateProgress("NTP Subsystem (UDP 123)", "Passed", $"Pass - Time: {ukTime.ToString("HH:mm:ss")}");
+                    }
+                    catch
+                    {
+                        // Fallback if timezone not found
+                        Log($"NTP Server reported time: {detectedTime.Value.ToString("yyyy-MM-dd HH:mm:ss UTC")}");
+                        UpdateProgress("NTP Subsystem (UDP 123)", "Passed", $"Pass - Time: {detectedTime.Value.ToString("HH:mm:ss UTC")}");
+                    }
+                }
+                else
+                {
+                    UpdateProgress("NTP Subsystem (UDP 123)", "Passed", "Pass - UDP 123 Outbound Open");
+                }
                 return true;
             }
             else
