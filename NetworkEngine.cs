@@ -936,12 +936,15 @@ namespace AgilicoConnectChecker
 
             string[] ntpHosts = { "pool.ntp.org", "time.google.com", "time.windows.com" };
             bool ntpOk = false;
+            DateTime? detectedTime = null;
             foreach (var ntpHost in ntpHosts)
             {
                 Log($"Sending standard NTP synchronization request to {ntpHost}...");
-                ntpOk = await TestNtpAsync(ntpHost, token);
-                if (ntpOk)
+                var ntpResult = await TestNtpAsync(ntpHost, token);
+                if (ntpResult.success)
                 {
+                    ntpOk = true;
+                    detectedTime = ntpResult.time;
                     Log($"Success: Received NTP response from {ntpHost}.");
                     break;
                 }
@@ -953,8 +956,9 @@ namespace AgilicoConnectChecker
 
             if (ntpOk)
             {
-                Log("Test 3: PASSED. Outbound UDP port 123 (NTP) is open and receiving replies.");
-                UpdateProgress("NTP Subsystem (UDP 123)", "Passed", "Pass - UDP 123 Outbound Open");
+                Log($"Test 3: PASSED. Outbound UDP port 123 (NTP) is open and receiving replies.");
+                Log($"NTP Server reported time: {detectedTime?.ToString("yyyy-MM-dd HH:mm:ss UTC")}");
+                UpdateProgress("NTP Subsystem (UDP 123)", "Passed", $"Pass - Time: {detectedTime?.ToString("HH:mm:ss UTC")}");
                 return true;
             }
             else
@@ -965,7 +969,7 @@ namespace AgilicoConnectChecker
             }
         }
 
-        private async Task<bool> TestNtpAsync(string host, CancellationToken token)
+        private async Task<(bool success, DateTime? time)> TestNtpAsync(string host, CancellationToken token)
         {
             try
             {
@@ -973,7 +977,7 @@ namespace AgilicoConnectChecker
                 ntpData[0] = 0x1B; // LeapIndicator = 0, Version = 3, Mode = 3 (Client)
 
                 var addresses = await Dns.GetHostAddressesAsync(host, token);
-                if (addresses.Length == 0) return false;
+                if (addresses.Length == 0) return (false, null);
                 var endPoint = new IPEndPoint(addresses[0], 123);
 
                 using var client = new UdpClient(0);
@@ -997,13 +1001,22 @@ namespace AgilicoConnectChecker
                     // Record received packet
                     Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), 123, localIp, localPort, true);
                     // Validate: length >= 48 and Mode field (bits 0-2 of byte 0) == 4 (server)
-                    return result.Buffer.Length >= 48 && (result.Buffer[0] & 0x07) == 4;
+                    if (result.Buffer.Length >= 48 && (result.Buffer[0] & 0x07) == 4)
+                    {
+                        ulong intPart = (ulong)result.Buffer[40] << 24 | (ulong)result.Buffer[41] << 16 | (ulong)result.Buffer[42] << 8 | (ulong)result.Buffer[43];
+                        ulong fractPart = (ulong)result.Buffer[44] << 24 | (ulong)result.Buffer[45] << 16 | (ulong)result.Buffer[46] << 8 | (ulong)result.Buffer[47];
+
+                        var milliseconds = (intPart * 1000) + ((fractPart * 1000) / 0x100000000L);
+                        var networkDateTime = (new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)).AddMilliseconds((long)milliseconds);
+
+                        return (true, networkDateTime);
+                    }
                 }
-                return false;
+                return (false, null);
             }
             catch
             {
-                return false;
+                return (false, null);
             }
         }
 
@@ -1319,165 +1332,119 @@ namespace AgilicoConnectChecker
                 return true;
             }
 
-            UdpClient? client = null;
-            try
+            string[] servers = { "sip.linphone.org", "sip2sip.info" };
+            bool responseReceived = false;
+            bool sipAlgDetected = false;
+
+            foreach (var server in servers)
             {
+                if (token.IsCancellationRequested) return false;
+                
+                Log($"Testing SIP ALG against public server: {server}...");
                 try
                 {
-                    client = new UdpClient(LocalSipPort);
-                    Log($"Bound to local SIP port {LocalSipPort} for ALG verification.");
-                }
-                catch (SocketException)
-                {
-                    client = new UdpClient(0);
-                    Log($"Local port {LocalSipPort} is in use. Bound to local ephemeral port {((IPEndPoint)client.Client.LocalEndPoint!).Port} for verification.");
-                }
-
-                client.Client.SendTimeout = 2500;
-                client.Client.ReceiveTimeout = 2500;
-
-                string localIp = GetLocalIpAddress();
-                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
-
-                Log($"Resolving SIP ALG reflection server: {SipAlgServer}...");
-                var addresses = await Dns.GetHostAddressesAsync(SipAlgServer, token);
-                if (addresses.Length == 0) throw new Exception("No DNS response from reflection host.");
-
-                var endpoint = new IPEndPoint(addresses[0], SipAlgPort);
-                Log($"SIP ALG Reflection Endpoint: {endpoint.Address}:{endpoint.Port}");
-
-                // Construct a SIP REGISTER request to force ALG detection without triggering server bans
-                string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
-                string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
-                string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
-
-                string[] userAgents = { "Agilico Network Diagnostic Tool", "Asterisk PBX", "FreeSWITCH", "Kamailio (1.5.0)" };
-                string userAgent = userAgents[new Random().Next(userAgents.Length)];
-
-                string sipRegister =
-                    $"REGISTER sip:{SipAlgServer} SIP/2.0\r\n" +
-                    $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
-                    $"Max-Forwards: 70\r\n" +
-                    $"To: <sip:checker@{SipAlgServer}>\r\n" +
-                    $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
-                    $"Call-ID: {callId}\r\n" +
-                    $"CSeq: 1 REGISTER\r\n" +
-                    $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                    $"User-Agent: {userAgent}\r\n" +
-                    $"Content-Length: 0\r\n\r\n";
-
-                byte[] registerBytes = Encoding.UTF8.GetBytes(sipRegister);
-                string expectedCrc = Crc32.ComputeHex(registerBytes);
-
-                Log($"Sending SIP REGISTER payload to {SipAlgServer}:{SipAlgPort}...");
-                Log($"Local expected packet CRC32: {expectedCrc}");
-                Log($"Expected Via header: Via: SIP/2.0/UDP {localIp}:{localPort}");
-
-                // Record sent packet
-                Pcap.RecordPacket(registerBytes, localIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
-
-                await client.SendAsync(registerBytes, registerBytes.Length, endpoint);
-
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(3000, token);
-
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
-                {
-                    var result = await receiveTask;
-                    // Record received packet
-                    Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, localIp, localPort, true);
-                    string responseStr = Encoding.UTF8.GetString(result.Buffer);
-
-                    // Validate response is for our request by checking Call-ID
-                    if (!responseStr.Contains(callId, StringComparison.OrdinalIgnoreCase))
+                    var addresses = await Dns.GetHostAddressesAsync(server, token);
+                    if (addresses.Length == 0) continue;
+                    
+                    var endpoint = new IPEndPoint(addresses[0], 5060);
+                    using var udpClient = new UdpClient(0);
+                    udpClient.Client.SendTimeout = 3000;
+                    udpClient.Client.ReceiveTimeout = 3000;
+                    
+                    int localPort = ((IPEndPoint)udpClient.Client.LocalEndPoint!).Port;
+                    string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
+                    string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
+                    string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
+                    
+                    // We use a generic internal IP to force the ALG to translate it if active
+                    string fakeLocalIp = "192.168.1.100";
+                    
+                    string sipOptions = $"OPTIONS sip:{server} SIP/2.0\r\n" +
+                        $"Via: SIP/2.0/UDP {fakeLocalIp}:{localPort};rport;branch={branch}\r\n" +
+                        $"Max-Forwards: 70\r\n" +
+                        $"To: <sip:ping@{server}>\r\n" +
+                        $"From: <sip:ping@{fakeLocalIp}:{localPort}>;tag={tag}\r\n" +
+                        $"Call-ID: {callId}\r\n" +
+                        $"CSeq: 1 OPTIONS\r\n" +
+                        $"Contact: <sip:ping@{fakeLocalIp}:{localPort}>\r\n" +
+                        $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
+                        $"Content-Length: 0\r\n\r\n";
+                        
+                    byte[] bytes = Encoding.UTF8.GetBytes(sipOptions);
+                    
+                    // Record sent packet
+                    string actualLocalIp = GetLocalIpAddress();
+                    Pcap.RecordPacket(bytes, actualLocalIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
+                    
+                    Log($"Sending OPTIONS payload with dummy Via IP {fakeLocalIp}...");
+                    await udpClient.SendAsync(bytes, bytes.Length, endpoint);
+                    
+                    var receiveTask = udpClient.ReceiveAsync(token).AsTask();
+                    var delayTask = Task.Delay(3000, token);
+                    
+                    var completed = await Task.WhenAny(receiveTask, delayTask);
+                    if (completed == receiveTask)
                     {
-                        Log("Warning: Received SIP response with mismatched Call-ID. Ignoring stale response.");
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Uncorrelated SIP Response");
-                        return false;
-                    }
-
-                    Log("Received SIP response. Analyzing payload integrity and Via headers for SIP ALG tampering...");
-
-                    string[] lines = responseStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                    bool viaMatched = false;
-                    bool viaFound = false;
-                    bool receivedParamFound = false;
-                    string remoteCrc = "";
-
-                    foreach (var line in lines)
-                    {
-                        if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
+                        var result = await receiveTask;
+                        responseReceived = true;
+                        
+                        Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, actualLocalIp, localPort, true);
+                        string respStr = Encoding.UTF8.GetString(result.Buffer);
+                        Log($"Received response from {server}. Analyzing Via headers...");
+                        
+                        bool viaFound = false;
+                        string[] lines = respStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        
+                        foreach (var line in lines)
                         {
-                            viaFound = true;
-                            Log($"Remote returned {line}");
-                            if (line.Contains($"{localIp}:{localPort}"))
+                            if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
                             {
-                                viaMatched = true;
-                            }
-                            if (line.Contains("received=", StringComparison.OrdinalIgnoreCase))
-                            {
-                                receivedParamFound = true;
+                                viaFound = true;
+                                Log($"Returned {line}");
+                                // If the router modified our hardcoded fake IP to its WAN IP, SIP ALG is doing deep inspection!
+                                if (!line.Contains(fakeLocalIp))
+                                {
+                                    sipAlgDetected = true;
+                                }
                             }
                         }
-                        else if (line.StartsWith("X-CSREQ:", StringComparison.OrdinalIgnoreCase))
+                        
+                        if (!viaFound)
                         {
-                            remoteCrc = line.Substring(8).Trim();
-                            Log($"Server calculated remote CRC32: {remoteCrc}");
+                            Log("No Via header returned in response.");
                         }
-                    }
-
-                    if (!viaFound)
-                    {
-                        Log("Violation: No Via header returned. Unexpected response.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - Invalid Response from Server");
-                        return false;
-                    }
-                    else if (!string.IsNullOrEmpty(remoteCrc) && !string.Equals(remoteCrc, expectedCrc, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Log($"Violation: Deep packet inspection confirmed. Original CRC32 was {expectedCrc}, but server received {remoteCrc}.", true);
-                        Log("This strictly confirms that the router's SIP ALG has mangled the SIP packet payload (likely modifying SDP bodies or Contact headers).", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Payload Mangled)");
-                        return false;
-                    }
-                    else if (!viaMatched)
-                    {
-                        Log("Violation: The returned Via header does NOT match the local IP/Port sent.", true);
-                        Log("This indicates SIP ALG has modified the SIP headers in transit.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Header Mangled)");
-                        return false;
-                    }
-                    else if (!receivedParamFound)
-                    {
-                        Log("Violation: The 'received=' parameter is missing from the Via header.", true);
-                        Log("This indicates the router's SIP ALG symmetrically translated the IP to public, causing the server to omit 'received='.", true);
-                        UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Symmetric Translation Detected)");
-                        return false;
+                        
+                        if (responseReceived) break;
                     }
                     else
                     {
-                        Log("Pass: 'received=' parameter is present, internal IP matches, and Payload CRC32 matches. No SIP ALG tampering detected.");
-                        UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
-                        return true;
+                        Log($"Request to {server} timed out.");
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Log("Error: SIP OPTIONS request timed out. No response received.", true);
-                    Log("This means UDP port 5060 is being dropped by the firewall, or SIP ALG is silently discarding the packets.", true);
-                    UpdateProgress("SIP ALG Detection", "Failed", "Fail - Timeout (UDP 5060 Blocked)");
-                    return false;
+                    Log($"Failed for {server}: {ex.Message}");
                 }
             }
-            catch (Exception ex)
+
+            if (!responseReceived)
             {
-                Log($"SIP ALG test failed with error: {ex.Message}", true);
-                UpdateProgress("SIP ALG Detection", "Failed", "Error: " + ex.Message);
+                Log("Test 8: FAILED. No response received from any public SIP server. Outbound UDP 5060 may be blocked.", true);
+                UpdateProgress("SIP ALG Detection", "Failed", "Fail - No SIP Response (UDP 5060 Blocked)");
                 return false;
             }
-            finally
+            else if (sipAlgDetected)
             {
-                client?.Close();
+                Log("Violation: The returned Via header does NOT match the dummy internal IP sent.", true);
+                Log("This strictly confirms that the router's SIP ALG has mangled the SIP packet payload.", true);
+                UpdateProgress("SIP ALG Detection", "Failed", "Fail - SIP ALG Enabled (Header Mangled)");
+                return false;
+            }
+            else
+            {
+                Log("Pass: Response matched dummy internal IP. SIP ALG is Disabled.");
+                UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
+                return true;
             }
         }
 
