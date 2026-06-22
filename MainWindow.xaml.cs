@@ -872,13 +872,13 @@ namespace AgilicoConnectChecker
             double downloadMbps = 0;
             double uploadMbps = 0;
             using var client = new System.Net.Http.HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = TimeSpan.FromSeconds(15); // Allow up to 15 seconds for realistic tests
 
-            // 1. Download Test (Cloudflare 50MB Endpoint)
+            // 1. Download Test (Using Cloudflare Speedtest Endpoint ~5MB)
             try
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=50000000", token);
+                var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=5242880", token);
                 response.EnsureSuccessStatusCode();
                 var bytes = await response.Content.ReadAsByteArrayAsync(token);
                 sw.Stop();
@@ -894,11 +894,10 @@ namespace AgilicoConnectChecker
                 System.Diagnostics.Debug.WriteLine($"Download speed test failed: {ex.Message}");
             }
 
-            // 2. Upload Test (Cloudflare Upload Endpoint)
+            // 2. Upload Test (Using Cloudflare Speedtest Endpoint ~2MB)
             try
             {
-                // 15 MB random payload
-                var payload = new byte[15000000];
+                var payload = new byte[2097152];
                 new Random().NextBytes(payload);
                 var content = new System.Net.Http.ByteArrayContent(payload);
 
