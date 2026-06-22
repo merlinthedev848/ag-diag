@@ -872,13 +872,13 @@ namespace AgilicoConnectChecker
             double downloadMbps = 0;
             double uploadMbps = 0;
             using var client = new System.Net.Http.HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(5);
+            client.Timeout = TimeSpan.FromSeconds(30);
 
-            // 1. Download Test
+            // 1. Download Test (Cloudflare 50MB Endpoint)
             try
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await client.GetAsync("https://customerportal.hp2k.co.uk", token);
+                var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=50000000", token);
                 response.EnsureSuccessStatusCode();
                 var bytes = await response.Content.ReadAsByteArrayAsync(token);
                 sw.Stop();
@@ -889,21 +889,22 @@ namespace AgilicoConnectChecker
                     downloadMbps = (bytes.Length * 8.0) / (seconds * 1000000.0);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                var rand = new Random();
-                downloadMbps = Math.Round(40 + rand.NextDouble() * 20, 1);
+                System.Diagnostics.Debug.WriteLine($"Download speed test failed: {ex.Message}");
             }
 
-            // 2. Upload Test
+            // 2. Upload Test (Cloudflare Upload Endpoint)
             try
             {
-                var payload = new byte[1024 * 100]; // 100 KB payload
+                // 15 MB random payload
+                var payload = new byte[15000000];
                 new Random().NextBytes(payload);
                 var content = new System.Net.Http.ByteArrayContent(payload);
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await client.PostAsync("https://customerportal.hp2k.co.uk", content, token);
+                var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, token);
+                response.EnsureSuccessStatusCode();
                 sw.Stop();
 
                 double seconds = sw.Elapsed.TotalSeconds;
@@ -912,21 +913,9 @@ namespace AgilicoConnectChecker
                     uploadMbps = (payload.Length * 8.0) / (seconds * 1000000.0);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                var rand = new Random();
-                uploadMbps = Math.Round(10 + rand.NextDouble() * 5, 1);
-            }
-
-            if (downloadMbps < 1.0)
-            {
-                var rand = new Random();
-                downloadMbps = Math.Round(60 + rand.NextDouble() * 20, 1);
-            }
-            if (uploadMbps < 1.0)
-            {
-                var rand = new Random();
-                uploadMbps = Math.Round(18 + rand.NextDouble() * 6, 1);
+                System.Diagnostics.Debug.WriteLine($"Upload speed test failed: {ex.Message}");
             }
 
             return (Math.Round(downloadMbps, 1), Math.Round(uploadMbps, 1));
