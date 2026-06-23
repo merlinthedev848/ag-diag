@@ -352,7 +352,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test1IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test1IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test1Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test1Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test1IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -393,7 +393,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test2IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test2IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test2Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test2Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test2IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -434,7 +434,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test3IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test3IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test3Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test3Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test3IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -475,7 +475,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test4IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test4IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test4Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test4Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test4IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -516,7 +516,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test5IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test5IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test5Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test5Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test5IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -557,7 +557,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test6IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test6IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test6Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test6Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test6IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -598,7 +598,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test7IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test7IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test7Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test7Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test7IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -639,7 +639,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test8IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test8IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test8Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test8Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test8IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -680,7 +680,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test9IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test9IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test9Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test9Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test9IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test9IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test9IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
@@ -721,7 +721,7 @@
                                                 <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
                                                     <Ellipse x:Name="Test10IconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
                                                     <Ellipse x:Name="Test10IconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
-                                                    <Path x:Name="Test10Spinner" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="Test10Spinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test10IconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test10IconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
                                                     <Path x:Name="Test10IconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>

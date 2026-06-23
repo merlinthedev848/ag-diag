@@ -79,8 +79,8 @@ namespace AgilicoConnectChecker
             TxtSipAlgPort.Text = _engine.SipAlgPort.ToString();
             ChkSimulation.IsChecked = _engine.IsSimulationMode;
 
-            // Trigger firewall permission prompt on load so it doesn't block running tests
-            _engine.TriggerFirewallPrompt();
+            // Trigger firewall permission prompt on load in background so it doesn't block startup
+            _ = Task.Run(() => _engine.TriggerFirewallPrompt());
 
             // Initialize default Probe sub-tab
             SelectProbeTab(0, BtnProbeTrace);
@@ -212,44 +212,51 @@ namespace AgilicoConnectChecker
 
         private void RefreshLocalNetworkInfo()
         {
-            var info = _engine.GetLocalNetworkInfo();
-            TxtLocalStatus.Text = info.Status;
-            TxtLocalIp.Text = info.IpAddress;
-            TxtLocalSubnet.Text = info.SubnetMask;
-            TxtLocalGateway.Text = info.Gateway;
-            TxtLocalDns.Text = info.DnsServers;
-            TxtLocalVlan.Text = info.Vlan;
-            TxtPublicIp.Text = info.PublicIpAddress;
+            TxtLocalStatus.Text = "Detecting...";
+            TxtLocalIp.Text = "Detecting...";
+            TxtLocalSubnet.Text = "Detecting...";
+            TxtLocalGateway.Text = "Detecting...";
+            TxtLocalDns.Text = "Detecting...";
+            TxtLocalVlan.Text = "Detecting...";
+            TxtPublicIp.Text = "Detecting...";
 
-            // Fetch public IP in background if it's currently not detected
-            if (info.PublicIpAddress == "-" || info.PublicIpAddress == "Unknown" || info.PublicIpAddress == "Detecting...")
+            _ = Task.Run(async () =>
             {
-                TxtPublicIp.Text = "Detecting...";
-                _ = Task.Run(async () =>
+                var info = _engine.GetLocalNetworkInfo();
+                string pubIp = info.PublicIpAddress;
+
+                if (pubIp == "-" || pubIp == "Unknown" || pubIp == "Detecting...")
                 {
-                    string pubIp = await _engine.ResolvePublicIpAsync(CancellationToken.None);
-                    Dispatcher.Invoke(() =>
-                    {
-                        TxtPublicIp.Text = pubIp;
-                    });
-                });
-            }
+                    pubIp = await _engine.ResolvePublicIpAsync(CancellationToken.None);
+                }
 
-            if (info.Status.Contains("No ") || info.Status.Contains("Disconnected"))
-            {
-                TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentRedBrush");
-                TxtLocalStatus.FontWeight = FontWeights.Bold;
-            }
-            else if (info.Status.Contains("VPN"))
-            {
-                TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentYellowBrush");
-                TxtLocalStatus.FontWeight = FontWeights.Bold;
-            }
-            else
-            {
-                TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentBlueBrush");
-                TxtLocalStatus.FontWeight = FontWeights.SemiBold;
-            }
+                Dispatcher.Invoke(() =>
+                {
+                    TxtLocalStatus.Text = info.Status;
+                    TxtLocalIp.Text = info.IpAddress;
+                    TxtLocalSubnet.Text = info.SubnetMask;
+                    TxtLocalGateway.Text = info.Gateway;
+                    TxtLocalDns.Text = info.DnsServers;
+                    TxtLocalVlan.Text = info.Vlan;
+                    TxtPublicIp.Text = pubIp;
+
+                    if (info.Status.Contains("No ") || info.Status.Contains("Disconnected"))
+                    {
+                        TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentRedBrush");
+                        TxtLocalStatus.FontWeight = FontWeights.Bold;
+                    }
+                    else if (info.Status.Contains("VPN"))
+                    {
+                        TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentWarningBrush");
+                        TxtLocalStatus.FontWeight = FontWeights.Bold;
+                    }
+                    else
+                    {
+                        TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentBlueBrush");
+                        TxtLocalStatus.FontWeight = FontWeights.SemiBold;
+                    }
+                });
+            });
         }
 
         private async void BtnStart_Click(object sender, RoutedEventArgs e)
