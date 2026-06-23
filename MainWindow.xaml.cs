@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -30,6 +31,8 @@ namespace AgilicoConnectChecker
         private readonly ObservableCollection<SrvRecord> _srvRecords = new();
         private readonly ObservableCollection<PortProbeResult> _portProbeResults = new();
         private CancellationTokenSource? _portProbeCts;
+        private readonly ObservableCollection<ActiveSocket> _allSockets = new();
+        private readonly ObservableCollection<ActiveSocket> _displayedSockets = new();
 
         public MainWindow()
         {
@@ -63,6 +66,7 @@ namespace AgilicoConnectChecker
             GridTraceHops.ItemsSource = _traceHops;
             GridSrvRecords.ItemsSource = _srvRecords;
             GridPortProber.ItemsSource = _portProbeResults;
+            GridActiveSockets.ItemsSource = _displayedSockets;
             
             // Initialize view
             SelectTab(0, BtnDashboard);
@@ -144,7 +148,7 @@ namespace AgilicoConnectChecker
         {
             ProbeTabControl.SelectedIndex = index;
 
-            var probeButtons = new[] { BtnProbeTrace, BtnProbePorts, BtnProbeDns };
+            var probeButtons = new[] { BtnProbeTrace, BtnProbePorts, BtnProbeDns, BtnProbeSockets };
             foreach (var btn in probeButtons)
             {
                 if (btn == activeButton)
@@ -173,6 +177,11 @@ namespace AgilicoConnectChecker
             else if (sender == BtnProbeDns)
             {
                 SelectProbeTab(2, BtnProbeDns);
+            }
+            else if (sender == BtnProbeSockets)
+            {
+                SelectProbeTab(3, BtnProbeSockets);
+                _ = RefreshSocketsListAsync();
             }
         }
 
@@ -1248,21 +1257,27 @@ namespace AgilicoConnectChecker
                                 {
                                     if (reply.Address != null)
                                     {
+                                        var ipStr = reply.Address.ToString();
+                                        var hostTask = System.Net.Dns.GetHostEntryAsync(reply.Address);
+                                        var geoTask = LookupGeoIpAndAsnAsync(ipStr);
+
+                                        string hostname = "-";
                                         try
                                         {
-                                            var entry = await System.Net.Dns.GetHostEntryAsync(reply.Address);
-                                            Dispatcher.Invoke(() =>
-                                            {
-                                                hopResult.Hostname = entry.HostName;
-                                            });
+                                            var entry = await hostTask;
+                                            hostname = entry.HostName;
                                         }
-                                        catch
+                                        catch { }
+
+                                        var (asn, location) = await geoTask;
+
+                                        Dispatcher.Invoke(() =>
                                         {
-                                            Dispatcher.Invoke(() =>
-                                            {
-                                                hopResult.Hostname = "-";
-                                            });
-                                        }
+                                            hopResult.Hostname = hostname;
+                                            hopResult.Asn = asn;
+                                            hopResult.Location = location;
+                                            GridTraceHops.Items.Refresh();
+                                        });
                                     }
                                 });
 
@@ -1800,6 +1815,276 @@ namespace AgilicoConnectChecker
         }
 
         #endregion
+
+        #region Active Socket Monitor & GeoIP Lookup Actions
+
+        private static async Task<(string Asn, string Location)> LookupGeoIpAndAsnAsync(string ipAddress)
+        {
+            if (string.IsNullOrEmpty(ipAddress) || ipAddress == "*" || ipAddress == "-")
+                return ("-", "-");
+
+            if (IsPrivateIp(ipAddress))
+                return ("Private Address", "Local Network");
+
+            try
+            {
+                using var client = new System.Net.Http.HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(3);
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.3");
+
+                string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
+                string json = await client.GetStringAsync(url);
+
+                using var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+                var root = jsonDoc.RootElement;
+
+                if (root.TryGetProperty("status", out var statusProp) && statusProp.GetString() == "success")
+                {
+                    string country = root.TryGetProperty("country", out var countryProp) ? countryProp.GetString() ?? "" : "";
+                    string city = root.TryGetProperty("city", out var cityProp) ? cityProp.GetString() ?? "" : "";
+                    string asField = root.TryGetProperty("as", out var asProp) ? asProp.GetString() ?? "" : "";
+
+                    string location = (!string.IsNullOrEmpty(city) && !string.IsNullOrEmpty(country))
+                        ? $"{city}, {country}"
+                        : (!string.IsNullOrEmpty(country) ? country : "-");
+
+                    string asn = "-";
+                    if (!string.IsNullOrEmpty(asField))
+                    {
+                        int spaceIndex = asField.IndexOf(' ');
+                        if (spaceIndex > 0)
+                        {
+                            string asnPart = asField.Substring(0, spaceIndex);
+                            string orgPart = asField.Substring(spaceIndex + 1);
+                            asn = $"{asnPart} ({orgPart})";
+                        }
+                        else
+                        {
+                            asn = asField;
+                        }
+                    }
+
+                    return (asn, location);
+                }
+            }
+            catch
+            {
+                // Silence exceptions and fall back
+            }
+
+            return ("-", "-");
+        }
+
+        private static bool IsPrivateIp(string ipAddress)
+        {
+            if (System.Net.IPAddress.TryParse(ipAddress, out var ip))
+            {
+                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    byte[] bytes = ip.GetAddressBytes();
+                    if (bytes.Length == 4)
+                    {
+                        if (bytes[0] == 10) return true;
+                        if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
+                        if (bytes[0] == 192 && bytes[1] == 168) return true;
+                        if (bytes[0] == 127) return true;
+                        if (bytes[0] == 169 && bytes[1] == 254) return true;
+                    }
+                }
+                else if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+                {
+                    if (ip.IsIPv6LinkLocal || System.Net.IPAddress.IsLoopback(ip) || ip.IsIPv6SiteLocal)
+                        return true;
+
+                    string ipStr = ip.ToString().ToLower();
+                    if (ipStr.StartsWith("fc00") || ipStr.StartsWith("fd00"))
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private async Task<List<ActiveSocket>> GetActiveSocketsAsync()
+        {
+            var sockets = new List<ActiveSocket>();
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "netstat.exe",
+                    Arguments = "-ano",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(psi);
+                if (process == null) return sockets;
+
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                // Build a cache of PIDs to Process Names
+                var processes = System.Diagnostics.Process.GetProcesses();
+                var pidMap = new Dictionary<int, string>();
+                foreach (var p in processes)
+                {
+                    pidMap[p.Id] = p.ProcessName;
+                }
+
+                string[] lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string line in lines)
+                {
+                    string trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("Active") || trimmed.StartsWith("Proto"))
+                        continue;
+
+                    string[] parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 4) continue;
+
+                    string proto = parts[0].ToUpper();
+                    if (proto != "TCP" && proto != "UDP") continue;
+
+                    string localEp = parts[1];
+                    string remoteEp = parts[2];
+                    string state = string.Empty;
+                    int pid = 0;
+
+                    if (proto == "TCP")
+                    {
+                        if (parts.Length >= 5)
+                        {
+                            state = parts[3];
+                            int.TryParse(parts[4], out pid);
+                        }
+                    }
+                    else // UDP
+                    {
+                        state = "-";
+                        int.TryParse(parts[3], out pid);
+                    }
+
+                    // Split IP and Port
+                    string localIp = localEp;
+                    int localPort = 0;
+                    int lastColonLocal = localEp.LastIndexOf(':');
+                    if (lastColonLocal >= 0)
+                    {
+                        localIp = localEp.Substring(0, lastColonLocal);
+                        int.TryParse(localEp.Substring(lastColonLocal + 1), out localPort);
+                    }
+
+                    string remoteIp = remoteEp;
+                    string remotePort = "*";
+                    int lastColonRemote = remoteEp.LastIndexOf(':');
+                    if (lastColonRemote >= 0)
+                    {
+                        remoteIp = remoteEp.Substring(0, lastColonRemote);
+                        remotePort = remoteEp.Substring(lastColonRemote + 1);
+                    }
+
+                    pidMap.TryGetValue(pid, out string? procName);
+                    if (string.IsNullOrEmpty(procName))
+                    {
+                        if (pid == 0) procName = "System Idle Process";
+                        else if (pid == 4) procName = "System";
+                        else procName = "Unknown";
+                    }
+
+                    sockets.Add(new ActiveSocket
+                    {
+                        Protocol = proto,
+                        LocalAddress = localIp,
+                        LocalPort = localPort,
+                        RemoteAddress = remoteIp,
+                        RemotePort = remotePort,
+                        State = state,
+                        Pid = pid,
+                        ProcessName = procName
+                    });
+                }
+            }
+            catch { }
+
+            return sockets;
+        }
+
+        private async Task RefreshSocketsListAsync()
+        {
+            if (BtnRefreshSockets != null) BtnRefreshSockets.IsEnabled = false;
+
+            var list = await GetActiveSocketsAsync();
+
+            _allSockets.Clear();
+            foreach (var s in list)
+            {
+                _allSockets.Add(s);
+            }
+
+            ApplySocketFilters();
+
+            if (BtnRefreshSockets != null) BtnRefreshSockets.IsEnabled = true;
+        }
+
+        private void ApplySocketFilters()
+        {
+            if (GridActiveSockets == null) return;
+
+            string search = TxtSocketSearch.Text.Trim().ToLower();
+            string protoFilter = (ComboSocketProtocol.SelectedItem is ComboBoxItem selectedItem)
+                ? selectedItem.Content.ToString()?.ToUpper() ?? "ALL"
+                : "ALL";
+            bool agilicoOnly = ChkAgilicoOnly.IsChecked == true;
+
+            var filtered = _allSockets.Where(s =>
+            {
+                if (protoFilter != "ALL" && s.Protocol != protoFilter) return false;
+                if (agilicoOnly && !s.ProcessName.ToLower().Contains("agilico")) return false;
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    bool match = s.ProcessName.ToLower().Contains(search) ||
+                                 s.LocalAddress.Contains(search) ||
+                                 s.LocalPort.ToString().Contains(search) ||
+                                 s.RemoteAddress.Contains(search) ||
+                                 s.RemotePort.Contains(search) ||
+                                 s.Pid.ToString().Contains(search) ||
+                                 s.State.ToLower().Contains(search);
+                    if (!match) return false;
+                }
+
+                return true;
+            }).ToList();
+
+            _displayedSockets.Clear();
+            foreach (var s in filtered)
+            {
+                _displayedSockets.Add(s);
+            }
+        }
+
+        private void TxtSocketSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplySocketFilters();
+        }
+
+        private void ComboSocketProtocol_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplySocketFilters();
+        }
+
+        private void ChkAgilicoOnly_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplySocketFilters();
+        }
+
+        private async void BtnRefreshSockets_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshSocketsListAsync();
+        }
+
+        #endregion
     }
 
     public class TraceHop
@@ -1808,5 +2093,19 @@ namespace AgilicoConnectChecker
         public string IpAddress { get; set; } = string.Empty;
         public string Hostname { get; set; } = string.Empty;
         public string RttDisplay { get; set; } = string.Empty;
+        public string Asn { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+    }
+
+    public class ActiveSocket
+    {
+        public string ProcessName { get; set; } = "System";
+        public int Pid { get; set; }
+        public string Protocol { get; set; } = "TCP";
+        public string LocalAddress { get; set; } = string.Empty;
+        public int LocalPort { get; set; }
+        public string RemoteAddress { get; set; } = string.Empty;
+        public string RemotePort { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
     }
 }

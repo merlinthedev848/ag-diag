@@ -21,9 +21,9 @@
     <Product>Agilico Network Diagnostic Tool</Product>
     <Copyright>Copyright © 2026 Agilico. All rights reserved.</Copyright>
     <Description>Network diagnostic tool for Agilico Connect Windows App.</Description>
-    <Version>3.5.2</Version>
-    <AssemblyVersion>3.5.2</AssemblyVersion>
-    <FileVersion>3.5.2</FileVersion>
+    <Version>3.5.3</Version>
+    <AssemblyVersion>3.5.3</AssemblyVersion>
+    <FileVersion>3.5.3</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

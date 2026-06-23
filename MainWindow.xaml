@@ -66,7 +66,7 @@
 
                 <!-- Sidebar Footer -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,20" VerticalAlignment="Bottom">
-                    <TextBlock Text="v3.5.2" FontSize="10.5" Foreground="#cbd5e1" Opacity="0.75" HorizontalAlignment="Center" FontWeight="Medium"/>
+                    <TextBlock Text="v3.5.3" FontSize="10.5" Foreground="#cbd5e1" Opacity="0.75" HorizontalAlignment="Center" FontWeight="Medium"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -1082,11 +1082,13 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="BtnProbeTrace" Style="{StaticResource ProbeTabButtonStyle}" Content="Traceroute Path Discovery" Click="BtnProbeTab_Click" Margin="0,0,10,0"/>
                             <Button x:Name="BtnProbePorts" Grid.Column="1" Style="{StaticResource ProbeTabButtonStyle}" Content="Outbound Port Prober" Click="BtnProbeTab_Click" Margin="0,0,10,0"/>
-                            <Button x:Name="BtnProbeDns" Grid.Column="2" Style="{StaticResource ProbeTabButtonStyle}" Content="DNS SRV Locator" Click="BtnProbeTab_Click"/>
+                            <Button x:Name="BtnProbeDns" Grid.Column="2" Style="{StaticResource ProbeTabButtonStyle}" Content="DNS SRV Locator" Click="BtnProbeTab_Click" Margin="0,0,10,0"/>
+                            <Button x:Name="BtnProbeSockets" Grid.Column="3" Style="{StaticResource ProbeTabButtonStyle}" Content="Active Socket Monitor" Click="BtnProbeTab_Click"/>
                         </Grid>
 
                         <!-- Sub-Tab Content Area -->
@@ -1145,9 +1147,11 @@
                                             </DataGrid.Resources>
                                             <DataGrid.Columns>
                                                 <DataGridTextColumn Header="Hop" Binding="{Binding HopNumber}" Width="50" />
-                                                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="150" />
-                                                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="*" />
-                                                <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="100" />
+                                                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="120" />
+                                                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.5*" />
+                                                <DataGridTextColumn Header="AS Number / ISP" Binding="{Binding Asn}" Width="2*" />
+                                                <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="1.2*" />
+                                                <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="80" />
                                             </DataGrid.Columns>
                                         </DataGrid>
                                     </Grid>
@@ -1299,6 +1303,88 @@
                                                 <DataGridTextColumn Header="Weight" Binding="{Binding Weight}" Width="65" />
                                                 <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="60" />
                                                 <DataGridTextColumn Header="Target Host" Binding="{Binding Target}" Width="*" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+                                </Border>
+                            </TabItem>
+
+                            <!-- Active Socket Monitor (Full Width) -->
+                            <TabItem>
+                                <Border Style="{StaticResource CardStyle}" Margin="0">
+                                    <Grid Margin="15">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                            <TextBlock Text="Active Socket Monitor" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                            <TextBlock Text="Monitor active network connections on this device to check for port conflicts, socket state, and verify connection status for processes." 
+                                                       TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
+                                        </StackPanel>
+
+                                        <!-- Controls Bar -->
+                                        <Grid Grid.Row="1" Margin="0,0,0,15">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/> <!-- Search -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Protocol -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Agilico Only -->
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/> <!-- Refresh button -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Search Box -->
+                                            <StackPanel Orientation="Horizontal" Grid.Column="0" Margin="0,0,15,0" VerticalAlignment="Center">
+                                                <TextBlock Text="Search:" VerticalAlignment="Center" Foreground="{StaticResource TextDarkBrush}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                                <TextBox x:Name="TxtSocketSearch" Width="150" Height="32" Padding="8,6" VerticalAlignment="Center" TextChanged="TxtSocketSearch_TextChanged"/>
+                                            </StackPanel>
+
+                                            <!-- Protocol Filter -->
+                                            <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="0,0,15,0" VerticalAlignment="Center">
+                                                <TextBlock Text="Protocol:" VerticalAlignment="Center" Foreground="{StaticResource TextDarkBrush}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                                <ComboBox x:Name="ComboSocketProtocol" Width="100" Height="32" Padding="8,4" VerticalAlignment="Center" SelectionChanged="ComboSocketProtocol_SelectionChanged">
+                                                    <ComboBoxItem Content="All" IsSelected="True"/>
+                                                    <ComboBoxItem Content="TCP"/>
+                                                    <ComboBoxItem Content="UDP"/>
+                                                </ComboBox>
+                                            </StackPanel>
+
+                                            <!-- Agilico Only -->
+                                            <CheckBox x:Name="ChkAgilicoOnly" Grid.Column="2" Content="Agilico Connect Only" VerticalAlignment="Center" Checked="ChkAgilicoOnly_Changed" Unchecked="ChkAgilicoOnly_Changed" Foreground="{StaticResource TextDarkBrush}" FontWeight="SemiBold"/>
+
+                                            <!-- Refresh Button -->
+                                            <Button x:Name="BtnRefreshSockets" Grid.Column="4" Style="{StaticResource ActionButtonStyle}" Content="REFRESH SOCKETS" Click="BtnRefreshSockets_Click" Padding="15,0"/>
+                                        </Grid>
+
+                                        <!-- Sockets Grid -->
+                                        <DataGrid Grid.Row="2" x:Name="GridActiveSockets" AutoGenerateColumns="False" IsReadOnly="True" 
+                                                  GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
+                                            <DataGrid.Resources>
+                                                <Style TargetType="DataGridColumnHeader">
+                                                    <Setter Property="Background" Value="#f1f5f9"/>
+                                                    <Setter Property="Foreground" Value="#64748b"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Padding" Value="8,6"/>
+                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                </Style>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Padding" Value="8,4"/>
+                                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                                </Style>
+                                            </DataGrid.Resources>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="150" />
+                                                <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="65" />
+                                                <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="60" />
+                                                <DataGridTextColumn Header="Local Address" Binding="{Binding LocalAddress}" Width="160" />
+                                                <DataGridTextColumn Header="Local Port" Binding="{Binding LocalPort}" Width="80" />
+                                                <DataGridTextColumn Header="Remote Address" Binding="{Binding RemoteAddress}" Width="160" />
+                                                <DataGridTextColumn Header="Remote Port" Binding="{Binding RemotePort}" Width="90" />
+                                                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="*" />
                                             </DataGrid.Columns>
                                         </DataGrid>
                                     </Grid>
