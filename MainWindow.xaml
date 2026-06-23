@@ -7,8 +7,8 @@
         mc:Ignorable="d"
         Title="Agilico Network Diagnostic Tool" 
         Icon="logo.png"
-        Width="1024" Height="940" 
-        MinHeight="840" MinWidth="900"
+        Width="1174" Height="940" 
+        MinHeight="840" MinWidth="1174"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
         Background="{StaticResource AppBgBrush}">
@@ -53,7 +53,7 @@
                     <Button x:Name="BtnPcap" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnPcap_Click" Visibility="Collapsed">
                         <TextBlock Text="PCAP" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
-                    <Button x:Name="BtnVoipTools" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconPhone}" Click="BtnVoipTools_Click">
+                    <Button x:Name="BtnVoipTools" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconPhone}" Click="BtnVoipTools_Click" Visibility="Collapsed">
                         <TextBlock Text="VoIP Tools" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                     <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
@@ -1514,8 +1514,8 @@
                                             <ColumnDefinition Width="200"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="SIP ALG Target Server IP:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBox x:Name="TxtSipAlgServer" Grid.Column="1" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                        <TextBlock Text="SIP ALG Target Server:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBox x:Name="TxtSipAlgServer" Grid.Column="1" Padding="8,6" Text="sip.linphone.org" BorderBrush="{StaticResource BorderLightBrush}"/>
                                     </Grid>
 
                                     <Grid Margin="0,0,0,25">

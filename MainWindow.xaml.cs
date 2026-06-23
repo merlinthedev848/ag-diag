@@ -1073,8 +1073,9 @@ namespace AgilicoConnectChecker
                 BtnTraceroute.Visibility = Visibility.Collapsed;
                 BtnPcap.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
+                BtnVoipTools.Visibility = Visibility.Collapsed;
                 
-                if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6 && PageTabControl.SelectedIndex != 7)
+                if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 6 && PageTabControl.SelectedIndex != 7)
                 {
                     SelectTab(0, BtnDashboard);
                 }

@@ -27,7 +27,7 @@ namespace AgilicoConnectChecker
         // Configuration defaults from official Agilico Network Guidance
         public string DomainToCheck { get; set; } = "customerportal.hp2k.co.uk";
         public string LocalSipPortStr { get; set; } = "5060";
-        public string SipAlgServer { get; set; } = "109.73.119.31";
+        public string SipAlgServer { get; set; } = "sip.linphone.org";
         public int SipAlgPort { get; set; } = 5060;
         public int LocalSipPort { get; set; } = 5060;
         public string StunServer { get; set; } = "stun-gb-a.hp2k.co.uk";
