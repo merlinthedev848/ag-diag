@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Resource Include="logo.png" />
+    <Resource Include="logo.ico" />
   </ItemGroup>
 
   <ItemGroup>

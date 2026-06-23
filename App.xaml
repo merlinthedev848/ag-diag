@@ -6,7 +6,7 @@
         <!-- Colour Palette -->
         <SolidColorBrush x:Key="SidebarBgBrush" Color="#000034"/>
         <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#111155"/>
-        <SolidColorBrush x:Key="HeaderBgBrush" Color="#000028"/>
+        <SolidColorBrush x:Key="HeaderBgBrush" Color="#000034"/>
         <SolidColorBrush x:Key="AppBgBrush" Color="#f5f6fa"/>
         <SolidColorBrush x:Key="CardBgBrush" Color="#ffffff"/>
         

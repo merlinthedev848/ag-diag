@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:AgilicoConnectChecker"
         mc:Ignorable="d"
         Title="Agilico Network Diagnostic Tool" 
-        Icon="logo.png"
+        Icon="logo.ico"
         Width="1174" Height="940" 
         MinHeight="840" MinWidth="1174"
         WindowStartupLocation="CenterScreen"
