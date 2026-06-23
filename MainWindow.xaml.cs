@@ -914,21 +914,41 @@ namespace AgilicoConnectChecker
             double downloadMbps = 0;
             double uploadMbps = 0;
             using var client = new System.Net.Http.HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(15); // Allow up to 15 seconds for realistic tests
+            client.Timeout = TimeSpan.FromSeconds(15);
 
-            // 1. Download Test (Using Cloudflare Speedtest Endpoint ~5MB)
+            // Pre-connect warm up to establish DNS/TCP/TLS session
             try
             {
+                await client.GetAsync("https://speed.cloudflare.com/__down?bytes=1", token);
+            }
+            catch { /* Ignore warm-up failure, proceed with main test */ }
+
+            // 1. Download Test (4 streams * 2.5MB = 10MB)
+            try
+            {
+                int downloadStreams = 4;
+                long downloadBytesPerStream = 2621440; // 2.5MB
+                var downloadTasks = new List<Task<byte[]>>();
+                
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=5242880", token);
-                response.EnsureSuccessStatusCode();
-                var bytes = await response.Content.ReadAsByteArrayAsync(token);
+                for (int i = 0; i < downloadStreams; i++)
+                {
+                    downloadTasks.Add(client.GetByteArrayAsync($"https://speed.cloudflare.com/__down?bytes={downloadBytesPerStream}", token));
+                }
+                
+                var results = await Task.WhenAll(downloadTasks);
                 sw.Stop();
+                
+                long totalDownloaded = 0;
+                foreach (var bytes in results)
+                {
+                    totalDownloaded += bytes.Length;
+                }
                 
                 double seconds = sw.Elapsed.TotalSeconds;
                 if (seconds > 0)
                 {
-                    downloadMbps = (bytes.Length * 8.0) / (seconds * 1000000.0);
+                    downloadMbps = (totalDownloaded * 8.0) / (seconds * 1000000.0);
                 }
             }
             catch (Exception ex)
@@ -936,22 +956,35 @@ namespace AgilicoConnectChecker
                 System.Diagnostics.Debug.WriteLine($"Download speed test failed: {ex.Message}");
             }
 
-            // 2. Upload Test (Using Cloudflare Speedtest Endpoint ~2MB)
+            // 2. Upload Test (4 streams * 1MB = 4MB)
             try
             {
-                var payload = new byte[2097152];
-                new Random().NextBytes(payload);
-                var content = new System.Net.Http.ByteArrayContent(payload);
-
+                int uploadStreams = 4;
+                int uploadBytesPerStream = 1048576; // 1MB
+                var uploadTasks = new List<Task<System.Net.Http.HttpResponseMessage>>();
+                
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, token);
-                response.EnsureSuccessStatusCode();
+                for (int i = 0; i < uploadStreams; i++)
+                {
+                    var payload = new byte[uploadBytesPerStream];
+                    new Random().NextBytes(payload);
+                    var content = new System.Net.Http.ByteArrayContent(payload);
+                    uploadTasks.Add(client.PostAsync("https://speed.cloudflare.com/__up", content, token));
+                }
+                
+                var upResponses = await Task.WhenAll(uploadTasks);
                 sw.Stop();
-
+                
+                foreach (var resp in upResponses)
+                {
+                    resp.EnsureSuccessStatusCode();
+                }
+                
+                long totalUploaded = (long)uploadStreams * uploadBytesPerStream;
                 double seconds = sw.Elapsed.TotalSeconds;
                 if (seconds > 0)
                 {
-                    uploadMbps = (payload.Length * 8.0) / (seconds * 1000000.0);
+                    uploadMbps = (totalUploaded * 8.0) / (seconds * 1000000.0);
                 }
             }
             catch (Exception ex)
