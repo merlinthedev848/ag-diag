@@ -19,5 +19,4 @@ build_lite/
 build_standalone/
 test_run.log
 
-# Exclude standalone executables (too large for git)
-*Standalone.exe
+
