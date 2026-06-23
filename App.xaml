@@ -4,9 +4,9 @@
              xmlns:local="clr-namespace:AgilicoConnectChecker">
     <Application.Resources>
         <!-- Color Palette -->
-        <SolidColorBrush x:Key="SidebarBgBrush" Color="#0a1128"/>
-        <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#182349"/>
-        <SolidColorBrush x:Key="HeaderBgBrush" Color="#070c1e"/>
+        <SolidColorBrush x:Key="SidebarBgBrush" Color="#000034"/>
+        <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#111155"/>
+        <SolidColorBrush x:Key="HeaderBgBrush" Color="#000028"/>
         <SolidColorBrush x:Key="AppBgBrush" Color="#f5f6fa"/>
         <SolidColorBrush x:Key="CardBgBrush" Color="#ffffff"/>
         
