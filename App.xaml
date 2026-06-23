@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:AgilicoConnectChecker">
     <Application.Resources>
-        <!-- Color Palette -->
+        <!-- Colour Palette -->
         <SolidColorBrush x:Key="SidebarBgBrush" Color="#000034"/>
         <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#111155"/>
         <SolidColorBrush x:Key="HeaderBgBrush" Color="#000028"/>

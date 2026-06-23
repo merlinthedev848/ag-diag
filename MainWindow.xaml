@@ -1202,7 +1202,7 @@
                             <!-- Tab Header & Description -->
                             <StackPanel Grid.Row="0" Margin="0,0,0,15">
                                 <TextBlock Text="Packet Capture Service (PCAP)" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
-                                <TextBlock Text="The packet capture utility monitors diagnostic network protocols in real-time to analyze compatibility and identify communication bottlenecks." 
+                                <TextBlock Text="The packet capture utility monitors diagnostic network protocols in real-time to analyse compatibility and identify communication bottlenecks." 
                                            TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
                             </StackPanel>
 

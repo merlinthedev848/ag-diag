@@ -1408,7 +1408,7 @@ namespace AgilicoConnectChecker
                         
                         Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, actualLocalIp, localPort, true);
                         string respStr = Encoding.UTF8.GetString(result.Buffer);
-                        Log($"Received response from {server}. Analyzing Via headers...");
+                        Log($"Received response from {server}. Analysing Via headers...");
                         
                         bool viaFound = false;
                         string[] lines = respStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
