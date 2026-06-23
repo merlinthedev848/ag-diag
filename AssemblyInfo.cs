@@ -10,3 +10,7 @@ using System.Windows;
 )]
 
 [assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+
+[assembly: System.Reflection.AssemblyVersion("3.5.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("3.5.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("3.5.0")]
