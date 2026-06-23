@@ -1283,6 +1283,7 @@ namespace AgilicoConnectChecker
 
         private async Task RunStartupSpeedTestAsync()
         {
+            if (BtnRecheckSpeed != null) BtnRecheckSpeed.IsEnabled = false;
             TxtLocalDownloadSpeed.Text = "Testing...";
             TxtLocalUploadSpeed.Text = "Testing...";
             TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextMutedBrush");
@@ -1309,6 +1310,15 @@ namespace AgilicoConnectChecker
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
             }
+            finally
+            {
+                if (BtnRecheckSpeed != null) BtnRecheckSpeed.IsEnabled = true;
+            }
+        }
+
+        private async void BtnRecheckSpeed_Click(object sender, RoutedEventArgs e)
+        {
+            await RunStartupSpeedTestAsync();
         }
 
         #region VoIP and Advanced IT Tools
