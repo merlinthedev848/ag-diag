@@ -1,5 +1,0 @@
-﻿File: C:\Users\chris.kendall\.gemini\antigravity\scratch\dev\App.xaml | Line 6: <!-- Color Palette --> [pattern: color]
-File: C:\Users\chris.kendall\.gemini\antigravity\scratch\dev\MainWindow.xaml | Line 1205: <TextBlock Text="The packet capture utility monitors diagnostic network protocols in real-time to analyze compatibility and identify communication bottlenecks." [pattern: analyz]
-File: C:\Users\chris.kendall\.gemini\antigravity\scratch\dev\MainWindow.xaml.cs | Line 803: new GradientStop(Color.FromArgb(50, 59, 130, 246), 0.0), // Semi-transparent blue [pattern: color]
-File: C:\Users\chris.kendall\.gemini\antigravity\scratch\dev\MainWindow.xaml.cs | Line 804: new GradientStop(Color.FromArgb(0, 59, 130, 246), 1.0)  // Fully transparent [pattern: color]
-File: C:\Users\chris.kendall\.gemini\antigravity\scratch\dev\NetworkEngine.cs | Line 1411: Log($"Received response from {server}. Analyzing Via headers..."); [pattern: analyz]
