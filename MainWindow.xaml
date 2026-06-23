@@ -917,6 +917,7 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -927,216 +928,235 @@
                                        TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,0"/>
                         </StackPanel>
 
-                        <!-- Three Column Workspace: Port Prober (Left), DNS SRV Resolver (Middle) & Traceroute (Right) -->
-                        <Grid Grid.Row="1">
+                        <!-- Tab Navigation for Probe Modules -->
+                        <Grid Grid.Row="1" Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.2*"/>
-                                <ColumnDefinition Width="1*"/>
-                                <ColumnDefinition Width="1.2*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnProbeTrace" Style="{StaticResource ProbeTabButtonStyle}" Content="Traceroute Path Discovery" Click="BtnProbeTab_Click" Margin="0,0,10,0"/>
+                            <Button x:Name="BtnProbePorts" Grid.Column="1" Style="{StaticResource ProbeTabButtonStyle}" Content="Outbound Port Prober" Click="BtnProbeTab_Click" Margin="0,0,10,0"/>
+                            <Button x:Name="BtnProbeDns" Grid.Column="2" Style="{StaticResource ProbeTabButtonStyle}" Content="DNS SRV Locator" Click="BtnProbeTab_Click"/>
+                        </Grid>
 
-                            <!-- Left Column: Port Prober Card -->
-                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,10,0">
-                                <Grid Margin="15">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                        <!-- Sub-Tab Content Area -->
+                        <TabControl Grid.Row="2" x:Name="ProbeTabControl" Background="Transparent" BorderThickness="0" Padding="0">
+                            <TabControl.Resources>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </Style>
+                            </TabControl.Resources>
 
-                                    <!-- Header -->
-                                    <TextBlock Grid.Row="0" Text="Outbound Firewall Port Prober" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
-
-                                    <!-- Controls -->
-                                    <Grid Grid.Row="1" Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Select Profile: " VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
-                                        <ComboBox x:Name="CbPortProfile" Grid.Column="1" Height="32" Padding="8,4" SelectionChanged="CbPortProfile_SelectionChanged">
-                                            <ComboBoxItem Content="Agilico Connect" IsSelected="True"/>
-                                            <ComboBoxItem Content="3CX Phone System"/>
-                                            <ComboBoxItem Content="Microsoft Teams"/>
-                                            <ComboBoxItem Content="Custom Port Range"/>
-                                        </ComboBox>
-                                        <Button x:Name="BtnStartPortProbe" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="PROBE PORTS" Click="BtnStartPortProbe_Click" Margin="10,0,0,0" Padding="15,0"/>
-                                    </Grid>
-
-                                    <!-- Results Grid -->
-                                    <DataGrid Grid.Row="2" x:Name="GridPortProber" AutoGenerateColumns="False" IsReadOnly="True" 
-                                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
-                                        <DataGrid.Resources>
-                                            <Style TargetType="DataGridColumnHeader">
-                                                <Setter Property="Background" Value="#f1f5f9"/>
-                                                <Setter Property="Foreground" Value="#64748b"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Setter Property="Padding" Value="8,6"/>
-                                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                            </Style>
-                                            <Style TargetType="DataGridCell">
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Padding" Value="8,4"/>
-                                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                            </Style>
-                                        </DataGrid.Resources>
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Port" Binding="{Binding PortDisplay}" Width="80" />
-                                            <DataGridTextColumn Header="Service / Description" Binding="{Binding ServiceName}" Width="*" />
-                                            <DataGridTextColumn Header="Target Server" Binding="{Binding Target}" Width="1.2*" />
-                                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="FontWeight" Value="Bold"/>
-                                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                                        <Style.Triggers>
-                                                            <Trigger Property="Text" Value="Open">
-                                                                <Setter Property="Foreground" Value="#16a34a"/>
-                                                            </Trigger>
-                                                            <Trigger Property="Text" Value="Blocked">
-                                                                <Setter Property="Foreground" Value="#dc2626"/>
-                                                            </Trigger>
-                                                            <Trigger Property="Text" Value="Unresponsive">
-                                                                <Setter Property="Foreground" Value="#d97706"/>
-                                                            </Trigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="60"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                </Grid>
-                            </Border>
-
-                            <!-- Middle Column: DNS SRV Resolver Card -->
-                            <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="10,0,10,0">
-                                <Grid Margin="15">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header -->
-                                    <TextBlock Grid.Row="0" Text="DNS SRV Service Locator Lookup" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
-
-                                    <!-- Controls -->
-                                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                            <!-- Traceroute (Full Width) -->
+                            <TabItem>
+                                <Border Style="{StaticResource CardStyle}" Margin="0">
+                                    <Grid Margin="15">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
-                                        <Grid Grid.Row="0" Margin="0,0,0,8">
+
+                                        <!-- Header -->
+                                        <TextBlock Grid.Row="0" Text="Traceroute Path Discovery" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+
+                                        <!-- Controls -->
+                                        <Grid Grid.Row="1" Margin="0,0,0,15">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="70"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Domain:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                            <TextBox x:Name="TxtSrvDomain" Grid.Column="1" Padding="8,6" Text="sip.agilico.co.uk" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
-                                        </Grid>
-                                        <Grid Grid.Row="1">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Service:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
-                                            <ComboBox x:Name="CbSrvService" Grid.Column="1" Height="32" Padding="8,4">
-                                                <ComboBoxItem Content="_sip._udp" IsSelected="True"/>
-                                                <ComboBoxItem Content="_sip._tcp"/>
-                                                <ComboBoxItem Content="_sips._tcp"/>
-                                                <ComboBoxItem Content="_sip._tls"/>
+                                            <TextBlock Text="Target:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
+                                            <TextBox x:Name="TxtTraceTarget" Grid.Column="1" Height="32" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                            <Grid Grid.Column="2" Margin="10,0,0,0">
+                                                <Button x:Name="BtnStartTrace" Style="{StaticResource ActionButtonStyle}" Content="TRACE" Click="BtnStartTrace_Click" Padding="15,0" Height="32"/>
+                                                <Button x:Name="BtnStopTrace" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Content="STOP" Click="BtnStopTrace_Click" Padding="15,0" Height="32" Visibility="Collapsed"/>
+                                            </Grid>
+                                        </Grid>
+
+                                        <!-- Results Grid -->
+                                        <DataGrid Grid.Row="2" x:Name="GridTraceHops" AutoGenerateColumns="False" IsReadOnly="True" 
+                                                  GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
+                                            <DataGrid.Resources>
+                                                <Style TargetType="DataGridColumnHeader">
+                                                    <Setter Property="Background" Value="#f1f5f9"/>
+                                                    <Setter Property="Foreground" Value="#64748b"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Padding" Value="8,6"/>
+                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                </Style>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Padding" Value="8,4"/>
+                                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                                </Style>
+                                            </DataGrid.Resources>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Hop" Binding="{Binding HopNumber}" Width="50" />
+                                                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="150" />
+                                                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="*" />
+                                                <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="100" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+                                </Border>
+                            </TabItem>
+
+                            <!-- Port Prober (Full Width) -->
+                            <TabItem>
+                                <Border Style="{StaticResource CardStyle}" Margin="0">
+                                    <Grid Margin="15">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header -->
+                                        <TextBlock Grid.Row="0" Text="Outbound Firewall Port Prober" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+
+                                        <!-- Controls -->
+                                        <Grid Grid.Row="1" Margin="0,0,0,15">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Select Profile: " VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
+                                            <ComboBox x:Name="CbPortProfile" Grid.Column="1" Height="32" Padding="8,4" SelectionChanged="CbPortProfile_SelectionChanged">
+                                                <ComboBoxItem Content="Agilico Connect" IsSelected="True"/>
+                                                <ComboBoxItem Content="3CX Phone System"/>
+                                                <ComboBoxItem Content="Microsoft Teams"/>
+                                                <ComboBoxItem Content="Custom Port Range"/>
                                             </ComboBox>
-                                            <Button x:Name="BtnResolveSrv" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="RESOLVE SRV" Click="BtnResolveSrv_Click" Margin="10,0,0,0" Padding="15,0"/>
+                                            <Button x:Name="BtnStartPortProbe" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="PROBE PORTS" Click="BtnStartPortProbe_Click" Margin="10,0,0,0" Padding="15,0"/>
                                         </Grid>
+
+                                        <!-- Results Grid -->
+                                        <DataGrid Grid.Row="2" x:Name="GridPortProber" AutoGenerateColumns="False" IsReadOnly="True" 
+                                                  GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
+                                            <DataGrid.Resources>
+                                                <Style TargetType="DataGridColumnHeader">
+                                                    <Setter Property="Background" Value="#f1f5f9"/>
+                                                    <Setter Property="Foreground" Value="#64748b"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Padding" Value="8,6"/>
+                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                </Style>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Padding" Value="8,4"/>
+                                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                                </Style>
+                                            </DataGrid.Resources>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Port" Binding="{Binding PortDisplay}" Width="80" />
+                                                <DataGridTextColumn Header="Service / Description" Binding="{Binding ServiceName}" Width="*" />
+                                                <DataGridTextColumn Header="Target Server" Binding="{Binding Target}" Width="1.2*" />
+                                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100">
+                                                    <DataGridTextColumn.ElementStyle>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="FontWeight" Value="Bold"/>
+                                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                                            <Style.Triggers>
+                                                                <Trigger Property="Text" Value="Open">
+                                                                    <Setter Property="Foreground" Value="#16a34a"/>
+                                                                </Trigger>
+                                                                <Trigger Property="Text" Value="Blocked">
+                                                                    <Setter Property="Foreground" Value="#dc2626"/>
+                                                                </Trigger>
+                                                                <Trigger Property="Text" Value="Unresponsive">
+                                                                    <Setter Property="Foreground" Value="#d97706"/>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                                <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="60"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
                                     </Grid>
+                                </Border>
+                            </TabItem>
 
-                                    <!-- Results Grid -->
-                                    <DataGrid Grid.Row="2" x:Name="GridSrvRecords" AutoGenerateColumns="False" IsReadOnly="True" 
-                                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
-                                        <DataGrid.Resources>
-                                            <Style TargetType="DataGridColumnHeader">
-                                                <Setter Property="Background" Value="#f1f5f9"/>
-                                                <Setter Property="Foreground" Value="#64748b"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Setter Property="Padding" Value="8,6"/>
-                                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                            </Style>
-                                            <Style TargetType="DataGridCell">
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Padding" Value="8,4"/>
-                                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                            </Style>
-                                        </DataGrid.Resources>
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Priority" Binding="{Binding Priority}" Width="65" />
-                                            <DataGridTextColumn Header="Weight" Binding="{Binding Weight}" Width="65" />
-                                            <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="60" />
-                                            <DataGridTextColumn Header="Target Host" Binding="{Binding Target}" Width="*" />
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                </Grid>
-                            </Border>
+                            <!-- DNS SRV Resolver (Full Width) -->
+                            <TabItem>
+                                <Border Style="{StaticResource CardStyle}" Margin="0">
+                                    <Grid Margin="15">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
 
-                            <!-- Right Column: Traceroute Card -->
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="10,0,0,0">
-                                <Grid Margin="15">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    
-                                    <!-- Header -->
-                                    <TextBlock Grid.Row="0" Text="Traceroute Path Discovery" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
-                                    
-                                    <!-- Controls -->
-                                    <Grid Grid.Row="1" Margin="0,0,0,15">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Target:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
-                                        <TextBox x:Name="TxtTraceTarget" Grid.Column="1" Height="32" Padding="8,6" Text="customerportal.hp2k.co.uk" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
-                                        <Grid Grid.Column="2" Margin="10,0,0,0">
-                                            <Button x:Name="BtnStartTrace" Style="{StaticResource ActionButtonStyle}" Content="TRACE" Click="BtnStartTrace_Click" Padding="15,0" Height="32"/>
-                                            <Button x:Name="BtnStopTrace" Style="{StaticResource ActionButtonStyle}" Background="{StaticResource AccentRedBrush}" Content="STOP" Click="BtnStopTrace_Click" Padding="15,0" Height="32" Visibility="Collapsed"/>
+                                        <!-- Header -->
+                                        <TextBlock Grid.Row="0" Text="DNS SRV Service Locator Lookup" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
+
+                                        <!-- Controls -->
+                                        <Grid Grid.Row="1" Margin="0,0,0,15">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Domain:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBox x:Name="TxtSrvDomain" Grid.Column="1" Padding="8,6" Text="sip.agilico.co.uk" BorderBrush="{StaticResource BorderLightBrush}" SelectionBrush="{StaticResource AccentGreenBrush}"/>
+                                            </Grid>
+                                            <Grid Grid.Row="1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Service:" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <ComboBox x:Name="CbSrvService" Grid.Column="1" Height="32" Padding="8,4">
+                                                    <ComboBoxItem Content="SIP over UDP (_sip._udp)" Tag="_sip._udp" IsSelected="True"/>
+                                                    <ComboBoxItem Content="SIP over TCP (_sip._tcp)" Tag="_sip._tcp"/>
+                                                    <ComboBoxItem Content="Secure SIP over TCP (_sips._tcp)" Tag="_sips._tcp"/>
+                                                    <ComboBoxItem Content="Secure SIP over TLS (_sip._tls)" Tag="_sip._tls"/>
+                                                </ComboBox>
+                                                <Button x:Name="BtnResolveSrv" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="RESOLVE SRV" Click="BtnResolveSrv_Click" Margin="10,0,0,0" Padding="15,0"/>
+                                            </Grid>
                                         </Grid>
-                                    </Grid>
 
-                                    <!-- Results Grid -->
-                                    <DataGrid Grid.Row="2" x:Name="GridTraceHops" AutoGenerateColumns="False" IsReadOnly="True" 
-                                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
-                                        <DataGrid.Resources>
-                                            <Style TargetType="DataGridColumnHeader">
-                                                <Setter Property="Background" Value="#f1f5f9"/>
-                                                <Setter Property="Foreground" Value="#64748b"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Setter Property="Padding" Value="8,6"/>
-                                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                            </Style>
-                                            <Style TargetType="DataGridCell">
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Padding" Value="8,4"/>
-                                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                            </Style>
-                                        </DataGrid.Resources>
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Hop" Binding="{Binding HopNumber}" Width="45" />
-                                            <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="110" />
-                                            <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="*" />
-                                            <DataGridTextColumn Header="RTT" Binding="{Binding RttDisplay}" Width="65" />
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-                                </Grid>
-                            </Border>
-                        </Grid>
+                                        <!-- Results Grid -->
+                                        <DataGrid Grid.Row="2" x:Name="GridSrvRecords" AutoGenerateColumns="False" IsReadOnly="True" 
+                                                  GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
+                                            <DataGrid.Resources>
+                                                <Style TargetType="DataGridColumnHeader">
+                                                    <Setter Property="Background" Value="#f1f5f9"/>
+                                                    <Setter Property="Foreground" Value="#64748b"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Padding" Value="8,6"/>
+                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                </Style>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Padding" Value="8,4"/>
+                                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                                </Style>
+                                            </DataGrid.Resources>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Priority" Binding="{Binding Priority}" Width="65" />
+                                                <DataGridTextColumn Header="Weight" Binding="{Binding Weight}" Width="65" />
+                                                <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="60" />
+                                                <DataGridTextColumn Header="Target Host" Binding="{Binding Target}" Width="*" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Grid>
+                                </Border>
+                            </TabItem>
+                        </TabControl>
                     </Grid>
                 </TabItem>
 

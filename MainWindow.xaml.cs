@@ -82,6 +82,9 @@ namespace AgilicoConnectChecker
             // Trigger firewall permission prompt on load so it doesn't block running tests
             _engine.TriggerFirewallPrompt();
 
+            // Initialize default Probe sub-tab
+            SelectProbeTab(0, BtnProbeTrace);
+
             // Run connection speed test at startup
             _ = RunStartupSpeedTestAsync();
         }
@@ -127,11 +130,51 @@ namespace AgilicoConnectChecker
         private void BtnDashboard_Click(object sender, RoutedEventArgs e) => SelectTab(0, BtnDashboard);
         private void BtnNetScan_Click(object sender, RoutedEventArgs e) => SelectTab(1, BtnNetScan);
         private void BtnPingTrack_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnPingTrack);
-        private void BtnProbe_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnProbe);
+        private void BtnProbe_Click(object sender, RoutedEventArgs e)
+        {
+            SelectTab(3, BtnProbe);
+            SelectProbeTab(0, BtnProbeTrace);
+        }
         private void BtnPcap_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnPcap);
         private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnHelp);
         private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnLogs);
         private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnSettings);
+
+        private void SelectProbeTab(int index, Button activeButton)
+        {
+            ProbeTabControl.SelectedIndex = index;
+
+            var probeButtons = new[] { BtnProbeTrace, BtnProbePorts, BtnProbeDns };
+            foreach (var btn in probeButtons)
+            {
+                if (btn == activeButton)
+                {
+                    btn.Background = (Brush)FindResource("SidebarBgBrush");
+                    btn.Foreground = Brushes.White;
+                }
+                else
+                {
+                    btn.Background = (Brush)FindResource("BorderLightBrush");
+                    btn.Foreground = (Brush)FindResource("TextMutedBrush");
+                }
+            }
+        }
+
+        private void BtnProbeTab_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender == BtnProbeTrace)
+            {
+                SelectProbeTab(0, BtnProbeTrace);
+            }
+            else if (sender == BtnProbePorts)
+            {
+                SelectProbeTab(1, BtnProbePorts);
+            }
+            else if (sender == BtnProbeDns)
+            {
+                SelectProbeTab(2, BtnProbeDns);
+            }
+        }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -1241,7 +1284,7 @@ namespace AgilicoConnectChecker
         {
             var domain = TxtSrvDomain.Text.Trim();
             var serviceItem = CbSrvService.SelectedItem as ComboBoxItem;
-            var service = serviceItem?.Content?.ToString() ?? "_sip._udp";
+            var service = serviceItem?.Tag?.ToString() ?? "_sip._udp";
 
             if (string.IsNullOrWhiteSpace(domain))
             {
