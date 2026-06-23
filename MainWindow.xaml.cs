@@ -512,6 +512,8 @@ namespace AgilicoConnectChecker
             var spinner = FindName($"Test{testNum}Spinner") as UIElement;
             var pass = FindName($"Test{testNum}IconPass") as UIElement;
             var fail = FindName($"Test{testNum}IconFail") as UIElement;
+            var warning = FindName($"Test{testNum}IconWarning") as UIElement;
+            var helpLink = FindName($"Test{testNum}InfoLink") as UIElement;
             var text = FindName($"Test{testNum}Details") as TextBlock;
 
             if (text != null) text.Text = details;
@@ -521,6 +523,8 @@ namespace AgilicoConnectChecker
             if (spinner != null) spinner.Visibility = Visibility.Collapsed;
             if (pass != null) pass.Visibility = Visibility.Collapsed;
             if (fail != null) fail.Visibility = Visibility.Collapsed;
+            if (warning != null) warning.Visibility = Visibility.Collapsed;
+            if (helpLink != null) helpLink.Visibility = Visibility.Collapsed;
 
             switch (status.ToLower())
             {
@@ -535,10 +539,35 @@ namespace AgilicoConnectChecker
                 case "pass":
                     if (pass != null) pass.Visibility = Visibility.Visible;
                     break;
+                case "warning":
+                case "warn":
+                    if (warning != null) warning.Visibility = Visibility.Visible;
+                    if (helpLink != null) helpLink.Visibility = Visibility.Visible;
+                    break;
                 case "failed":
                 case "fail":
                     if (fail != null) fail.Visibility = Visibility.Visible;
+                    if (helpLink != null) helpLink.Visibility = Visibility.Visible;
                     break;
+            }
+        }
+
+        private void BtnTestHelp_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string url)
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -1319,6 +1348,30 @@ namespace AgilicoConnectChecker
         private async void BtnRecheckSpeed_Click(object sender, RoutedEventArgs e)
         {
             await RunStartupSpeedTestAsync();
+        }
+
+        private void BtnRaiseTicket_Click(object sender, RoutedEventArgs e)
+        {
+            string subject = $"Agilico Connect Check Failure - {Environment.MachineName}";
+            
+            string body = "Please detail your issue here:\n\n\n\n" +
+                          "--------------------------------------------------\n" +
+                          "DIAGNOSTIC TEST SUMMARY:\n" +
+                          $"{TxtScoreFail.Text}\n\n" +
+                          $"{TxtFailInstructions.Text.Replace("\r", "")}\n" +
+                          "--------------------------------------------------\n";
+            
+            string logContent = TxtLogs.Text;
+            byte[] pcapBytes = _engine.Pcap.GetPcapBytes();
+            string pingTarget = _pingTracker.CurrentTarget;
+            Action<string> pingLogExporter = (path) => _pingTracker.ExportLog(path);
+
+            var ticketDialog = new TicketDialog(subject, body, logContent, pcapBytes, pingTarget, pingLogExporter, new System.Collections.Generic.List<LanDevice>(_lanDevices))
+            {
+                Owner = this
+            };
+
+            ticketDialog.ShowDialog();
         }
 
         #region VoIP and Advanced IT Tools
