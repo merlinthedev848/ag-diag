@@ -619,6 +619,158 @@ namespace AgilicoConnectChecker
 
         #endregion
 
+        #region Settings Repair Actions
+
+        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1. Terminate running instances and record path
+                string? exePath = null;
+                var processes = System.Diagnostics.Process.GetProcesses();
+                foreach (var p in processes)
+                {
+                    try
+                    {
+                        string name = p.ProcessName.ToLower();
+                        if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
+                        {
+                            exePath = p.MainModule?.FileName;
+                            p.Kill();
+                            p.WaitForExit(2000);
+                        }
+                    }
+                    catch { }
+                }
+
+                // 2. Clear AppData Local folder
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string targetDir = System.IO.Path.Combine(localAppData, "AgilicoConnectV5forWindows");
+
+                if (System.IO.Directory.Exists(targetDir))
+                {
+                    try
+                    {
+                        System.IO.Directory.Delete(targetDir, true);
+                    }
+                    catch (System.IO.IOException)
+                    {
+                        // Fallback: delete files individually, skip locked files
+                        DeleteDirectoryContents(targetDir);
+                    }
+                }
+
+                // 3. Restart if path was found
+                bool restarted = false;
+                if (!string.IsNullOrEmpty(exePath) && System.IO.File.Exists(exePath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        UseShellExecute = true
+                    });
+                    restarted = true;
+                }
+
+                string msg = restarted 
+                    ? "Agilico Connect desktop application was closed, cache cleared, and application restarted successfully."
+                    : "Agilico Connect cache cleared successfully.\n\nPlease start the Agilico Connect desktop application manually.";
+                
+                MessageBox.Show(msg, "Cache Cleared", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to clear cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static void DeleteDirectoryContents(string path)
+        {
+            foreach (string file in System.IO.Directory.GetFiles(path))
+            {
+                try { System.IO.File.Delete(file); } catch { }
+            }
+            foreach (string dir in System.IO.Directory.GetDirectories(path))
+            {
+                try { System.IO.Directory.Delete(dir, true); } catch { }
+            }
+        }
+
+        private void BtnFlushDns_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "ipconfig",
+                    Arguments = "/flushdns",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                using var p = System.Diagnostics.Process.Start(psi);
+                p?.WaitForExit();
+                MessageBox.Show("DNS resolver cache flushed successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to flush DNS cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnResetStack_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Resetting the TCP/IP stack and Winsock catalog requires administrator privileges and a system restart to take effect.\n\nDo you want to proceed?",
+                "Administrator Authorization Required",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c netsh int ip reset & netsh winsock reset",
+                    Verb = "runas",
+                    CreateNoWindow = true,
+                    UseShellExecute = true
+                };
+                using var p = System.Diagnostics.Process.Start(psi);
+                p?.WaitForExit();
+                MessageBox.Show("Winsock catalog and TCP/IP stack reset successfully. Please restart your computer for changes to take effect.", "Reset Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Action cancelled or failed: {ex.Message}", "Status", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void BtnRepairFirewall_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c netsh advfirewall firewall add rule name=\"Agilico Connect Diagnostic Tool\" dir=in action=allow protocol=UDP localport=5060,5061,10000-20000 profile=any",
+                    Verb = "runas",
+                    CreateNoWindow = true,
+                    UseShellExecute = true
+                };
+                using var p = System.Diagnostics.Process.Start(psi);
+                p?.WaitForExit();
+                MessageBox.Show("Inbound Windows Defender Firewall rules for SIP and RTP ports have been created successfully.", "Firewall Repaired", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Action cancelled or failed: {ex.Message}", "Status", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        #endregion
+
         #region Ping Track Tab Actions
 
         private static readonly System.Text.RegularExpressions.Regex HostnameRegex = new(

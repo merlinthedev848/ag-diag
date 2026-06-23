@@ -66,7 +66,7 @@
 
                 <!-- Sidebar Footer -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,20" VerticalAlignment="Bottom">
-                    <TextBlock Text="v3.5.1" FontSize="10.5" Foreground="#cbd5e1" Opacity="0.75" HorizontalAlignment="Center" FontWeight="Medium"/>
+                    <TextBlock Text="v3.5.2" FontSize="10.5" Foreground="#cbd5e1" Opacity="0.75" HorizontalAlignment="Center" FontWeight="Medium"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -1679,6 +1679,76 @@
 
                                     <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0">
                                         <CheckBox x:Name="ChkSimulation" Content="Enable Offline Simulation Mode (Mock Network Responses)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                    </Border>
+
+                                    <!-- Automated Repair Toolkit -->
+                                    <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="0,20,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Automated Repair Toolkit" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,5"/>
+                                            <TextBlock Text="Resolve common local network issues and repair configurations automatically." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,15"/>
+                                            
+                                            <WrapPanel>
+                                                <!-- Clear App Cache -->
+                                                <Button x:Name="BtnClearCache" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnClearCache_Click">
+                                                    <Grid HorizontalAlignment="Left" Width="260">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="30"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Path Data="{StaticResource IconLogs}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                            <TextBlock Text="Clear Agilico App Cache" FontWeight="Bold" FontSize="12"/>
+                                                            <TextBlock Text="Close client, clear cache, restart application" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+
+                                                <!-- Flush DNS -->
+                                                <Button x:Name="BtnFlushDns" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnFlushDns_Click">
+                                                    <Grid HorizontalAlignment="Left" Width="260">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="30"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Path Data="{StaticResource IconRefresh}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                            <TextBlock Text="Flush DNS Cache" FontWeight="Bold" FontSize="12"/>
+                                                            <TextBlock Text="Purge local OS domain resolver cache" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+
+                                                <!-- Reset TCP/IP Winsock -->
+                                                <Button x:Name="BtnResetStack" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnResetStack_Click">
+                                                    <Grid HorizontalAlignment="Left" Width="260">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="30"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Path Data="{StaticResource IconRJ45}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                            <TextBlock Text="Reset TCP/IP &amp; Winsock" FontWeight="Bold" FontSize="12"/>
+                                                            <TextBlock Text="Reinitialize network sockets stack (Admin)" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+
+                                                <!-- Repair Firewall Rules -->
+                                                <Button x:Name="BtnRepairFirewall" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnRepairFirewall_Click">
+                                                    <Grid HorizontalAlignment="Left" Width="260">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="30"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Path Data="{StaticResource IconAlert}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                            <TextBlock Text="Repair Firewall Rules" FontWeight="Bold" FontSize="12"/>
+                                                            <TextBlock Text="Add Defender Firewall rules for SIP/RTP" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                            </WrapPanel>
+                                        </StackPanel>
                                     </Border>
                                 </StackPanel>
                             </Grid>
