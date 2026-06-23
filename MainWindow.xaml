@@ -1037,17 +1037,13 @@
                                             </Style>
                                         </DataGrid.Resources>
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="Auto" />
-                                            <DataGridTextColumn Header="Latency" Binding="{Binding LatencyDisplay}" Width="*" />
-                                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto">
+                                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="100" />
+                                            <DataGridTextColumn Header="Latency" Binding="{Binding LatencyDisplay}" Width="*">
                                                 <DataGridTextColumn.ElementStyle>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="FontWeight" Value="SemiBold"/>
                                                         <Style.Triggers>
-                                                            <Trigger Property="Text" Value="Success">
-                                                                <Setter Property="Foreground" Value="#10b981"/>
-                                                            </Trigger>
-                                                            <Trigger Property="Text" Value="TimedOut">
+                                                            <Trigger Property="Text" Value="Timeout">
                                                                 <Setter Property="Foreground" Value="#ef4444"/>
                                                             </Trigger>
                                                         </Style.Triggers>
