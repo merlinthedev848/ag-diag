@@ -338,6 +338,8 @@ namespace AgilicoConnectChecker
                 }
                 catch (Exception)
                 {
+                    if (token.IsCancellationRequested || _rawSocket == null)
+                        break;
                     await Task.Delay(10, token);
                 }
             }

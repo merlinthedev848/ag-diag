@@ -37,6 +37,16 @@ namespace AgilicoConnectChecker
         private const int MaxRecentCount = 60;
         private readonly object _lock = new object();
 
+        // Running statistics to avoid O(N) calculations per ping
+        private long _minLatency = long.MaxValue;
+        private long _maxLatency = long.MinValue;
+        private double _sumLatencies = 0;
+        private int _successfulPingsCount = 0;
+        private int _totalPings = 0;
+        private int _failedPings = 0;
+        private double _sumJitterDiff = 0;
+        private long? _lastSuccessfulLatency = null;
+
         public event Action<PingResult, PingStats>? OnPingResult;
 
         public bool IsRunning => _cts != null;
@@ -54,6 +64,16 @@ namespace AgilicoConnectChecker
                 CurrentIntervalMs = intervalMs;
                 _allResults.Clear();
                 _recentResults.Clear();
+
+                // Reset running stats
+                _minLatency = long.MaxValue;
+                _maxLatency = long.MinValue;
+                _sumLatencies = 0;
+                _successfulPingsCount = 0;
+                _totalPings = 0;
+                _failedPings = 0;
+                _sumJitterDiff = 0;
+                _lastSuccessfulLatency = null;
 
                 var token = _cts.Token;
                 Task.Run(() => RunPingLoopAsync(target, intervalMs, token), token);
@@ -134,6 +154,28 @@ namespace AgilicoConnectChecker
                         _recentResults.RemoveAt(0);
                     }
 
+                    // Update running statistics
+                    _totalPings++;
+                    if (result.LatencyMs.HasValue)
+                    {
+                        long val = result.LatencyMs.Value;
+                        _successfulPingsCount++;
+                        _sumLatencies += val;
+
+                        if (val < _minLatency) _minLatency = val;
+                        if (val > _maxLatency) _maxLatency = val;
+
+                        if (_lastSuccessfulLatency.HasValue)
+                        {
+                            _sumJitterDiff += Math.Abs(val - _lastSuccessfulLatency.Value);
+                        }
+                        _lastSuccessfulLatency = val;
+                    }
+                    else
+                    {
+                        _failedPings++;
+                    }
+
                     stats = CalculateStats();
                 }
 
@@ -174,29 +216,20 @@ namespace AgilicoConnectChecker
         private PingStats CalculateStats()
         {
             var stats = new PingStats();
-            var successfulPings = _allResults.Where(r => r.LatencyMs.HasValue).Select(r => r.LatencyMs!.Value).ToList();
-            var totalPings = _allResults.Count;
+            if (_totalPings == 0) return stats;
 
-            if (totalPings == 0) return stats;
+            stats.LossPercentage = (double)_failedPings / _totalPings * 100.0;
 
-            stats.LossPercentage = (double)_allResults.Count(r => !r.LatencyMs.HasValue) / totalPings * 100.0;
-
-            if (successfulPings.Count > 0)
+            if (_successfulPingsCount > 0)
             {
-                stats.Current = successfulPings.Last();
-                stats.Min = successfulPings.Min();
-                stats.Max = successfulPings.Max();
-                stats.Average = successfulPings.Average();
+                stats.Current = _lastSuccessfulLatency ?? 0;
+                stats.Min = _minLatency;
+                stats.Max = _maxLatency;
+                stats.Average = _sumLatencies / _successfulPingsCount;
 
-                // Calculate Jitter (mean absolute deviation of consecutive latencies)
-                if (successfulPings.Count > 1)
+                if (_successfulPingsCount > 1)
                 {
-                    double sumDiff = 0;
-                    for (int i = 1; i < successfulPings.Count; i++)
-                    {
-                        sumDiff += Math.Abs(successfulPings[i] - successfulPings[i - 1]);
-                    }
-                    stats.Jitter = sumDiff / (successfulPings.Count - 1);
+                    stats.Jitter = _sumJitterDiff / (_successfulPingsCount - 1);
                 }
                 else
                 {

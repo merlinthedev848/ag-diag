@@ -143,6 +143,8 @@ namespace AgilicoConnectChecker
 
                     if (isAlive || targetIp == localIp)
                     {
+                        if (token.IsCancellationRequested) return;
+
                         var mac = GetMacAddress(targetIp);
                         var device = new LanDevice
                         {
@@ -150,7 +152,9 @@ namespace AgilicoConnectChecker
                             MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
                         };
                         
-                        // Get Hostname immediately
+                        if (token.IsCancellationRequested) return;
+
+                        // Get Hostname immediately with a timeout to avoid hangs
                         try
                         {
                             if (device.IpAddress == localIp)
@@ -159,14 +163,28 @@ namespace AgilicoConnectChecker
                             }
                             else
                             {
-                                var hostEntry = await Dns.GetHostEntryAsync(device.IpAddress);
-                                device.Hostname = hostEntry.HostName;
+                                var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
+                                var timeoutTask = Task.Delay(1000, token); // 1-second timeout
+                                var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
+                                if (completedTask == dnsTask)
+                                {
+                                    var hostEntry = await dnsTask;
+                                    device.Hostname = hostEntry.HostName;
+                                }
+                                else
+                                {
+                                    device.Hostname = "-";
+                                }
                             }
                         }
                         catch { device.Hostname = "-"; }
 
+                        if (token.IsCancellationRequested) return;
+
                         // Get Manufacturer immediately
-                        device.Manufacturer = await GetManufacturerAsync(device.MacAddress);
+                        device.Manufacturer = await GetManufacturerAsync(device.MacAddress, token);
+
+                        if (token.IsCancellationRequested) return;
 
                         lock (syncLock)
                         {
@@ -224,7 +242,7 @@ namespace AgilicoConnectChecker
             return "";
         }
 
-        private async Task<string> GetManufacturerAsync(string macAddress)
+        private async Task<string> GetManufacturerAsync(string macAddress, CancellationToken token)
         {
             if (string.IsNullOrEmpty(macAddress) || macAddress == "Local Interface")
                 return "Current Device";
@@ -243,7 +261,7 @@ namespace AgilicoConnectChecker
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.macvendors.com/{prefix}");
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(request, token);
                 if (response.IsSuccessStatusCode)
                 {
                     string result = await response.Content.ReadAsStringAsync();
