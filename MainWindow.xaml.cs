@@ -57,7 +57,7 @@ namespace AgilicoConnectChecker
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnPcap, BtnHelp, BtnLogs, BtnSettings, BtnVoipTools };
+            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnTraceroute, BtnPcap, BtnVoipTools, BtnHelp, BtnLogs, BtnSettings };
             GridLanDevices.ItemsSource = _lanDevices;
             GridPingLogs.ItemsSource = _pingLogs;
             GridTraceHops.ItemsSource = _traceHops;
@@ -129,10 +129,10 @@ namespace AgilicoConnectChecker
         private void BtnPingTrack_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnPingTrack);
         private void BtnTraceroute_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnTraceroute);
         private void BtnPcap_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnPcap);
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnSettings);
-        private void BtnVoipTools_Click(object sender, RoutedEventArgs e) => SelectTab(8, BtnVoipTools);
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnHelp);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnLogs);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(8, BtnSettings);
+        private void BtnVoipTools_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnVoipTools);
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -1073,9 +1073,8 @@ namespace AgilicoConnectChecker
                 BtnTraceroute.Visibility = Visibility.Collapsed;
                 BtnPcap.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
-                BtnVoipTools.Visibility = Visibility.Collapsed;
                 
-                if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6)
+                if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6 && PageTabControl.SelectedIndex != 7)
                 {
                     SelectTab(0, BtnDashboard);
                 }
