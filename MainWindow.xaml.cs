@@ -2047,7 +2047,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.6");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.7");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
