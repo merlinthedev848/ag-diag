@@ -234,6 +234,7 @@ namespace AgilicoConnectChecker
             int current = offset;
             bool jumped = false;
             int savedOffset = -1;
+            int jumpCount = 0;
 
             while (current < response.Length)
             {
@@ -254,6 +255,9 @@ namespace AgilicoConnectChecker
                         jumped = true;
                     }
                     current = pointer;
+                    
+                    jumpCount++;
+                    if (jumpCount > 20) break; // Prevent compression loops
                 }
                 else
                 {

@@ -79,12 +79,17 @@ namespace AgilicoConnectChecker
 
         public void Stop()
         {
+            CancellationTokenSource? oldCts = null;
             lock (_lock)
             {
                 _isWriting = false;
                 try
                 {
-                    _captureCts?.Cancel();
+                    if (_captureCts != null)
+                    {
+                        oldCts = _captureCts;
+                        oldCts.Cancel();
+                    }
                     _rawSocket?.Close();
                 }
                 catch { }
@@ -92,6 +97,15 @@ namespace AgilicoConnectChecker
                 _captureCts = null;
                 _rawSocket = null;
                 _captureTask = null;
+            }
+
+            if (oldCts != null)
+            {
+                // Dispose token source after a delay to ensure any asynchronous capture loop handles cancellation cleanly
+                Task.Delay(500).ContinueWith(_ =>
+                {
+                    try { oldCts.Dispose(); } catch { }
+                });
             }
         }
 
@@ -120,6 +134,7 @@ namespace AgilicoConnectChecker
             lock (_lock)
             {
                 if (!_isWriting) return;
+                if (_totalBytes > 25 * 1024 * 1024 || _packetCount > 50000) return;
 
                 // Apply IP filter
                 string? filter = _ipFilter;
@@ -350,6 +365,7 @@ namespace AgilicoConnectChecker
             lock (_lock)
             {
                 if (!_isWriting) return;
+                if (_totalBytes > 25 * 1024 * 1024 || _packetCount > 50000) return;
 
                 try
                 {

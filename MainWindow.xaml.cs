@@ -424,16 +424,16 @@ namespace AgilicoConnectChecker
 
         private void Engine_OnLog(string message, bool isError)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 TxtLogs.AppendText(message + Environment.NewLine);
                 TxtLogs.ScrollToEnd();
-            });
+            }));
         }
 
         private void Engine_OnProgress(string testName, string status, string details)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 TxtProgressStatus.Text = $"{testName}: {details}";
                 
@@ -456,7 +456,7 @@ namespace AgilicoConnectChecker
                 {
                     UpdateTestUI(testIndex, status, details);
                 }
-            });
+            }));
         }
 
         private void Engine_OnComplete(bool success, int score)
@@ -2062,7 +2062,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.7");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.8");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);

@@ -685,7 +685,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(800);
+                await Task.Delay(800, token);
                 UpdateProgress("DNS Domain & Resolution Check", "Passed", "Pass - DNS resolving correctly");
                 return true;
             }
@@ -846,7 +846,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(800);
+                await Task.Delay(800, token);
                 UpdateProgress("HTTP/HTTPS Outbound Probes", "Passed", "Pass - HTTP/HTTPS Verified (TLS Succeeded)");
                 return true;
             }
@@ -929,7 +929,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(800);
+                await Task.Delay(800, token);
                 UpdateProgress("NTP Subsystem (UDP 123)", "Passed", "Pass - UDP 123 Outbound Open");
                 return true;
             }
@@ -1046,7 +1046,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000, token);
                 UpdateProgress("Agilico STUN Servers", "Passed", "Pass - All 4 Agilico STUN servers OK");
                 return true;
             }
@@ -1101,7 +1101,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000, token);
                 UpdateProgress("Google STUN Servers", "Passed", "Pass - All 5 Google STUN servers OK");
                 return true;
             }
@@ -1166,7 +1166,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000, token);
                 UpdateProgress("NAT Routing & Hops Check", "Passed", "Pass - Single NAT (1 private hop)");
                 return true;
             }
@@ -1262,7 +1262,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(800);
+                await Task.Delay(800, token);
                 mappedPort = 53891;
                 Log($"[Simulation] Local Port: {localPort}, STUN Mapped Port: {mappedPort}");
                 Log("Pass: Public interface NAT port is random and different from local port.");
@@ -1344,7 +1344,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000, token);
                 Log("[Simulation] Verification response matched. SIP ALG: Disabled.");
                 UpdateProgress("SIP ALG Detection", "Passed", "Pass - SIP ALG Disabled");
                 return true;
@@ -1610,7 +1610,7 @@ namespace AgilicoConnectChecker
 
             if (IsSimulationMode)
             {
-                Thread.Sleep(1500);
+                await Task.Delay(1500, token);
                 double mos = VoipTools.CalculateMosScore(20, 5, 0); // 4.4
                 Log($"[Simulation] Packet Loss: 0%, Jitter: 5ms, Est. MOS: {mos}");
                 UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Excellent Quality (0% loss, 5ms jitter, Est. MOS: {mos} - Excellent)");
