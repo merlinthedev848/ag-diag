@@ -1504,7 +1504,7 @@ namespace AgilicoConnectChecker
             buttonPanel.Children.Add(okButton);
             buttonPanel.Children.Add(cancelButton);
 
-            var mainPanel = new StackPanel { Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
+            var mainPanel = new StackPanel { Background = new SolidColorBrush(Color.FromRgb(0, 0, 52)) };
             mainPanel.Children.Add(new TextBlock { Text = "Enter Agilico Engineer Password:", Foreground = Brushes.White, Margin = new Thickness(10), FontSize = 13, FontWeight = FontWeights.SemiBold });
             mainPanel.Children.Add(passwordBox);
             mainPanel.Children.Add(buttonPanel);
@@ -1518,7 +1518,7 @@ namespace AgilicoConnectChecker
                 Owner = this,
                 ResizeMode = ResizeMode.NoResize,
                 WindowStyle = WindowStyle.ToolWindow,
-                Background = new SolidColorBrush(Color.FromRgb(30, 41, 59))
+                Background = new SolidColorBrush(Color.FromRgb(0, 0, 52))
             };
 
             okButton.Click += (s, ev) =>
@@ -1585,9 +1585,9 @@ namespace AgilicoConnectChecker
                 if (CboPcapAdapter.SelectedItem is AdapterItem selectedItem)
                 {
                     selectedIp = selectedItem.IpAddress;
-                    isInactive = selectedItem.Name.Contains("(Inactive)");
+                    isInactive = selectedItem.Name.StartsWith("🔴");
                     
-                    if (selectedItem.Name != "Automatic (Detect Active)" && string.IsNullOrEmpty(selectedIp))
+                    if (!selectedItem.Name.StartsWith("🔵") && string.IsNullOrEmpty(selectedIp))
                     {
                         MessageBox.Show("The selected network adapter does not have a configured IPv4 address.", "No IPv4 Configured", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
@@ -1648,14 +1648,14 @@ namespace AgilicoConnectChecker
                 CboPcapAdapter.Items.Clear();
                 
                 // Add default/automatic option
-                CboPcapAdapter.Items.Add(new AdapterItem { Name = "Automatic (Detect Active)", IpAddress = "" });
+                CboPcapAdapter.Items.Add(new AdapterItem { Name = "🔵 Automatic (Detect Active)", IpAddress = "" });
 
                 foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
 
                     bool isActive = ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up;
-                    string statusSuffix = isActive ? "" : " (Inactive)";
+                    string prefix = isActive ? "🟢 " : "🔴 ";
 
                     var ips = ni.GetIPProperties().UnicastAddresses;
                     bool hasIpv4 = false;
@@ -1667,7 +1667,7 @@ namespace AgilicoConnectChecker
                             hasIpv4 = true;
                             CboPcapAdapter.Items.Add(new AdapterItem
                             {
-                                Name = $"{ni.Name}{statusSuffix} ({ua.Address})",
+                                Name = $"{prefix}{ni.Name} ({ua.Address})",
                                 IpAddress = ua.Address.ToString()
                             });
                         }
@@ -1677,7 +1677,7 @@ namespace AgilicoConnectChecker
                     {
                         CboPcapAdapter.Items.Add(new AdapterItem
                         {
-                            Name = $"{ni.Name}{statusSuffix} (No IPv4)",
+                            Name = $"{prefix}{ni.Name} (No IPv4)",
                             IpAddress = ""
                         });
                     }
