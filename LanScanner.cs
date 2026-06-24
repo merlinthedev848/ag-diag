@@ -29,6 +29,7 @@ namespace AgilicoConnectChecker
 
         private readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         private readonly Dictionary<string, string> _ouiCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly SemaphoreSlim _macApiSemaphore = new SemaphoreSlim(1, 1);
 
         // A curated list of common OUI prefixes for instant resolution without internet
         private readonly Dictionary<string, string> _commonOuis = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -258,8 +259,13 @@ namespace AgilicoConnectChecker
             if (_ouiCache.TryGetValue(prefix, out string? cached) && cached != null)
                 return cached;
 
+            await _macApiSemaphore.WaitAsync(token);
             try
             {
+                // Double check cache after obtaining the semaphore
+                if (_ouiCache.TryGetValue(prefix, out string? cachedVal) && cachedVal != null)
+                    return cachedVal;
+
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.macvendors.com/{prefix}");
                 var response = await _httpClient.SendAsync(request, token);
                 if (response.IsSuccessStatusCode)
@@ -273,11 +279,15 @@ namespace AgilicoConnectChecker
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
-                    // Rate limited - do not cache, return warning
                     return "Unknown (Rate Limited)";
                 }
             }
             catch { } 
+            finally
+            {
+                // Delay releasing the semaphore for 600ms to stay within the 2 req/sec rate limit of api.macvendors.com
+                _ = Task.Delay(600).ContinueWith(_ => _macApiSemaphore.Release());
+            }
 
             _ouiCache[prefix] = "Unknown";
             return "Unknown";

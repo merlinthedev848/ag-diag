@@ -240,7 +240,7 @@ namespace AgilicoConnectChecker
                     pubIp = await _engine.ResolvePublicIpAsync(CancellationToken.None);
                 }
 
-                Dispatcher.Invoke(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     TxtLocalStatus.Text = info.Status;
                     TxtLocalIp.Text = info.IpAddress;
@@ -265,7 +265,7 @@ namespace AgilicoConnectChecker
                         TxtLocalStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentBlueBrush");
                         TxtLocalStatus.FontWeight = FontWeights.SemiBold;
                     }
-                });
+                }));
             });
         }
 
@@ -320,20 +320,20 @@ namespace AgilicoConnectChecker
             {
                 var devices = await _lanScanner.ScanNetworkAsync((completed, total) =>
                 {
-                    Dispatcher.Invoke(() =>
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
                         TxtLanScanProgress.Text = $"Scanning subnet ({completed}/{total})...";
-                    });
+                    }));
                 }, (dev) =>
                 {
-                    Dispatcher.Invoke(() =>
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
                         _lanDevices.Add(dev);
-                    });
+                    }));
                 }, token);
 
                 // Sort at the end
-                Dispatcher.Invoke(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     var sorted = _lanDevices.OrderBy(d => 
                     {
@@ -349,7 +349,7 @@ namespace AgilicoConnectChecker
                     {
                         _lanDevices.Add(d);
                     }
-                });
+                }));
             }
             catch (OperationCanceledException) { /* scan was cancelled */ }
 
@@ -461,7 +461,7 @@ namespace AgilicoConnectChecker
 
         private void Engine_OnComplete(bool success, int score)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 RestoreControlButtons();
                 RefreshLocalNetworkInfo();
@@ -519,7 +519,7 @@ namespace AgilicoConnectChecker
                     
                     TxtFailInstructions.Text = sb.ToString();
                 }
-            });
+            }));
         }
 
         private void UpdateTestUI(int testNum, string status, string details)
@@ -854,7 +854,7 @@ namespace AgilicoConnectChecker
 
         private void PingTracker_OnPingResult(PingResult result, PingStats stats)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 _currentPingStats = stats;
 
@@ -885,7 +885,7 @@ namespace AgilicoConnectChecker
 
                 // Draw Graph
                 DrawPingGraph(_pingTracker.GetRecentResults(), stats);
-            });
+            }));
         }
 
         private void DrawPingGraph(List<PingResult> recentPings, PingStats stats)
@@ -1140,7 +1140,7 @@ namespace AgilicoConnectChecker
                             {
                                 long currentBytes = System.Threading.Interlocked.Read(ref totalDownloaded);
                                 double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
-                                Dispatcher.BeginInvoke(() =>
+                                _ = Dispatcher.BeginInvoke(() =>
                                 {
                                     TxtLocalDownloadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
                                 });
@@ -1234,7 +1234,7 @@ namespace AgilicoConnectChecker
             }
 
             // Update UI to show final download speed or prepare upload
-            Dispatcher.BeginInvoke(() =>
+            _ = Dispatcher.BeginInvoke(() =>
             {
                 TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
@@ -1263,7 +1263,7 @@ namespace AgilicoConnectChecker
                             {
                                 long currentBytes = System.Threading.Interlocked.Read(ref totalUploaded);
                                 double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
-                                Dispatcher.BeginInvoke(() =>
+                                _ = Dispatcher.BeginInvoke(() =>
                                 {
                                     TxtLocalUploadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
                                 });
@@ -1318,7 +1318,7 @@ namespace AgilicoConnectChecker
                 System.Diagnostics.Debug.WriteLine($"Upload test failed: {ex.Message}");
             }
 
-            Dispatcher.BeginInvoke(() =>
+            _ = Dispatcher.BeginInvoke(() =>
             {
                 TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
@@ -1369,7 +1369,7 @@ namespace AgilicoConnectChecker
                         var currentHop = hop;
                         var hopResult = new TraceHop { HopNumber = currentHop, IpAddress = "*", Hostname = "*", RttDisplay = "Timeout" };
 
-                        Dispatcher.Invoke(() => _traceHops.Add(hopResult));
+                        _ = Dispatcher.BeginInvoke(new Action(() => _traceHops.Add(hopResult)));
 
                         try
                         {
@@ -1406,13 +1406,13 @@ namespace AgilicoConnectChecker
 
                                         var (asn, location) = await geoTask;
 
-                                        Dispatcher.Invoke(() =>
+                                        _ = Dispatcher.BeginInvoke(new Action(() =>
                                         {
                                             hopResult.Hostname = hostname;
                                             hopResult.Asn = asn;
                                             hopResult.Location = location;
                                             GridTraceHops.Items.Refresh();
-                                        });
+                                        }));
                                     }
                                 });
 
@@ -1432,10 +1432,10 @@ namespace AgilicoConnectChecker
                             hopResult.Hostname = ex.Message;
                         }
 
-                        Dispatcher.Invoke(() =>
+                        _ = Dispatcher.BeginInvoke(new Action(() =>
                         {
                             GridTraceHops.Items.Refresh();
-                        });
+                        }));
 
                         if (destinationReached)
                         {
@@ -1941,7 +1941,7 @@ namespace AgilicoConnectChecker
                     probeTasks.Remove(completedTask);
 
                     var res = await completedTask;
-                    Dispatcher.Invoke(() => _portProbeResults.Add(res));
+                    _ = Dispatcher.BeginInvoke(new Action(() => _portProbeResults.Add(res)));
                 }
             }
             catch (OperationCanceledException) { }
@@ -2062,7 +2062,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.8");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.9");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
