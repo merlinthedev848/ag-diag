@@ -18,5 +18,5 @@ Desktop.ini
 build_lite/
 build_standalone/
 test_run.log
-
-
+# Backup / locked files
+*.old

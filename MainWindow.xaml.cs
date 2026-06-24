@@ -1111,6 +1111,11 @@ namespace AgilicoConnectChecker
             double downloadMbps = 0;
             double uploadMbps = 0;
 
+            using var client = new System.Net.Http.HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(15);
+            // Use a standard browser User-Agent to avoid blocks/403s on Cloudflare
+            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
             // 1. Download Test
             try
             {
@@ -1145,31 +1150,32 @@ namespace AgilicoConnectChecker
                     }
                 }, downloadToken);
 
-                // Run 4 concurrent download workers
+                // Run 4 concurrent download workers looping 50MB downloads (Cloudflare blocks 100MB+)
                 var downloadTasks = new List<Task>();
                 for (int i = 0; i < 4; i++)
                 {
                     downloadTasks.Add(Task.Run(async () =>
                     {
-                        using var client = new System.Net.Http.HttpClient();
-                        client.Timeout = TimeSpan.FromSeconds(10);
-                        try
+                        while (!downloadToken.IsCancellationRequested)
                         {
-                            // 100MB stream from Cloudflare speed test endpoint
-                            using var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=104857600", System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
-                            response.EnsureSuccessStatusCode();
-                            using var stream = await response.Content.ReadAsStreamAsync(downloadToken);
-                            byte[] buffer = new byte[65536]; // 64KB
-                            int bytesRead;
-                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, downloadToken)) > 0)
+                            try
                             {
-                                System.Threading.Interlocked.Add(ref totalDownloaded, bytesRead);
+                                using var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=52428800", System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
+                                response.EnsureSuccessStatusCode();
+                                using var stream = await response.Content.ReadAsStreamAsync(downloadToken);
+                                byte[] buffer = new byte[65536]; // 64KB
+                                int bytesRead;
+                                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, downloadToken)) > 0)
+                                {
+                                    System.Threading.Interlocked.Add(ref totalDownloaded, bytesRead);
+                                }
                             }
-                        }
-                        catch (OperationCanceledException) { }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Download worker error: {ex.Message}");
+                            catch (OperationCanceledException) { break; }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Download worker error: {ex.Message}");
+                                try { await Task.Delay(100, downloadToken); } catch { break; } // Avoid tight loop on error
+                            }
                         }
                     }, downloadToken));
                 }
@@ -1230,7 +1236,7 @@ namespace AgilicoConnectChecker
                     }
                 }, uploadToken);
 
-                // Run 4 concurrent upload workers
+                // Run 4 concurrent upload workers using the shared client
                 var uploadTasks = new List<Task>();
                 byte[] uploadBuffer = new byte[1048576]; // 1MB chunk
                 Random.Shared.NextBytes(uploadBuffer);
@@ -1239,8 +1245,6 @@ namespace AgilicoConnectChecker
                 {
                     uploadTasks.Add(Task.Run(async () =>
                     {
-                        using var client = new System.Net.Http.HttpClient();
-                        client.Timeout = TimeSpan.FromSeconds(10);
                         while (!uploadToken.IsCancellationRequested)
                         {
                             try
