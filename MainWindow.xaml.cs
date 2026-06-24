@@ -1579,21 +1579,20 @@ namespace AgilicoConnectChecker
                         return;
                     }
                 }
-
                 string? selectedIp = null;
                 bool isInactive = false;
                 if (CboPcapAdapter.SelectedItem is AdapterItem selectedItem)
                 {
                     selectedIp = selectedItem.IpAddress;
-                    isInactive = selectedItem.Name.StartsWith("🔴");
+                    isInactive = !selectedItem.IsActive && !selectedItem.IsAutomatic;
                     
-                    if (!selectedItem.Name.StartsWith("🔵") && string.IsNullOrEmpty(selectedIp))
+                    if (!selectedItem.IsAutomatic && string.IsNullOrEmpty(selectedIp))
                     {
                         MessageBox.Show("The selected network adapter does not have a configured IPv4 address.", "No IPv4 Configured", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
                 }
-
+ 
                 if (isInactive)
                 {
                     MessageBox.Show("The selected network adapter is inactive. Please choose an active adapter to capture traffic.", "Adapter Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1648,14 +1647,21 @@ namespace AgilicoConnectChecker
                 CboPcapAdapter.Items.Clear();
                 
                 // Add default/automatic option
-                CboPcapAdapter.Items.Add(new AdapterItem { Name = "🔵 Automatic (Detect Active)", IpAddress = "" });
+                CboPcapAdapter.Items.Add(new AdapterItem 
+                { 
+                    Name = "Automatic (Detect Active)", 
+                    IpAddress = "", 
+                    StatusColor = "#3b82f6", // Blue
+                    IsActive = true,
+                    IsAutomatic = true 
+                });
 
                 foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
 
                     bool isActive = ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up;
-                    string prefix = isActive ? "🟢 " : "🔴 ";
+                    string color = isActive ? "#22c55e" : "#ef4444"; // Green or Red
 
                     var ips = ni.GetIPProperties().UnicastAddresses;
                     bool hasIpv4 = false;
@@ -1667,8 +1673,11 @@ namespace AgilicoConnectChecker
                             hasIpv4 = true;
                             CboPcapAdapter.Items.Add(new AdapterItem
                             {
-                                Name = $"{prefix}{ni.Name} ({ua.Address})",
-                                IpAddress = ua.Address.ToString()
+                                Name = $"{ni.Name} ({ua.Address})",
+                                IpAddress = ua.Address.ToString(),
+                                StatusColor = color,
+                                IsActive = isActive,
+                                IsAutomatic = false
                             });
                         }
                     }
@@ -1677,8 +1686,11 @@ namespace AgilicoConnectChecker
                     {
                         CboPcapAdapter.Items.Add(new AdapterItem
                         {
-                            Name = $"{prefix}{ni.Name} (No IPv4)",
-                            IpAddress = ""
+                            Name = $"{ni.Name} (No IPv4)",
+                            IpAddress = "",
+                            StatusColor = color,
+                            IsActive = isActive,
+                            IsAutomatic = false
                         });
                     }
                 }
@@ -1698,6 +1710,9 @@ namespace AgilicoConnectChecker
         {
             public string Name { get; set; } = string.Empty;
             public string IpAddress { get; set; } = string.Empty;
+            public string StatusColor { get; set; } = "#94a3b8"; // Slate gray default
+            public bool IsActive { get; set; }
+            public bool IsAutomatic { get; set; }
             public override string ToString() => Name;
         }
 
