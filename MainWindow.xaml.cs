@@ -1581,9 +1581,23 @@ namespace AgilicoConnectChecker
                 }
 
                 string? selectedIp = null;
+                bool isInactive = false;
                 if (CboPcapAdapter.SelectedItem is AdapterItem selectedItem)
                 {
                     selectedIp = selectedItem.IpAddress;
+                    isInactive = selectedItem.Name.Contains("(Inactive)");
+                    
+                    if (selectedItem.Name != "Automatic (Detect Active)" && string.IsNullOrEmpty(selectedIp))
+                    {
+                        MessageBox.Show("The selected network adapter does not have a configured IPv4 address.", "No IPv4 Configured", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+
+                if (isInactive)
+                {
+                    MessageBox.Show("The selected network adapter is inactive. Please choose an active adapter to capture traffic.", "Adapter Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
 
                 try
@@ -1638,19 +1652,34 @@ namespace AgilicoConnectChecker
 
                 foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up) continue;
                     if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
 
-                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    bool isActive = ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up;
+                    string statusSuffix = isActive ? "" : " (Inactive)";
+
+                    var ips = ni.GetIPProperties().UnicastAddresses;
+                    bool hasIpv4 = false;
+
+                    foreach (var ua in ips)
                     {
                         if (ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                         {
+                            hasIpv4 = true;
                             CboPcapAdapter.Items.Add(new AdapterItem
                             {
-                                Name = $"{ni.Name} ({ua.Address})",
+                                Name = $"{ni.Name}{statusSuffix} ({ua.Address})",
                                 IpAddress = ua.Address.ToString()
                             });
                         }
+                    }
+
+                    if (!hasIpv4)
+                    {
+                        CboPcapAdapter.Items.Add(new AdapterItem
+                        {
+                            Name = $"{ni.Name}{statusSuffix} (No IPv4)",
+                            IpAddress = ""
+                        });
                     }
                 }
 
