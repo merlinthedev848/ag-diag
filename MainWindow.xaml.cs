@@ -1120,7 +1120,7 @@ namespace AgilicoConnectChecker
             try
             {
                 using var ctsDownload = CancellationTokenSource.CreateLinkedTokenSource(token);
-                ctsDownload.CancelAfter(TimeSpan.FromSeconds(5));
+                ctsDownload.CancelAfter(TimeSpan.FromSeconds(3));
                 var downloadToken = ctsDownload.Token;
 
                 long totalDownloaded = 0;
@@ -1206,7 +1206,7 @@ namespace AgilicoConnectChecker
             try
             {
                 using var ctsUpload = CancellationTokenSource.CreateLinkedTokenSource(token);
-                ctsUpload.CancelAfter(TimeSpan.FromSeconds(5));
+                ctsUpload.CancelAfter(TimeSpan.FromSeconds(3));
                 var uploadToken = ctsUpload.Token;
 
                 long totalUploaded = 0;
@@ -1926,7 +1926,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.4");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.5");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
