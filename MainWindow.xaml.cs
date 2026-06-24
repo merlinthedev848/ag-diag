@@ -1110,84 +1110,176 @@ namespace AgilicoConnectChecker
 
             double downloadMbps = 0;
             double uploadMbps = 0;
-            using var client = new System.Net.Http.HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(15);
 
-            // Pre-connect warm up to establish DNS/TCP/TLS session
+            // 1. Download Test
             try
             {
-                await client.GetAsync("https://speed.cloudflare.com/__down?bytes=1", token);
-            }
-            catch { /* Ignore warm-up failure, proceed with main test */ }
+                using var ctsDownload = CancellationTokenSource.CreateLinkedTokenSource(token);
+                ctsDownload.CancelAfter(TimeSpan.FromSeconds(5));
+                var downloadToken = ctsDownload.Token;
 
-            // 1. Download Test (4 streams * 2.5MB = 10MB)
-            try
-            {
-                int downloadStreams = 4;
-                long downloadBytesPerStream = 2621440; // 2.5MB
-                var downloadTasks = new List<Task<byte[]>>();
-                
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                for (int i = 0; i < downloadStreams; i++)
-                {
-                    downloadTasks.Add(client.GetByteArrayAsync($"https://speed.cloudflare.com/__down?bytes={downloadBytesPerStream}", token));
-                }
-                
-                var results = await Task.WhenAll(downloadTasks);
-                sw.Stop();
-                
                 long totalDownloaded = 0;
-                foreach (var bytes in results)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                // Periodic UI update task
+                var uiUpdateTask = Task.Run(async () =>
                 {
-                    totalDownloaded += bytes.Length;
+                    while (!downloadToken.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            await Task.Delay(200, downloadToken);
+                            double elapsed = sw.Elapsed.TotalSeconds;
+                            if (elapsed > 0)
+                            {
+                                long currentBytes = System.Threading.Interlocked.Read(ref totalDownloaded);
+                                double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
+                                Dispatcher.BeginInvoke(() =>
+                                {
+                                    TxtLocalDownloadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
+                                });
+                            }
+                        }
+                        catch (OperationCanceledException) { break; }
+                        catch { }
+                    }
+                }, downloadToken);
+
+                // Run 4 concurrent download workers
+                var downloadTasks = new List<Task>();
+                for (int i = 0; i < 4; i++)
+                {
+                    downloadTasks.Add(Task.Run(async () =>
+                    {
+                        using var client = new System.Net.Http.HttpClient();
+                        client.Timeout = TimeSpan.FromSeconds(10);
+                        try
+                        {
+                            // 100MB stream from Cloudflare speed test endpoint
+                            using var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=104857600", System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
+                            response.EnsureSuccessStatusCode();
+                            using var stream = await response.Content.ReadAsStreamAsync(downloadToken);
+                            byte[] buffer = new byte[65536]; // 64KB
+                            int bytesRead;
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, downloadToken)) > 0)
+                            {
+                                System.Threading.Interlocked.Add(ref totalDownloaded, bytesRead);
+                            }
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Download worker error: {ex.Message}");
+                        }
+                    }, downloadToken));
                 }
-                
-                double seconds = sw.Elapsed.TotalSeconds;
-                if (seconds > 0)
+
+                await Task.WhenAll(downloadTasks);
+                sw.Stop();
+                try { await uiUpdateTask; } catch { }
+
+                double finalElapsed = sw.Elapsed.TotalSeconds;
+                if (finalElapsed > 0)
                 {
-                    downloadMbps = (totalDownloaded * 8.0) / (seconds * 1000000.0);
+                    downloadMbps = (System.Threading.Interlocked.Read(ref totalDownloaded) * 8.0) / (finalElapsed * 1000000.0);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Download speed test failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Download test failed: {ex.Message}");
             }
 
-            // 2. Upload Test (4 streams * 1MB = 4MB)
+            // Update UI to show final download speed or prepare upload
+            Dispatcher.BeginInvoke(() =>
+            {
+                TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
+                TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+            });
+
+            // 2. Upload Test
             try
             {
-                int uploadStreams = 4;
-                int uploadBytesPerStream = 1048576; // 1MB
-                var uploadTasks = new List<Task<System.Net.Http.HttpResponseMessage>>();
-                
+                using var ctsUpload = CancellationTokenSource.CreateLinkedTokenSource(token);
+                ctsUpload.CancelAfter(TimeSpan.FromSeconds(5));
+                var uploadToken = ctsUpload.Token;
+
+                long totalUploaded = 0;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                for (int i = 0; i < uploadStreams; i++)
+
+                // Periodic UI update task
+                var uiUpdateTask = Task.Run(async () =>
                 {
-                    var payload = new byte[uploadBytesPerStream];
-                    new Random().NextBytes(payload);
-                    var content = new System.Net.Http.ByteArrayContent(payload);
-                    uploadTasks.Add(client.PostAsync("https://speed.cloudflare.com/__up", content, token));
+                    while (!uploadToken.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            await Task.Delay(200, uploadToken);
+                            double elapsed = sw.Elapsed.TotalSeconds;
+                            if (elapsed > 0)
+                            {
+                                long currentBytes = System.Threading.Interlocked.Read(ref totalUploaded);
+                                double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
+                                Dispatcher.BeginInvoke(() =>
+                                {
+                                    TxtLocalUploadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
+                                });
+                            }
+                        }
+                        catch (OperationCanceledException) { break; }
+                        catch { }
+                    }
+                }, uploadToken);
+
+                // Run 4 concurrent upload workers
+                var uploadTasks = new List<Task>();
+                byte[] uploadBuffer = new byte[1048576]; // 1MB chunk
+                Random.Shared.NextBytes(uploadBuffer);
+
+                for (int i = 0; i < 4; i++)
+                {
+                    uploadTasks.Add(Task.Run(async () =>
+                    {
+                        using var client = new System.Net.Http.HttpClient();
+                        client.Timeout = TimeSpan.FromSeconds(10);
+                        while (!uploadToken.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                var content = new System.Net.Http.ByteArrayContent(uploadBuffer);
+                                var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, uploadToken);
+                                response.EnsureSuccessStatusCode();
+                                System.Threading.Interlocked.Add(ref totalUploaded, uploadBuffer.Length);
+                            }
+                            catch (OperationCanceledException) { break; }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Upload worker error: {ex.Message}");
+                                try { await Task.Delay(100, uploadToken); } catch { break; } // Avoid tight loop on error
+                            }
+                        }
+                    }, uploadToken));
                 }
-                
-                var upResponses = await Task.WhenAll(uploadTasks);
+
+                await Task.WhenAll(uploadTasks);
                 sw.Stop();
-                
-                foreach (var resp in upResponses)
+                try { await uiUpdateTask; } catch { }
+
+                double finalElapsed = sw.Elapsed.TotalSeconds;
+                if (finalElapsed > 0)
                 {
-                    resp.EnsureSuccessStatusCode();
-                }
-                
-                long totalUploaded = (long)uploadStreams * uploadBytesPerStream;
-                double seconds = sw.Elapsed.TotalSeconds;
-                if (seconds > 0)
-                {
-                    uploadMbps = (totalUploaded * 8.0) / (seconds * 1000000.0);
+                    uploadMbps = (System.Threading.Interlocked.Read(ref totalUploaded) * 8.0) / (finalElapsed * 1000000.0);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Upload speed test failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Upload test failed: {ex.Message}");
             }
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
+                TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+            });
 
             return (Math.Round(downloadMbps, 1), Math.Round(uploadMbps, 1));
         }
@@ -1830,7 +1922,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.3");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.4");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
