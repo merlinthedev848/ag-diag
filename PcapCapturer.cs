@@ -56,7 +56,7 @@ namespace AgilicoConnectChecker
             _outputStream = new MemoryStream();
         }
 
-        public void Start(bool startRawSniffer = false, string? ipFilter = null)
+        public void Start(bool startRawSniffer = false, string? ipFilter = null, string? adapterIp = null)
         {
             Stop();
 
@@ -72,7 +72,7 @@ namespace AgilicoConnectChecker
 
                 if (startRawSniffer)
                 {
-                    StartRawSocketSniffer();
+                    StartRawSocketSniffer(adapterIp);
                 }
             }
         }
@@ -267,11 +267,11 @@ namespace AgilicoConnectChecker
             if (!BitConverter.IsLittleEndian) Array.Reverse(bytes);
             _outputStream.Write(bytes, 0, 2);
         }
-        private void StartRawSocketSniffer()
+        private void StartRawSocketSniffer(string? adapterIp = null)
         {
             try
             {
-                string localIp = GetLocalIpAddress();
+                string localIp = !string.IsNullOrEmpty(adapterIp) ? adapterIp : GetLocalIpAddress();
                 if (localIp == "127.0.0.1" || string.IsNullOrEmpty(localIp))
                 {
                     throw new InvalidOperationException("No active local IP address found to bind packet sniffer.");

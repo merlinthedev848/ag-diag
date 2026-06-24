@@ -74,6 +74,7 @@ namespace AgilicoConnectChecker
             PanelSummaryDefault.Visibility = Visibility.Visible;
             
             RefreshLocalNetworkInfo();
+            InitializePcapAdapters();
 
             // Sync settings from engine (which auto-loaded from registry where available)
             TxtStunServer.Text = _engine.StunServer;
@@ -1563,6 +1564,7 @@ namespace AgilicoConnectChecker
                 TxtTogglePcap.Text = "START CAPTURE";
                 BtnTogglePcap.Background = (Brush)FindResource("AccentGreenBrush");
                 TxtPcapFilterIp.IsEnabled = true;
+                CboPcapAdapter.IsEnabled = true;
             }
             else
             {
@@ -1578,13 +1580,20 @@ namespace AgilicoConnectChecker
                     }
                 }
 
+                string? selectedIp = null;
+                if (CboPcapAdapter.SelectedItem is AdapterItem selectedItem)
+                {
+                    selectedIp = selectedItem.IpAddress;
+                }
+
                 try
                 {
-                    _engine.Pcap.Start(true, string.IsNullOrEmpty(filterIp) ? null : filterIp);
+                    _engine.Pcap.Start(true, string.IsNullOrEmpty(filterIp) ? null : filterIp, string.IsNullOrEmpty(selectedIp) ? null : selectedIp);
                     _isManualCapturing = true;
                     TxtTogglePcap.Text = "STOP CAPTURE";
                     BtnTogglePcap.Background = (Brush)FindResource("AccentRedBrush");
                     TxtPcapFilterIp.IsEnabled = false;
+                    CboPcapAdapter.IsEnabled = false;
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -1616,6 +1625,51 @@ namespace AgilicoConnectChecker
                 TxtPcapSize.Text = $"{(bytes / (1024.0 * 1024.0)):F2} MB";
 
             TxtPcapDuration.Text = $"{pcap.DurationSeconds:F1}s";
+        }
+
+        private void InitializePcapAdapters()
+        {
+            try
+            {
+                CboPcapAdapter.Items.Clear();
+                
+                // Add default/automatic option
+                CboPcapAdapter.Items.Add(new AdapterItem { Name = "Automatic (Detect Active)", IpAddress = "" });
+
+                foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up) continue;
+                    if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
+
+                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    {
+                        if (ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                        {
+                            CboPcapAdapter.Items.Add(new AdapterItem
+                            {
+                                Name = $"{ni.Name} ({ua.Address})",
+                                IpAddress = ua.Address.ToString()
+                            });
+                        }
+                    }
+                }
+
+                if (CboPcapAdapter.Items.Count > 0)
+                {
+                    CboPcapAdapter.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load network adapters: {ex.Message}");
+            }
+        }
+
+        public class AdapterItem
+        {
+            public string Name { get; set; } = string.Empty;
+            public string IpAddress { get; set; } = string.Empty;
+            public override string ToString() => Name;
         }
 
         private async Task RunStartupSpeedTestAsync()

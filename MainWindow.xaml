@@ -1440,6 +1440,13 @@
                                 <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="10,0,0,0">
                                     <TextBlock Text="Packet Capture Control" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,15"/>
 
+                                    <!-- Network Adapter Selection -->
+                                    <StackPanel Margin="0,0,0,15">
+                                        <TextBlock Text="Select Network Adapter:" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CboPcapAdapter" Height="32" Padding="8,4" Background="White" BorderBrush="{StaticResource BorderLightBrush}"/>
+                                        <TextBlock Text="Choose the active interface to capture traffic on." FontSize="10" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+
                                     <!-- Filter Input -->
                                     <StackPanel Margin="0,0,0,15">
                                         <TextBlock Text="Filter IP Address (Optional):" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,5"/>
