@@ -1150,18 +1150,47 @@ namespace AgilicoConnectChecker
                     }
                 }, downloadToken);
 
-                // Run 4 concurrent download workers looping 50MB downloads (Cloudflare blocks 100MB+)
+                // Run 4 concurrent download workers with dynamic failover support
+                string[] downloadUrls = new string[]
+                {
+                    "https://speed.cloudflare.com/__down?bytes=52428800",
+                    "https://cachefly.cachefly.net/50mb.test",
+                    "http://ipv4.download.thinkbroadband.com/50MB.zip"
+                };
+                int currentUrlIndex = 0;
+                object urlLock = new object();
+
                 var downloadTasks = new List<Task>();
                 for (int i = 0; i < 4; i++)
                 {
+                    int workerId = i;
                     downloadTasks.Add(Task.Run(async () =>
                     {
                         while (!downloadToken.IsCancellationRequested)
                         {
+                            string targetUrl;
+                            lock (urlLock)
+                            {
+                                targetUrl = downloadUrls[currentUrlIndex];
+                            }
+
                             try
                             {
-                                using var response = await client.GetAsync("https://speed.cloudflare.com/__down?bytes=52428800", System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
-                                response.EnsureSuccessStatusCode();
+                                using var response = await client.GetAsync(targetUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
+                                
+                                if (!response.IsSuccessStatusCode)
+                                {
+                                    lock (urlLock)
+                                    {
+                                        if (currentUrlIndex < downloadUrls.Length - 1 && downloadUrls[currentUrlIndex] == targetUrl)
+                                        {
+                                            currentUrlIndex++;
+                                            System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Failover status {response.StatusCode} on {targetUrl}. Falling back to: {downloadUrls[currentUrlIndex]}");
+                                        }
+                                    }
+                                    continue;
+                                }
+
                                 using var stream = await response.Content.ReadAsStreamAsync(downloadToken);
                                 byte[] buffer = new byte[65536]; // 64KB
                                 int bytesRead;
@@ -1173,7 +1202,15 @@ namespace AgilicoConnectChecker
                             catch (OperationCanceledException) { break; }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"Download worker error: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Error: {ex.Message}");
+                                lock (urlLock)
+                                {
+                                    if (currentUrlIndex < downloadUrls.Length - 1 && downloadUrls[currentUrlIndex] == targetUrl)
+                                    {
+                                        currentUrlIndex++;
+                                        System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Failover on exception on {targetUrl}. Falling back to: {downloadUrls[currentUrlIndex]}");
+                                    }
+                                }
                                 try { await Task.Delay(100, downloadToken); } catch { break; } // Avoid tight loop on error
                             }
                         }
@@ -1202,7 +1239,7 @@ namespace AgilicoConnectChecker
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
             });
 
-            // 2. Upload Test
+            // 2. Upload Test (4 streams * 25MB = 100MB)
             try
             {
                 using var ctsUpload = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -1238,28 +1275,29 @@ namespace AgilicoConnectChecker
 
                 // Run 4 concurrent upload workers using the shared client
                 var uploadTasks = new List<Task>();
-                byte[] uploadBuffer = new byte[1048576]; // 1MB chunk
+                byte[] uploadBuffer = new byte[26214400]; // 25MB
                 Random.Shared.NextBytes(uploadBuffer);
 
                 for (int i = 0; i < 4; i++)
                 {
+                    int workerId = i;
                     uploadTasks.Add(Task.Run(async () =>
                     {
-                        while (!uploadToken.IsCancellationRequested)
+                        try
                         {
-                            try
+                            using var memoryStream = new System.IO.MemoryStream(uploadBuffer);
+                            using var progressStream = new ProgressStream(memoryStream, (bytesRead) =>
                             {
-                                var content = new System.Net.Http.ByteArrayContent(uploadBuffer);
-                                var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, uploadToken);
-                                response.EnsureSuccessStatusCode();
-                                System.Threading.Interlocked.Add(ref totalUploaded, uploadBuffer.Length);
-                            }
-                            catch (OperationCanceledException) { break; }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Upload worker error: {ex.Message}");
-                                try { await Task.Delay(100, uploadToken); } catch { break; } // Avoid tight loop on error
-                            }
+                                System.Threading.Interlocked.Add(ref totalUploaded, bytesRead);
+                            });
+                            using var content = new System.Net.Http.StreamContent(progressStream);
+                            var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, uploadToken);
+                            response.EnsureSuccessStatusCode();
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Upload worker {workerId} error: {ex.Message}");
                         }
                     }, uploadToken));
                 }
@@ -1926,7 +1964,7 @@ namespace AgilicoConnectChecker
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.5");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.6");
 
                 string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
@@ -2203,5 +2241,40 @@ namespace AgilicoConnectChecker
         public string RemoteAddress { get; set; } = string.Empty;
         public string RemotePort { get; set; } = string.Empty;
         public string State { get; set; } = string.Empty;
+    }
+
+    public class ProgressStream : System.IO.Stream
+    {
+        private readonly System.IO.Stream _innerStream;
+        private readonly System.Action<long> _onBytesRead;
+
+        public ProgressStream(System.IO.Stream innerStream, System.Action<long> onBytesRead)
+        {
+            _innerStream = innerStream;
+            _onBytesRead = onBytesRead;
+        }
+
+        public override bool CanRead => _innerStream.CanRead;
+        public override bool CanSeek => _innerStream.CanSeek;
+        public override bool CanWrite => _innerStream.CanWrite;
+        public override long Length => _innerStream.Length;
+        public override long Position { get => _innerStream.Position; set => _innerStream.Position = value; }
+
+        public override void Flush() => _innerStream.Flush();
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = _innerStream.Read(buffer, offset, count);
+            _onBytesRead?.Invoke(read);
+            return read;
+        }
+        public override async System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
+        {
+            int read = await _innerStream.ReadAsync(buffer, offset, count, cancellationToken);
+            _onBytesRead?.Invoke(read);
+            return read;
+        }
+        public override long Seek(long offset, System.IO.SeekOrigin origin) => _innerStream.Seek(offset, origin);
+        public override void SetLength(long value) => _innerStream.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => _innerStream.Write(buffer, offset, count);
     }
 }
