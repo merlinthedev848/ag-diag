@@ -66,7 +66,7 @@
 
                 <!-- Sidebar Footer -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,20" VerticalAlignment="Bottom">
-                    <TextBlock Text="v3.5.9" FontSize="10.5" Foreground="#f1f5f9" Opacity="0.95" HorizontalAlignment="Center" FontWeight="Medium"/>
+                    <TextBlock Text="v3.6.0" FontSize="10.5" Foreground="#f1f5f9" Opacity="0.95" HorizontalAlignment="Center" FontWeight="Medium"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -133,7 +133,12 @@
 
                                     <!-- Action Buttons -->
                                     <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="BtnStart" Style="{StaticResource ActionButtonStyle}" Click="BtnStart_Click" Margin="0,0,10,0">
+                                        <Button x:Name="BtnResetConnect" Style="{StaticResource ActionButtonStyle}" Click="BtnResetConnect_Click" Margin="0,0,10,0" Background="{StaticResource AccentWarningBrush}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="RESET CONNECT"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="BtnStart" Style="{StaticResource ActionButtonStyle}" Click="BtnStart_Click" Margin="0,0,10,0" HorizontalAlignment="Right">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="START DIAGNOSTICS"/>
                                             </StackPanel>
@@ -1801,6 +1806,21 @@
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
                                                             <TextBlock Text="Clear Agilico App Cache" FontWeight="Bold" FontSize="12"/>
                                                             <TextBlock Text="Close client, clear cache, restart application" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+
+                                                <!-- Reset Connect -->
+                                                <Button x:Name="BtnResetConnectSettings" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnResetConnect_Click">
+                                                    <Grid HorizontalAlignment="Left" Width="260">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="30"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Path Data="{StaticResource IconRefresh}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                            <TextBlock Text="Reset Connect" FontWeight="Bold" FontSize="12"/>
+                                                            <TextBlock Text="Force-close Agilico Connect application" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
                                                         </StackPanel>
                                                     </Grid>
                                                 </Button>

@@ -631,27 +631,81 @@ namespace AgilicoConnectChecker
 
         #region Settings Repair Actions
 
-        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Shared helper: gracefully close then kill any running Agilico Connect process.
+        /// Returns the exe path of the process if one was found.
+        /// </summary>
+        private static string? ForceCloseAgilicoConnect()
         {
-            try
+            string? exePath = null;
+            foreach (var p in System.Diagnostics.Process.GetProcesses())
             {
-                // 1. Terminate running instances and record path
-                string? exePath = null;
-                var processes = System.Diagnostics.Process.GetProcesses();
-                foreach (var p in processes)
+                try
                 {
-                    try
+                    string name = p.ProcessName.ToLower();
+                    if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
                     {
-                        string name = p.ProcessName.ToLower();
-                        if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
+                        try { exePath = p.MainModule?.FileName; } catch { }
+                        // Attempt graceful close first
+                        p.CloseMainWindow();
+                        if (!p.WaitForExit(2000))
                         {
-                            exePath = p.MainModule?.FileName;
+                            // Force-kill if still alive
                             p.Kill();
                             p.WaitForExit(2000);
                         }
                     }
-                    catch { }
                 }
+                catch { }
+            }
+            return exePath;
+        }
+
+        private void BtnResetConnect_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1. Force-close any running Agilico Connect process
+                ForceCloseAgilicoConnect();
+
+                // 2. Clear AppData Local cache directory
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string targetDir = System.IO.Path.Combine(localAppData, "AgilicoConnectV5forWindows");
+                bool cacheCleared = false;
+
+                if (System.IO.Directory.Exists(targetDir))
+                {
+                    try
+                    {
+                        System.IO.Directory.Delete(targetDir, true);
+                        cacheCleared = true;
+                    }
+                    catch (System.IO.IOException)
+                    {
+                        // Fallback: delete files individually, skip locked files
+                        DeleteDirectoryContents(targetDir);
+                        cacheCleared = true;
+                    }
+                }
+
+                string msg = cacheCleared
+                    ? "Agilico Connect has been closed and its cache cleared successfully.\n\nPlease restart Agilico Connect manually."
+                    : "Agilico Connect has been closed.\n\nNo cache directory was found to clear.";
+
+                MessageBox.Show(msg, "Reset Connect", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Reset Connect failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1. Gracefully close then force-kill running instances and record path
+                string? exePath = ForceCloseAgilicoConnect();
 
                 // 2. Clear AppData Local folder
                 string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);

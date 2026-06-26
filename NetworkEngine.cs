@@ -500,6 +500,68 @@ namespace AgilicoConnectChecker
             Log("=================================================================");
             Log("All tests are running directly against the servers and ports specified in the network guide.");
 
+            // --- Local Network Status (logged before any tests) ---
+            try
+            {
+                Log("");
+                Log("=================================================================");
+                Log("LOCAL NETWORK STATUS");
+                Log("=================================================================");
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                    string speedStr = ni.Speed > 0
+                        ? $"{ni.Speed / 1_000_000.0:0} Mbps"
+                        : "Unknown";
+                    Log($"Adapter:  {ni.Name} ({ni.Description})");
+                    Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {speedStr}");
+
+                    if (ni.OperationalStatus != OperationalStatus.Up)
+                    {
+                        Log("  (Adapter is offline/disconnected – skipping detail)");
+                        continue;
+                    }
+
+                    var props = ni.GetIPProperties();
+
+                    // IP addresses
+                    var ipv4List = new List<string>();
+                    foreach (var addr in props.UnicastAddresses)
+                    {
+                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                            ipv4List.Add($"{addr.Address}/{addr.IPv4Mask}");
+                    }
+                    Log($"  IPv4:   {(ipv4List.Count > 0 ? string.Join(", ", ipv4List) : "None")}");
+
+                    // Gateway
+                    var gwList = new List<string>();
+                    foreach (var gw in props.GatewayAddresses) gwList.Add(gw.Address.ToString());
+                    Log($"  Gateway:{(gwList.Count > 0 ? " " + string.Join(", ", gwList) : " None")}");
+
+                    // DNS
+                    var dnsList = new List<string>();
+                    foreach (var dns in props.DnsAddresses) dnsList.Add(dns.ToString());
+                    Log($"  DNS:    {(dnsList.Count > 0 ? string.Join(", ", dnsList) : "None")}");
+
+                    // Traffic counters
+                    try
+                    {
+                        var stats = ni.GetIPStatistics();
+                        Log($"  Bytes Sent:     {stats.BytesSent:N0}");
+                        Log($"  Bytes Received: {stats.BytesReceived:N0}");
+                    }
+                    catch { Log("  Traffic stats: N/A"); }
+                }
+                Log("=================================================================");
+                Log("");
+            }
+            catch (Exception ex)
+            {
+                Log($"[WARN] Could not log local network status: {ex.Message}");
+            }
+            // --- End Local Network Status ---
+
             try
             {
                 await RunEnvironmentScanAsync(token);
