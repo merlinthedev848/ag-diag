@@ -1676,54 +1676,72 @@ namespace AgilicoConnectChecker
                     IsActive = true,
                     IsAutomatic = true 
                 });
+                CboPcapAdapter.SelectedIndex = 0;
 
-                foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                // Load the rest asynchronously so we don't block the UI thread during startup
+                _ = Task.Run(() => 
                 {
-                    if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
-
-                    bool isActive = ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up;
-                    string color = isActive ? "#22c55e" : "#ef4444"; // Green or Red
-
-                    var ips = ni.GetIPProperties().UnicastAddresses;
-                    bool hasIpv4 = false;
-
-                    foreach (var ua in ips)
+                    try
                     {
-                        if (ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                        var interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+                        var adapterItems = new System.Collections.Generic.List<AdapterItem>();
+
+                        foreach (var ni in interfaces)
                         {
-                            hasIpv4 = true;
-                            CboPcapAdapter.Items.Add(new AdapterItem
+                            if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
+
+                            bool isActive = ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up;
+                            string color = isActive ? "#22c55e" : "#ef4444"; // Green or Red
+
+                            var ips = ni.GetIPProperties().UnicastAddresses;
+                            bool hasIpv4 = false;
+
+                            foreach (var ua in ips)
                             {
-                                Name = $"{ni.Name} ({ua.Address})",
-                                IpAddress = ua.Address.ToString(),
-                                StatusColor = color,
-                                IsActive = isActive,
-                                IsAutomatic = false
-                            });
+                                if (ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                                {
+                                    hasIpv4 = true;
+                                    adapterItems.Add(new AdapterItem
+                                    {
+                                        Name = ni.Name,
+                                        IpAddress = ua.Address.ToString(),
+                                        StatusColor = color,
+                                        IsActive = isActive,
+                                        IsAutomatic = false
+                                    });
+                                }
+                            }
+
+                            if (!hasIpv4)
+                            {
+                                adapterItems.Add(new AdapterItem
+                                {
+                                    Name = ni.Name,
+                                    IpAddress = "No IPv4",
+                                    StatusColor = color,
+                                    IsActive = isActive,
+                                    IsAutomatic = false
+                                });
+                            }
                         }
-                    }
 
-                    if (!hasIpv4)
-                    {
-                        CboPcapAdapter.Items.Add(new AdapterItem
+                        _ = Dispatcher.BeginInvoke(new Action(() => 
                         {
-                            Name = $"{ni.Name} (No IPv4)",
-                            IpAddress = "",
-                            StatusColor = color,
-                            IsActive = isActive,
-                            IsAutomatic = false
-                        });
+                            foreach (var item in adapterItems)
+                            {
+                                CboPcapAdapter.Items.Add(item);
+                            }
+                        }));
                     }
-                }
-
-                if (CboPcapAdapter.Items.Count > 0)
-                {
-                    CboPcapAdapter.SelectedIndex = 0;
-                }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to async load PCAP adapters: {ex.Message}");
+                    }
+                });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to load network adapters: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to init PCAP adapters: {ex.Message}");
             }
         }
 
