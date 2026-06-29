@@ -707,53 +707,6 @@ namespace AgilicoConnectChecker
             }
         }
 
-        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // 1. Gracefully close then force-kill running instances and record path
-                string? exePath = ForceCloseAgilicoConnect();
-
-                // 2. Clear AppData Local folder
-                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string targetDir = System.IO.Path.Combine(localAppData, "AgilicoConnectV5forWindows");
-
-                if (System.IO.Directory.Exists(targetDir))
-                {
-                    try
-                    {
-                        System.IO.Directory.Delete(targetDir, true);
-                    }
-                    catch (System.IO.IOException)
-                    {
-                        // Fallback: delete files individually, skip locked files
-                        DeleteDirectoryContents(targetDir);
-                    }
-                }
-
-                // 3. Restart if path was found
-                bool restarted = false;
-                if (!string.IsNullOrEmpty(exePath) && System.IO.File.Exists(exePath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        UseShellExecute = true
-                    });
-                    restarted = true;
-                }
-
-                string msg = restarted 
-                    ? "Agilico Connect desktop application was closed, cache cleared, and application restarted successfully."
-                    : "Agilico Connect cache cleared successfully.\n\nPlease start the Agilico Connect desktop application manually.";
-                
-                MessageBox.Show(msg, "Cache Cleared", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to clear cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         private static void DeleteDirectoryContents(string path)
         {
