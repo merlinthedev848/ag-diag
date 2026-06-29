@@ -4,8 +4,8 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- Require Administrator privileges -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- Run as invoker to ensure standard startup behavior -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

@@ -93,8 +93,8 @@ namespace AgilicoConnectChecker
             // Initialize default Probe sub-tab
             SelectProbeTab(0, BtnProbeTrace);
 
-            // Run connection speed test at startup
-            _ = RunStartupSpeedTestAsync();
+            // Speed test is now manually triggered via the Recheck button
+            // _ = RunStartupSpeedTestAsync();
         }
 
         #region Navigation
@@ -682,16 +682,23 @@ namespace AgilicoConnectChecker
 
                 if (System.IO.Directory.Exists(targetDir))
                 {
-                    try
+                    string[] cacheFolders = { "Cache", "GPUCache", @"EBWebView\Default\Cache" };
+                    foreach (var cf in cacheFolders)
                     {
-                        System.IO.Directory.Delete(targetDir, true);
-                        cacheCleared = true;
-                    }
-                    catch (System.IO.IOException)
-                    {
-                        // Fallback: delete files individually, skip locked files
-                        DeleteDirectoryContents(targetDir);
-                        cacheCleared = true;
+                        string cDir = System.IO.Path.Combine(targetDir, cf);
+                        if (System.IO.Directory.Exists(cDir))
+                        {
+                            try
+                            {
+                                System.IO.Directory.Delete(cDir, true);
+                                cacheCleared = true;
+                            }
+                            catch (System.IO.IOException)
+                            {
+                                DeleteDirectoryContents(cDir);
+                                cacheCleared = true;
+                            }
+                        }
                     }
                 }
 
