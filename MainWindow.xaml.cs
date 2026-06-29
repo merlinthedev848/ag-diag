@@ -34,6 +34,9 @@ namespace AgilicoConnectChecker
         private readonly ObservableCollection<ActiveSocket> _allSockets = new();
         private readonly ObservableCollection<ActiveSocket> _displayedSockets = new();
 
+        private double _lastDownloadMbps = 0.0;
+        private double _lastUploadMbps = 0.0;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -300,6 +303,10 @@ namespace AgilicoConnectChecker
 
             ResetTestStatuses();
             RefreshLocalNetworkInfo();
+
+            // Pass last speed test result into engine so it appears in the diagnostic log
+            _engine.LastDownloadMbps = _lastDownloadMbps;
+            _engine.LastUploadMbps = _lastUploadMbps;
 
             // Run
             await _engine.RunDiagnosticsAsync();

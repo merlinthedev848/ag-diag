@@ -20,3 +20,5 @@ build_standalone/
 test_run.log
 # Backup / locked files
 *.old
+
+publish/

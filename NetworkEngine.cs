@@ -34,6 +34,9 @@ namespace AgilicoConnectChecker
         public int StunPort { get; set; } = 3478;
         public bool IsSimulationMode { get; set; } = false;
         public string PublicIpAddress { get; set; } = "-";
+        
+        public double LastDownloadMbps { get; set; } = 0;
+        public double LastUploadMbps { get; set; } = 0;
 
         // Selected tests to run (index 0 to 9)
         public bool[] SelectedTests { get; set; } = new bool[10] { true, true, true, true, true, true, true, true, true, true };
@@ -507,6 +510,8 @@ namespace AgilicoConnectChecker
                 Log("=================================================================");
                 Log("LOCAL NETWORK STATUS");
                 Log("=================================================================");
+                Log($"Last Speed Test:  Download: {LastDownloadMbps:F1} Mbps | Upload: {LastUploadMbps:F1} Mbps");
+                Log("-----------------------------------------------------------------");
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
@@ -519,7 +524,7 @@ namespace AgilicoConnectChecker
 
                     if (ni.OperationalStatus != OperationalStatus.Up)
                     {
-                        Log("  (Adapter is offline/disconnected – skipping detail)");
+                        Log("  (Adapter is offline/disconnected - skipping detail)");
                         continue;
                     }
 
