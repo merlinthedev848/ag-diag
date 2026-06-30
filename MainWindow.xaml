@@ -364,7 +364,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test1InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/dns-resolution" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test1InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/dns-domain-resolution-failure" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -405,7 +405,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test2InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/outbound-http-probes" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test2InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/outbound-http-probes" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -446,7 +446,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test3InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/ntp-time-sync" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test3InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/ntp-time-sync" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -487,7 +487,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test4InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/stun-configuration" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test4InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/stun-configuration" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -528,7 +528,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test5InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/google-stun-backup" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test5InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/google-stun-backup" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -569,7 +569,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test6InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/double-nat-issues" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test6InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/double-nat-issues" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -610,7 +610,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test7InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/nat-port-preservation" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test7InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/nat-port-preservation" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -651,7 +651,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test8InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/disabling-sip-alg" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test8InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/disabling-sip-alg" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -692,7 +692,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test9InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/rtp-quality-voip" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test9InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/rtp-quality-voip" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -733,7 +733,7 @@
                                                 </StackPanel>
 
                                                 <!-- Info Link -->
-                                                <Button x:Name="Test10InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/articles/signalr-websockets-connection" ToolTip="Read troubleshooting article">
+                                                <Button x:Name="Test10InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/signalr-websockets-connection" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">
@@ -1538,7 +1538,7 @@
                                             <TextBlock Text="→ Check your DNS server settings. Ensure Google DNS (8.8.8.8 / 8.8.4.4) or your corporate DNS can resolve Agilico service domains." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/dns-resolution" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/dns-domain-resolution-failure" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1552,7 +1552,7 @@
                                             <TextBlock Text="→ Outbound TCP port 80 or 443 is blocked. Ensure web requests to customerportal.hp2k.co.uk are allowed through your firewall or proxy." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/outbound-http-probes" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/outbound-http-probes" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1566,7 +1566,7 @@
                                             <TextBlock Text="→ Outbound UDP port 123 (NTP) is blocked. Clients must be able to synchronise time for authentication and call setup." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/ntp-time-sync" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/ntp-time-sync" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1580,7 +1580,7 @@
                                             <TextBlock Text="→ Agilico STUN servers (UDP port 3478) are unreachable. Check outbound UDP firewall rules." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/stun-configuration" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/stun-configuration" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1594,7 +1594,7 @@
                                             <TextBlock Text="→ Google backup STUN servers (UDP port 3478) failed to respond. This may indicate broad UDP blocking." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/google-stun-backup" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/google-stun-backup" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1608,7 +1608,7 @@
                                             <TextBlock Text="→ Double NAT detected. This can cause intermittent call drops and one-way audio. Simplify your network topology to a single NAT gateway." 
                                                        FontSize="12" Foreground="#7c2d12" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/double-nat-issues" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/double-nat-issues" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1622,7 +1622,7 @@
                                             <TextBlock Text="→ NAT port preservation is active. Random/non-preserved NAT ports are recommended for reliable WebRTC ICE negotiation." 
                                                        FontSize="12" Foreground="#7c2d12" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/nat-port-preservation" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/nat-port-preservation" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1636,7 +1636,7 @@
                                             <TextBlock Text="→ SIP ALG is active or UDP port 5060 is blocked. Disable 'SIP ALG' or 'SIP Helper' in your router/firewall security settings." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/disabling-sip-alg" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/disabling-sip-alg" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1650,7 +1650,7 @@
                                             <TextBlock Text="→ Severe packet loss or jitter detected on the media path. Check QoS settings, bandwidth utilisation, and ensure UDP traffic is prioritised." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/rtp-quality-voip" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/rtp-quality-voip" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
@@ -1664,7 +1664,7 @@
                                             <TextBlock Text="→ Persistent WebSocket connections to Agilico SignalR hubs are failing. Ensure your proxy/DPI allows WebSocket upgrades on TCP 80/443." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
-                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/articles/signalr-websockets-connection" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/signalr-websockets-connection" RequestNavigate="Hyperlink_RequestNavigate">
                                                     Read troubleshooting article
                                                 </Hyperlink>
                                             </TextBlock>
