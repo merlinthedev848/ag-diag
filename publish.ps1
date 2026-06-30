@@ -11,7 +11,8 @@ Set-Location $srcDir
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "bin\Publish\Standalone"
 
 Write-Host "Publishing Lite (Framework-Dependent) version..."
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "bin\Publish\Lite"
+Remove-Item "obj\Release" -Recurse -Force -ErrorAction SilentlyContinue
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=false -p:IncludeNativeLibrariesForSelfExtract=false -o "bin\Publish\Lite"
 
 Write-Host "Copying to release directory..."
 Copy-Item "bin\Publish\Standalone\AgilicoNetworkDiagnosticTool.exe" -Destination "$outDir\AgilicoNetworkDiagnosticTool-Standalone.exe" -Force
