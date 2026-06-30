@@ -17,6 +17,28 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Global Exception Handling
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            var ex = args.ExceptionObject as Exception;
+            System.Diagnostics.Debug.WriteLine($"AppDomain Unhandled Exception: {ex?.Message}\n{ex?.StackTrace}");
+            MessageBox.Show($"A critical error occurred and the application must close.\n\nError: {ex?.Message}", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        };
+
+        DispatcherUnhandledException += (s, args) =>
+        {
+            System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
+            MessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true; // Prevent app from closing if possible
+        };
+
+        TaskScheduler.UnobservedTaskException += (s, args) =>
+        {
+            System.Diagnostics.Debug.WriteLine($"Unobserved Task Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
+            // Don't show message box for unobserved background task exceptions, just log them
+            args.SetObserved();
+        };
+
         bool silentMode = false;
         foreach (var arg in e.Args)
         {

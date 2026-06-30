@@ -54,34 +54,38 @@ namespace AgilicoConnectChecker
         public async Task<List<LanDevice>> ScanNetworkAsync(Action<int, int> progressCallback, Action<LanDevice> deviceFoundCallback, CancellationToken token)
         {
             var activeDevices = new List<LanDevice>();
-            string localIp = GetLocalIpAddress();
+            string localIp = await Task.Run(() => GetLocalIpAddress(), token);
             
             if (localIp == "127.0.0.1" || string.IsNullOrEmpty(localIp))
             {
                 return activeDevices;
             }
 
-            // Determine actual subnet mask from the network interface
-            IPAddress subnetMask = IPAddress.Parse("255.255.255.0"); // fallback
-            try
+            // Determine actual subnet mask from the network interface on a background thread
+            IPAddress subnetMask = await Task.Run(() =>
             {
-                var localAddr = IPAddress.Parse(localIp);
-                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                IPAddress mask = IPAddress.Parse("255.255.255.0"); // fallback
+                try
                 {
-                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    var localAddr = IPAddress.Parse(localIp);
+                    foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                     {
-                        if (ua.Address.AddressFamily == AddressFamily.InterNetwork &&
-                            ua.Address.Equals(localAddr) && ua.IPv4Mask != null)
+                        if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                        foreach (var ua in ni.GetIPProperties().UnicastAddresses)
                         {
-                            subnetMask = ua.IPv4Mask;
-                            break;
+                            if (ua.Address.AddressFamily == AddressFamily.InterNetwork &&
+                                ua.Address.Equals(localAddr) && ua.IPv4Mask != null)
+                            {
+                                mask = ua.IPv4Mask;
+                                break;
+                            }
                         }
                     }
                 }
-            }
-            catch { /* use fallback /24 */ }
+                catch { /* use fallback /24 */ }
+                return mask;
+            }, token);
 
             // Calculate network range from IP and mask
             byte[] ipBytes = IPAddress.Parse(localIp).GetAddressBytes();

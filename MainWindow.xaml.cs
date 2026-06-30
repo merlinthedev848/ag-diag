@@ -63,38 +63,43 @@ namespace AgilicoConnectChecker
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnProbe, BtnPcap, BtnHelp, BtnLogs, BtnSettings };
-            GridLanDevices.ItemsSource = _lanDevices;
-            GridPingLogs.ItemsSource = _pingLogs;
-            GridTraceHops.ItemsSource = _traceHops;
-            GridSrvRecords.ItemsSource = _srvRecords;
-            GridPortProber.ItemsSource = _portProbeResults;
-            GridActiveSockets.ItemsSource = _displayedSockets;
-            
-            // Initialize view
-            SelectTab(0, BtnDashboard);
-            ResetTestStatuses();
-            PanelSummaryDefault.Visibility = Visibility.Visible;
-            
-            RefreshLocalNetworkInfo();
-            InitializePcapAdapters();
+            try
+            {
+                _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnProbe, BtnPcap, BtnHelp, BtnLogs, BtnSettings };
+                GridLanDevices.ItemsSource = _lanDevices;
+                GridPingLogs.ItemsSource = _pingLogs;
+                GridTraceHops.ItemsSource = _traceHops;
+                GridSrvRecords.ItemsSource = _srvRecords;
+                GridPortProber.ItemsSource = _portProbeResults;
+                GridActiveSockets.ItemsSource = _displayedSockets;
+                
+                // Initialize view
+                SelectTab(0, BtnDashboard);
+                ResetTestStatuses();
+                PanelSummaryDefault.Visibility = Visibility.Visible;
+                
+                RefreshLocalNetworkInfo();
+                InitializePcapAdapters();
 
-            // Sync settings from engine (which auto-loaded from registry where available)
-            TxtStunServer.Text = _engine.StunServer;
-            TxtStunPort.Text = _engine.StunPort.ToString();
-            TxtLocalPort.Text = _engine.LocalSipPort.ToString();
-            TxtSipAlgServer.Text = _engine.SipAlgServer;
-            TxtSipAlgPort.Text = _engine.SipAlgPort.ToString();
-            ChkSimulation.IsChecked = _engine.IsSimulationMode;
+                // Sync settings from engine (which auto-loaded from registry where available)
+                TxtStunServer.Text = _engine.StunServer;
+                TxtStunPort.Text = _engine.StunPort.ToString();
+                TxtLocalPort.Text = _engine.LocalSipPort.ToString();
+                TxtSipAlgServer.Text = _engine.SipAlgServer;
+                TxtSipAlgPort.Text = _engine.SipAlgPort.ToString();
+                ChkSimulation.IsChecked = _engine.IsSimulationMode;
 
-            // Trigger firewall permission prompt on load in background so it doesn't block startup
-            _ = Task.Run(() => _engine.TriggerFirewallPrompt());
+                // Trigger firewall permission prompt on load in background so it doesn't block startup
+                _ = Task.Run(() => _engine.TriggerFirewallPrompt());
 
-            // Initialize default Probe sub-tab
-            SelectProbeTab(0, BtnProbeTrace);
-
-            // Speed test is now manually triggered via the Recheck button
-            // _ = RunStartupSpeedTestAsync();
+                // Initialize default Probe sub-tab
+                SelectProbeTab(0, BtnProbeTrace);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to initialize the application on startup.\n\nError: {ex.Message}", "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"Startup Error: {ex.Message}");
+            }
         }
 
         #region Navigation
@@ -1772,8 +1777,11 @@ namespace AgilicoConnectChecker
 
                 var (downloadMbps, uploadMbps) = await RunSpeedTestAsync(token);
 
-                TxtLocalDownloadSpeed.Text = $"{downloadMbps} Mbps";
-                TxtLocalUploadSpeed.Text = $"{uploadMbps} Mbps";
+                _lastDownloadMbps = downloadMbps;
+                _lastUploadMbps = uploadMbps;
+
+                TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
+                TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
             }

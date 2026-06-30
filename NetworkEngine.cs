@@ -946,16 +946,14 @@ namespace AgilicoConnectChecker
             }
         }
 
+        private static readonly HttpClient _sharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
         private async Task<(bool ok, string msg)> TestHttpEndpointAsync(string url, CancellationToken token)
         {
             try
             {
-                using var handler = new HttpClientHandler();
-                using var client = new HttpClient(handler);
-                client.Timeout = TimeSpan.FromSeconds(5);
-                
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                var response = await _sharedHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
                 return (true, $"Success (Status: {(int)response.StatusCode} {response.ReasonPhrase})");
             }
             catch (Exception ex)
