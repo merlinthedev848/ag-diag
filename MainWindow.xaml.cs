@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
@@ -11,15 +12,15 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Win32;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public partial class MainWindow : Window
     {
         private readonly NetworkEngine _engine;
         private readonly LanScanner _lanScanner;
         private readonly ObservableCollection<LanDevice> _lanDevices;
-        private readonly PingTracker _pingTracker;
-        private readonly ObservableCollection<PingResult> _pingLogs;
+        private ObservableCollection<PingTargetItem> _pingTargets = new ObservableCollection<PingTargetItem>();
+        private PingTargetItem? _selectedPingTarget;
         private PingStats _currentPingStats = new PingStats();
         private CancellationTokenSource? _lanScanCts;
         private Button[] _navButtons = Array.Empty<Button>();
@@ -43,8 +44,7 @@ namespace AgilicoConnectChecker
             _engine = new NetworkEngine();
             _lanScanner = new LanScanner();
             _lanDevices = new ObservableCollection<LanDevice>();
-            _pingTracker = new PingTracker();
-            _pingLogs = new ObservableCollection<PingResult>();
+
             
             _pcapTimer = new System.Windows.Threading.DispatcherTimer();
             _pcapTimer.Interval = TimeSpan.FromMilliseconds(500);
@@ -55,19 +55,34 @@ namespace AgilicoConnectChecker
             _engine.OnProgress += Engine_OnProgress;
             _engine.OnComplete += Engine_OnComplete;
 
-            // Wire up ping tracker events
-            _pingTracker.OnPingResult += PingTracker_OnPingResult;
 
             Loaded += MainWindow_Loaded;
+        }
+
+        // Custom Titlebar Handlers for Glassmorphism 
+        private void Window_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+                this.DragMove();
+        }
+
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                _navButtons = new[] { BtnDashboard, BtnNetScan, BtnPingTrack, BtnProbe, BtnPcap, BtnHelp, BtnLogs, BtnSettings };
+                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
                 GridLanDevices.ItemsSource = _lanDevices;
-                GridPingLogs.ItemsSource = _pingLogs;
+                GridPingTargets.ItemsSource = _pingTargets;
                 GridTraceHops.ItemsSource = _traceHops;
                 GridSrvRecords.ItemsSource = _srvRecords;
                 GridPortProber.ItemsSource = _portProbeResults;
@@ -92,12 +107,26 @@ namespace AgilicoConnectChecker
                 // Trigger firewall permission prompt on load in background so it doesn't block startup
                 _ = Task.Run(() => _engine.TriggerFirewallPrompt());
 
+                // Trigger startup speed test asynchronously
+                _ = RunStartupSpeedTestAsync();
+
                 // Initialize default Probe sub-tab
                 SelectProbeTab(0, BtnProbeTrace);
+
+                // Detect and set version/title based on Standard vs Lite mode
+                try
+                {
+                    string procName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+                    bool isLite = procName.Contains("Lite", StringComparison.OrdinalIgnoreCase);
+                    string mode = isLite ? "Lite" : "Standard";
+                    TxtVersion.Text = $"v4.0.0 ({mode})";
+                    TxtTitleBar.Text = "Agilico MSP Toolkit";
+                }
+                catch { }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize the application on startup.\n\nError: {ex.Message}", "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Failed to initialize the application on startup.\n\nError: {ex.Message}", "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 System.Diagnostics.Debug.WriteLine($"Startup Error: {ex.Message}");
             }
         }
@@ -107,6 +136,15 @@ namespace AgilicoConnectChecker
         private void SelectTab(int index, Button activeButton)
         {
             PageTabControl.SelectedIndex = index;
+            
+            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250));
+            var slideUp = new System.Windows.Media.Animation.ThicknessAnimation(new Thickness(0, 15, 0, -15), new Thickness(0), TimeSpan.FromMilliseconds(250))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+            };
+            
+            PageTabControl.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            PageTabControl.BeginAnimation(FrameworkElement.MarginProperty, slideUp);
 
             foreach (var btn in _navButtons)
             {
@@ -114,11 +152,14 @@ namespace AgilicoConnectChecker
                 SetStripeVisibility(btn, Visibility.Collapsed);
             }
 
-            activeButton.Background = (Brush)FindResource("SidebarItemHoverBrush");
-            SetStripeVisibility(activeButton, Visibility.Visible);
+            if (activeButton != null)
+            {
+                activeButton.Background = (Brush)FindResource("SidebarItemHoverBrush");
+                SetStripeVisibility(activeButton, Visibility.Visible);
+            }
 
-            // Manage PCAP stats real-time polling
-            if (index == 4)
+            // Manage PCAP stats real-time polling. PCAP is active if Network Tools tab (2) is open AND sub-tab PCAP (3) is open.
+            if (index == 2 && NetToolsTabControl != null && NetToolsTabControl.SelectedIndex == 3)
             {
                 UpdatePcapStats();
                 _pcapTimer.Start();
@@ -141,17 +182,68 @@ namespace AgilicoConnectChecker
         }
 
         private void BtnDashboard_Click(object sender, RoutedEventArgs e) => SelectTab(0, BtnDashboard);
-        private void BtnNetScan_Click(object sender, RoutedEventArgs e) => SelectTab(1, BtnNetScan);
-        private void BtnPingTrack_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnPingTrack);
-        private void BtnProbe_Click(object sender, RoutedEventArgs e)
+        private void BtnItTools_Click(object sender, RoutedEventArgs e) => SelectTab(1, BtnItTools);
+        private void BtnNetTools_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnNetTools);
+
+        private async void BtnHardwareScan_Click(object sender, RoutedEventArgs e)
         {
-            SelectTab(3, BtnProbe);
-            SelectProbeTab(0, BtnProbeTrace);
+            try
+            {
+                var items = await HardwareChecker.RunDiagnosticsAsync();
+                var hwDialog = new HardwareReportDialog(items);
+                hwDialog.Owner = this;
+                hwDialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to run hardware check.\n\nError: {ex.Message}", "Hardware Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
-        private void BtnPcap_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnPcap);
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(7, BtnSettings);
+        
+        private void BtnSubNetScan_Click(object sender, RoutedEventArgs e)
+        {
+            NetToolsTabControl.SelectedIndex = 0;
+            UpdateSubNavButtons((System.Windows.Controls.Button)sender);
+        }
+
+        private void BtnSubPingTrack_Click(object sender, RoutedEventArgs e)
+        {
+            NetToolsTabControl.SelectedIndex = 1;
+            UpdateSubNavButtons((System.Windows.Controls.Button)sender);
+        }
+
+        private void BtnSubProbe_Click(object sender, RoutedEventArgs e)
+        {
+            NetToolsTabControl.SelectedIndex = 2;
+            UpdateSubNavButtons((System.Windows.Controls.Button)sender);
+        }
+
+        private void BtnSubPcap_Click(object sender, RoutedEventArgs e)
+        {
+            NetToolsTabControl.SelectedIndex = 3;
+            UpdateSubNavButtons((System.Windows.Controls.Button)sender);
+            
+            // Start PCAP polling if we switched to it
+            UpdatePcapStats();
+            _pcapTimer.Start();
+        }
+
+        private void UpdateSubNavButtons(System.Windows.Controls.Button activeButton)
+        {
+            var buttons = new[] { BtnSubNetScan, BtnSubPingTrack, BtnSubProbe, BtnSubPcap };
+            foreach (var btn in buttons)
+            {
+                if (btn != null)
+                {
+                    btn.Style = btn == activeButton 
+                        ? (Style)FindResource("ActionButtonStyle") 
+                        : (Style)FindResource("SecondaryButtonStyle");
+                }
+            }
+        }
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnHelp);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnLogs);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnSettings);
 
         private void SelectProbeTab(int index, Button activeButton)
         {
@@ -196,15 +288,21 @@ namespace AgilicoConnectChecker
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            _engine.Cancel();
-            _pingTracker.Stop();
-            _pcapTimer.Stop();
-            _lanScanCts?.Cancel();
-            _lanScanCts?.Dispose();
-            _speedTestCts?.Cancel();
-            _speedTestCts?.Dispose();
-            _portProbeCts?.Cancel();
-            _portProbeCts?.Dispose();
+            try
+            {
+                _engine.Cancel();
+                foreach (var t in _pingTargets) t.Stop();
+                _pcapTimer.Stop();
+                _lanScanCts?.Cancel();
+                _lanScanCts?.Dispose();
+                _speedTestCts?.Cancel();
+                _speedTestCts?.Dispose();
+                _portProbeCts?.Cancel();
+                _portProbeCts?.Dispose();
+            }
+            catch { }
+
+            Environment.Exit(0);
         }
 
         #endregion
@@ -236,6 +334,7 @@ namespace AgilicoConnectChecker
             TxtLocalGateway.Text = "Detecting...";
             TxtLocalDns.Text = "Detecting...";
             TxtLocalVlan.Text = "Detecting...";
+            TxtLocalWifi.Text = "Detecting...";
             TxtPublicIp.Text = "Detecting...";
 
             _ = Task.Run(async () =>
@@ -256,6 +355,7 @@ namespace AgilicoConnectChecker
                     TxtLocalGateway.Text = info.Gateway;
                     TxtLocalDns.Text = info.DnsServers;
                     TxtLocalVlan.Text = info.Vlan;
+                    TxtLocalWifi.Text = info.WifiInfo;
                     TxtPublicIp.Text = pubIp;
 
                     if (info.Status.Contains("No ") || info.Status.Contains("Disconnected"))
@@ -279,42 +379,50 @@ namespace AgilicoConnectChecker
 
         private async void BtnStart_Click(object sender, RoutedEventArgs e)
         {
-            // Sync settings from UI text fields
-            if (!ValidateAndApplySettings()) return;
+            try
+            {
+                // Sync settings from UI text fields
+                if (!ValidateAndApplySettings()) return;
 
-            // Copy checkbox states to engine
-            _engine.SelectedTests[0] = ChkTest1.IsChecked == true;
-            _engine.SelectedTests[1] = ChkTest2.IsChecked == true;
-            _engine.SelectedTests[2] = ChkTest3.IsChecked == true;
-            _engine.SelectedTests[3] = ChkTest4.IsChecked == true;
-            _engine.SelectedTests[4] = ChkTest5.IsChecked == true;
-            _engine.SelectedTests[5] = ChkTest6.IsChecked == true;
-            _engine.SelectedTests[6] = ChkTest7.IsChecked == true;
-            _engine.SelectedTests[7] = ChkTest8.IsChecked == true;
-            _engine.SelectedTests[8] = ChkTest9.IsChecked == true;
-            _engine.SelectedTests[9] = ChkTest10.IsChecked == true;
+                // Copy checkbox states to engine
+                _engine.SelectedTests[0] = ChkTest1.IsChecked == true;
+                _engine.SelectedTests[1] = ChkTest2.IsChecked == true;
+                _engine.SelectedTests[2] = ChkTest3.IsChecked == true;
+                _engine.SelectedTests[3] = ChkTest4.IsChecked == true;
+                _engine.SelectedTests[4] = ChkTest5.IsChecked == true;
+                _engine.SelectedTests[5] = ChkTest6.IsChecked == true;
+                _engine.SelectedTests[6] = ChkTest7.IsChecked == true;
+                _engine.SelectedTests[7] = ChkTest8.IsChecked == true;
+                _engine.SelectedTests[8] = ChkTest9.IsChecked == true;
+                _engine.SelectedTests[9] = ChkTest10.IsChecked == true;
 
-            // Update Controls UI
-            BtnStart.Visibility = Visibility.Collapsed;
-            BtnStop.Visibility = Visibility.Visible;
-            ProgressArea.Visibility = Visibility.Visible;
-            TxtProgressStatus.Text = "Initializing...";
-            
-            // Clear previous summary and logs
-            PanelSummaryDefault.Visibility = Visibility.Collapsed;
-            PanelSummaryPass.Visibility = Visibility.Collapsed;
-            PanelSummaryFail.Visibility = Visibility.Collapsed;
-            TxtLogs.Clear();
+                // Update Controls UI
+                BtnStart.Visibility = Visibility.Collapsed;
+                BtnStop.Visibility = Visibility.Visible;
+                ProgressArea.Visibility = Visibility.Visible;
+                TxtProgressStatus.Text = "Initializing...";
+                
+                // Clear previous summary and logs
+                PanelSummaryDefault.Visibility = Visibility.Collapsed;
+                PanelSummaryPass.Visibility = Visibility.Collapsed;
+                PanelSummaryFail.Visibility = Visibility.Collapsed;
+                TxtLogs.Clear();
 
-            ResetTestStatuses();
-            RefreshLocalNetworkInfo();
+                ResetTestStatuses();
+                RefreshLocalNetworkInfo();
 
-            // Pass last speed test result into engine so it appears in the diagnostic log
-            _engine.LastDownloadMbps = _lastDownloadMbps;
-            _engine.LastUploadMbps = _lastUploadMbps;
+                // Pass last speed test result into engine so it appears in the diagnostic log
+                _engine.LastDownloadMbps = _lastDownloadMbps;
+                _engine.LastUploadMbps = _lastUploadMbps;
 
-            // Run
-            await _engine.RunDiagnosticsAsync();
+                // Run
+                await _engine.RunDiagnosticsAsync();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to run diagnostics.\n\nError: {ex.Message}", "Diagnostics Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                RestoreControlButtons();
+            }
         }
 
         private async void BtnStartLanScan_Click(object sender, RoutedEventArgs e)
@@ -387,7 +495,7 @@ namespace AgilicoConnectChecker
             // STUN Host
             if (string.IsNullOrWhiteSpace(TxtStunServer.Text))
             {
-                MessageBox.Show("Please enter a valid STUN Server address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid STUN Server address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             _engine.StunServer = TxtStunServer.Text.Trim();
@@ -395,7 +503,7 @@ namespace AgilicoConnectChecker
             // STUN Port
             if (!int.TryParse(TxtStunPort.Text, out int stunPort) || stunPort <= 0 || stunPort > 65535)
             {
-                MessageBox.Show("Please enter a valid STUN Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid STUN Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             _engine.StunPort = stunPort;
@@ -403,7 +511,7 @@ namespace AgilicoConnectChecker
             // Local SIP Port
             if (!int.TryParse(TxtLocalPort.Text, out int localPort) || localPort <= 0 || localPort > 65535)
             {
-                MessageBox.Show("Please enter a valid Local SIP Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid Local SIP Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             _engine.LocalSipPort = localPort;
@@ -411,7 +519,7 @@ namespace AgilicoConnectChecker
             // SIP ALG Host
             if (string.IsNullOrWhiteSpace(TxtSipAlgServer.Text))
             {
-                MessageBox.Show("Please enter a valid SIP ALG Server address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid SIP ALG Server address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             _engine.SipAlgServer = TxtSipAlgServer.Text.Trim();
@@ -419,7 +527,7 @@ namespace AgilicoConnectChecker
             // SIP ALG Port
             if (!int.TryParse(TxtSipAlgPort.Text, out int sipAlgPort) || sipAlgPort <= 0 || sipAlgPort > 65535)
             {
-                MessageBox.Show("Please enter a valid SIP ALG Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid SIP ALG Port (1-65535).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
             _engine.SipAlgPort = sipAlgPort;
@@ -595,9 +703,23 @@ namespace AgilicoConnectChecker
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        #endregion
+
+        #region Audit Logging
+
+        public void LogAuditAction(string actionText)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                string logMsg = $"[{DateTime.Now:HH:mm:ss}]   AUDIT: {actionText}";
+                TxtLogs.AppendText(logMsg + Environment.NewLine);
+                TxtLogs.ScrollToEnd();
+            }));
         }
 
         #endregion
@@ -613,7 +735,7 @@ namespace AgilicoConnectChecker
         {
             if (string.IsNullOrWhiteSpace(TxtLogs.Text))
             {
-                MessageBox.Show("Log is empty. Run a diagnostic test first to generate logs.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                ModernMessageBox.Show("Log is empty. Run a diagnostic test first to generate logs.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -628,11 +750,11 @@ namespace AgilicoConnectChecker
                 try
                 {
                     File.WriteAllText(dialog.FileName, TxtLogs.Text);
-                    MessageBox.Show("Log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ModernMessageBox.Show("Log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to save log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Failed to save log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -650,10 +772,13 @@ namespace AgilicoConnectChecker
         private static string? ForceCloseAgilicoConnect()
         {
             string? exePath = null;
+            int currentPid = System.Diagnostics.Process.GetCurrentProcess().Id;
             foreach (var p in System.Diagnostics.Process.GetProcesses())
             {
                 try
                 {
+                    if (p.Id == currentPid) continue;
+
                     string name = p.ProcessName.ToLower();
                     if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
                     {
@@ -687,35 +812,43 @@ namespace AgilicoConnectChecker
 
                 if (System.IO.Directory.Exists(targetDir))
                 {
-                    string[] cacheFolders = { "Cache", "GPUCache", @"EBWebView\Default\Cache" };
-                    foreach (var cf in cacheFolders)
+                    try
                     {
-                        string cDir = System.IO.Path.Combine(targetDir, cf);
-                        if (System.IO.Directory.Exists(cDir))
-                        {
-                            try
-                            {
-                                System.IO.Directory.Delete(cDir, true);
-                                cacheCleared = true;
-                            }
-                            catch (System.IO.IOException)
-                            {
-                                DeleteDirectoryContents(cDir);
-                                cacheCleared = true;
-                            }
-                        }
+                        System.IO.Directory.Delete(targetDir, true);
+                        cacheCleared = true;
+                    }
+                    catch
+                    {
+                        // Fallback: delete files individually, skip locked files
+                        DeleteDirectoryContents(targetDir);
+                        cacheCleared = true;
                     }
                 }
 
-                string msg = cacheCleared
-                    ? "Agilico Connect has been closed and its cache cleared successfully.\n\nPlease restart Agilico Connect manually."
-                    : "Agilico Connect has been closed.\n\nNo cache directory was found to clear.";
+                // 3. Clear softphone registry configuration
+                bool registryCleared = false;
+                try
+                {
+                    Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\DMC\WindowsSoftphone\v1", false);
+                    registryCleared = true;
+                }
+                catch { }
 
-                MessageBox.Show(msg, "Reset Connect", MessageBoxButton.OK, MessageBoxImage.Information);
+                string msg = "";
+                if (cacheCleared || registryCleared)
+                {
+                    msg = "Agilico Connect has been closed, registry settings removed, and its cache cleared successfully.\n\nPlease restart Agilico Connect manually.";
+                }
+                else
+                {
+                    msg = "Agilico Connect has been closed.\n\nNo cache directory or registry configuration was found to clear.";
+                }
+
+                ModernMessageBox.Show(msg, "Reset Connect", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Reset Connect failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Reset Connect failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -732,78 +865,7 @@ namespace AgilicoConnectChecker
             }
         }
 
-        private void BtnFlushDns_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "ipconfig",
-                    Arguments = "/flushdns",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                using var p = System.Diagnostics.Process.Start(psi);
-                p?.WaitForExit();
-                MessageBox.Show("DNS resolver cache flushed successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to flush DNS cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
-        private void BtnResetStack_Click(object sender, RoutedEventArgs e)
-        {
-            var result = MessageBox.Show(
-                "Resetting the TCP/IP stack and Winsock catalog requires administrator privileges and a system restart to take effect.\n\nDo you want to proceed?",
-                "Administrator Authorization Required",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes) return;
-
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = "/c netsh int ip reset & netsh winsock reset",
-                    Verb = "runas",
-                    CreateNoWindow = true,
-                    UseShellExecute = true
-                };
-                using var p = System.Diagnostics.Process.Start(psi);
-                p?.WaitForExit();
-                MessageBox.Show("Winsock catalog and TCP/IP stack reset successfully. Please restart your computer for changes to take effect.", "Reset Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Action cancelled or failed: {ex.Message}", "Status", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
-
-        private void BtnRepairFirewall_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = "/c netsh advfirewall firewall add rule name=\"Agilico Connect Diagnostic Tool\" dir=in action=allow protocol=UDP localport=5060,5061,10000-20000 profile=any",
-                    Verb = "runas",
-                    CreateNoWindow = true,
-                    UseShellExecute = true
-                };
-                using var p = System.Diagnostics.Process.Start(psi);
-                p?.WaitForExit();
-                MessageBox.Show("Inbound Windows Defender Firewall rules for SIP and RTP ports have been created successfully.", "Firewall Repaired", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Action cancelled or failed: {ex.Message}", "Status", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
 
         #endregion
 
@@ -813,12 +875,12 @@ namespace AgilicoConnectChecker
             @"^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$",
             System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        private void BtnStartPingTrack_Click(object sender, RoutedEventArgs e)
+        private void BtnAddPingTarget_Click(object sender, RoutedEventArgs e)
         {
-            var target = TxtPingTarget.Text.Trim();
+            var target = TxtAddPingTarget.Text.Trim();
             if (string.IsNullOrWhiteSpace(target))
             {
-                MessageBox.Show("Please enter a valid IP address or hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid IP address or hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -827,12 +889,12 @@ namespace AgilicoConnectChecker
             bool isValidHostname = !isValidIp && target.Length <= 253 && HostnameRegex.IsMatch(target);
             if (!isValidIp && !isValidHostname)
             {
-                MessageBox.Show("Please enter a valid IPv4/IPv6 address or RFC-compliant hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid IPv4/IPv6 address or RFC-compliant hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             int intervalMs = 1000;
-            if (ComboPingInterval.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag != null)
+            if (ComboAddPingInterval.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag != null)
             {
                 if (int.TryParse(selectedItem.Tag.ToString(), out int parsedInterval))
                 {
@@ -840,77 +902,135 @@ namespace AgilicoConnectChecker
                 }
             }
 
-            // UI changes
-            TxtPingTarget.IsEnabled = false;
-            ComboPingInterval.IsEnabled = false;
-            BtnStartPingTrack.Visibility = Visibility.Collapsed;
-            BtnStopPingTrack.Visibility = Visibility.Visible;
+            // Check if already exists
+            if (_pingTargets.Any(t => t.Target.Equals(target, StringComparison.OrdinalIgnoreCase)))
+            {
+                ModernMessageBox.Show("This host is already in the tracking list.", "Duplicate", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-            _pingLogs.Clear();
-            ResetPingUIStats();
+            var newItem = new PingTargetItem(target, intervalMs);
+            newItem.OnPingResultReceived += TargetItem_OnPingResultReceived;
+            _pingTargets.Add(newItem);
+            
+            // Start pinging immediately — don't wait for the user to press "Start All"
+            newItem.Start();
 
-            // Start Ping Tracker
-            _pingTracker.Start(target, intervalMs);
+            // Auto-select the newly added host so the graph appears straight away
+            GridPingTargets.SelectedItem = newItem;
+
+            TxtAddPingTarget.Text = string.Empty;
+            UpdatePingKpis();
+        }
+        
+        private void TargetItem_OnPingResultReceived(object? sender, PingResultEventArgs e)
+        {
+            if (sender is PingTargetItem item)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (GridPingTargets.SelectedItem == item)
+                    {
+                        _currentPingStats = e.Stats;
+                        DrawPingGraph(item.Tracker.GetRecentResults(), e.Stats);
+                    }
+                }));
+                UpdatePingKpis();
+            }
         }
 
-        private void BtnStopPingTrack_Click(object sender, RoutedEventArgs e)
+        private void GridPingTargets_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            _pingTracker.Stop();
-            RestorePingControlUI();
+            _selectedPingTarget = GridPingTargets.SelectedItem as PingTargetItem;
+            if (_selectedPingTarget != null)
+            {
+                TxtPingGraphTarget.Text = _selectedPingTarget.Target;
+                // Load the real accumulated stats from the tracker for this host
+                var allResults = _selectedPingTarget.Tracker.GetAllResults();
+                _currentPingStats = allResults.Count > 0
+                    ? _selectedPingTarget.Tracker.GetCurrentStats()
+                    : new PingStats();
+                DrawPingGraph(_selectedPingTarget.Tracker.GetRecentResults(), _currentPingStats);
+            }
+            else
+            {
+                TxtPingGraphTarget.Text = "Select a host above";
+                PingGraphCanvas.Children.Clear();
+            }
         }
 
-        private void RestorePingControlUI()
+        private void BtnPingTargetToggle_Click(object sender, RoutedEventArgs e)
         {
-            TxtPingTarget.IsEnabled = true;
-            ComboPingInterval.IsEnabled = true;
-            BtnStartPingTrack.Visibility = Visibility.Visible;
-            BtnStopPingTrack.Visibility = Visibility.Collapsed;
+            if (sender is Button btn && btn.Tag is PingTargetItem item)
+            {
+                if (item.Tracker.IsRunning)
+                    item.Stop();
+                else
+                    item.Start();
+                UpdatePingKpis();
+            }
+        }
+        
+        private void BtnPingTargetRemove_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is PingTargetItem item)
+            {
+                item.Stop();
+                item.OnPingResultReceived -= TargetItem_OnPingResultReceived;
+                _pingTargets.Remove(item);
+                
+                if (_selectedPingTarget == item)
+                {
+                    _selectedPingTarget = null;
+                    TxtPingGraphTarget.Text = "Select a host above";
+                    PingGraphCanvas.Children.Clear();
+                }
+                UpdatePingKpis();
+            }
+        }
+        
+        private void BtnPingStartAll_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var item in _pingTargets) item.Start();
+            UpdatePingKpis();
         }
 
-        private void ResetPingUIStats()
+        private void BtnPingStopAll_Click(object sender, RoutedEventArgs e)
         {
-            TxtPingCurrent.Text = "-";
-            TxtPingAverage.Text = "-";
-            TxtPingMinMax.Text = "-";
-            TxtPingJitter.Text = "-";
-            TxtPingLoss.Text = "0.0%";
-            TxtPingLoss.Foreground = (Brush)FindResource("TextDarkBrush");
-            PingGraphCanvas.Children.Clear();
+            foreach (var item in _pingTargets) item.Stop();
+            UpdatePingKpis();
         }
 
-        private void PingTracker_OnPingResult(PingResult result, PingStats stats)
+        private void UpdatePingKpis()
         {
+            int total = _pingTargets.Count;
+            int online = _pingTargets.Count(t => t.Status == "Online");
+            int offline = _pingTargets.Count(t => t.Status == "Offline/Timeout" || t.Status == "Timeout" || (t.Tracker.IsRunning && t.CurrentLatency.Contains("Timeout")));
+            
+            // Calculate average latency from all active pings
+            double totalLatency = 0;
+            int latencyCount = 0;
+            foreach (var target in _pingTargets)
+            {
+                var recent = target.Tracker.GetRecentResults();
+                if (recent.Count > 0)
+                {
+                    var valid = recent.Where(r => r.LatencyMs.HasValue).Select(r => (double)r.LatencyMs!.Value).ToList();
+                    if (valid.Count > 0)
+                    {
+                        totalLatency += valid.Average();
+                        latencyCount++;
+                    }
+                }
+            }
+            double overallAvg = latencyCount > 0 ? (totalLatency / latencyCount) : 0;
+
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                _currentPingStats = stats;
-
-                // Update metrics labels
-                TxtPingCurrent.Text = result.LatencyMs.HasValue ? $"{result.LatencyMs.Value} ms" : "Timeout";
-                TxtPingCurrent.Foreground = result.LatencyMs.HasValue ? (Brush)FindResource("AccentBlueBrush") : (Brush)FindResource("AccentRedBrush");
-
-                TxtPingAverage.Text = $"{stats.Average:F1} ms";
-                TxtPingMinMax.Text = $"{stats.Min} / {stats.Max} ms";
-                TxtPingJitter.Text = $"{stats.Jitter:F1} ms";
-                
-                TxtPingLoss.Text = $"{stats.LossPercentage:F1}%";
-                if (stats.LossPercentage > 0)
-                {
-                    TxtPingLoss.Foreground = (Brush)FindResource("AccentRedBrush");
-                }
-                else
-                {
-                    TxtPingLoss.Foreground = (Brush)FindResource("TextDarkBrush");
-                }
-
-                // Add to scrolling list
-                _pingLogs.Insert(0, result);
-                if (_pingLogs.Count > 50)
-                {
-                    _pingLogs.RemoveAt(_pingLogs.Count - 1);
-                }
-
-                // Draw Graph
-                DrawPingGraph(_pingTracker.GetRecentResults(), stats);
+                if (TxtKpiTotalTargets != null) TxtKpiTotalTargets.Text = total.ToString();
+                if (TxtKpiOnlineTargets != null) TxtKpiOnlineTargets.Text = online.ToString();
+                if (TxtKpiOfflineTargets != null) TxtKpiOfflineTargets.Text = offline.ToString();
+                if (TxtKpiAvgLatency != null) TxtKpiAvgLatency.Text = overallAvg > 0 ? $"{Math.Round(overallAvg, 1)} ms" : "0.0 ms";
             }));
         }
 
@@ -1058,37 +1178,43 @@ namespace AgilicoConnectChecker
 
         private void PingGraphCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (_pingTracker != null && _pingTracker.IsRunning)
+            if (_selectedPingTarget != null)
             {
-                DrawPingGraph(_pingTracker.GetRecentResults(), _currentPingStats);
+                DrawPingGraph(_selectedPingTarget.Tracker.GetRecentResults(), _currentPingStats);
             }
         }
 
-        private void BtnDownloadPingLog_Click(object sender, RoutedEventArgs e)
+        private void BtnPingExportSelected_Click(object sender, RoutedEventArgs e)
         {
-            var pings = _pingTracker.GetAllResults();
+            if (_selectedPingTarget == null)
+            {
+                ModernMessageBox.Show("Please select a host from the list first.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            
+            var pings = _selectedPingTarget.Tracker.GetAllResults();
             if (pings.Count == 0)
             {
-                MessageBox.Show("No ping tracking data to download. Start tracking first.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                ModernMessageBox.Show("No ping tracking data to download for this host.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var dialog = new SaveFileDialog
+            var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
-                FileName = $"Ping_Track_Log_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+                FileName = $"PingLog_{_selectedPingTarget.Target}_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
             };
 
             if (dialog.ShowDialog() == true)
             {
                 try
                 {
-                    _pingTracker.ExportLog(dialog.FileName);
-                    MessageBox.Show("Ping track log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _selectedPingTarget.Tracker.ExportLog(dialog.FileName);
+                    ModernMessageBox.Show("Ping track log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to save ping log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Error saving log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -1101,7 +1227,7 @@ namespace AgilicoConnectChecker
         {
             if (_engine.Pcap.PacketCount == 0)
             {
-                MessageBox.Show("There are no captured packets to save. Please run a packet capture first.", "No Packets Captured", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("There are no captured packets to save. Please run a packet capture first.", "No Packets Captured", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1117,11 +1243,11 @@ namespace AgilicoConnectChecker
                 {
                     var bytes = _engine.Pcap.GetPcapBytes();
                     System.IO.File.WriteAllBytes(sfd.FileName, bytes);
-                    MessageBox.Show("PCAP log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ModernMessageBox.Show("PCAP log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to save PCAP log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Failed to save PCAP log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -1147,7 +1273,7 @@ namespace AgilicoConnectChecker
             try
             {
                 using var ctsDownload = CancellationTokenSource.CreateLinkedTokenSource(token);
-                ctsDownload.CancelAfter(TimeSpan.FromSeconds(3));
+                ctsDownload.CancelAfter(TimeSpan.FromSeconds(6));
                 var downloadToken = ctsDownload.Token;
 
                 long totalDownloaded = 0;
@@ -1270,7 +1396,7 @@ namespace AgilicoConnectChecker
             try
             {
                 using var ctsUpload = CancellationTokenSource.CreateLinkedTokenSource(token);
-                ctsUpload.CancelAfter(TimeSpan.FromSeconds(3));
+                ctsUpload.CancelAfter(TimeSpan.FromSeconds(6));
                 var uploadToken = ctsUpload.Token;
 
                 long totalUploaded = 0;
@@ -1318,7 +1444,12 @@ namespace AgilicoConnectChecker
                                 System.Threading.Interlocked.Add(ref totalUploaded, bytesRead);
                             });
                             using var content = new System.Net.Http.StreamContent(progressStream);
-                            var response = await client.PostAsync("https://speed.cloudflare.com/__up", content, uploadToken);
+                            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://speed.cloudflare.com/__up")
+                            {
+                                Content = content
+                            };
+                            request.Headers.TransferEncodingChunked = true;
+                            using var response = await client.SendAsync(request, uploadToken);
                             response.EnsureSuccessStatusCode();
                         }
                         catch (OperationCanceledException) { }
@@ -1358,7 +1489,7 @@ namespace AgilicoConnectChecker
             var target = TxtTraceTarget.Text.Trim();
             if (string.IsNullOrWhiteSpace(target))
             {
-                MessageBox.Show("Please enter a valid IP address or hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid IP address or hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1366,7 +1497,7 @@ namespace AgilicoConnectChecker
             bool isValidHostname = !isValidIp && target.Length <= 253 && HostnameRegex.IsMatch(target);
             if (!isValidIp && !isValidHostname)
             {
-                MessageBox.Show("Please enter a valid IPv4/IPv6 address or RFC-compliant hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid IPv4/IPv6 address or RFC-compliant hostname.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1473,6 +1604,9 @@ namespace AgilicoConnectChecker
             catch (OperationCanceledException) { }
             finally
             {
+                // Always dispose the CTS to release OS resources, then restore UI
+                _traceCts?.Dispose();
+                _traceCts = null;
                 BtnStartTrace.Visibility = Visibility.Visible;
                 BtnStopTrace.Visibility = Visibility.Collapsed;
                 TxtTraceTarget.IsEnabled = true;
@@ -1499,82 +1633,52 @@ namespace AgilicoConnectChecker
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void ImgLogo_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (BtnNetScan.Visibility == Visibility.Visible)
+            if (BtnItTools.Visibility == Visibility.Visible)
             {
-                BtnNetScan.Visibility = Visibility.Collapsed;
-                BtnPingTrack.Visibility = Visibility.Collapsed;
-                BtnPcap.Visibility = Visibility.Collapsed;
+                BtnItTools.Visibility = Visibility.Collapsed;
+                BtnNetTools.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
-                BtnProbe.Visibility = Visibility.Collapsed;
                 
                 if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6)
                 {
                     SelectTab(0, BtnDashboard);
                 }
                 
-                MessageBox.Show("Engineer Mode deactivated.", "Lock", MessageBoxButton.OK, MessageBoxImage.Information);
+                ModernMessageBox.Show("Engineer Mode deactivated.", "Lock", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var passwordBox = new PasswordBox { Margin = new Thickness(10), Width = 200, VerticalAlignment = VerticalAlignment.Center };
-            var okButton = new Button { Content = "OK", IsDefault = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
-            var cancelButton = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
-            
-            var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(10) };
-            buttonPanel.Children.Add(okButton);
-            buttonPanel.Children.Add(cancelButton);
-
-            var mainPanel = new StackPanel { Background = new SolidColorBrush(Color.FromRgb(0, 0, 52)) };
-            mainPanel.Children.Add(new TextBlock { Text = "Enter Agilico Engineer Password:", Foreground = Brushes.White, Margin = new Thickness(10), FontSize = 13, FontWeight = FontWeights.SemiBold });
-            mainPanel.Children.Add(passwordBox);
-            mainPanel.Children.Add(buttonPanel);
-
-            var dialog = new Window
+            var dialog = new EngineerPasswordDialog
             {
-                Title = "Engineer Verification",
-                Content = mainPanel,
-                SizeToContent = SizeToContent.WidthAndHeight,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = this,
-                ResizeMode = ResizeMode.NoResize,
-                WindowStyle = WindowStyle.ToolWindow,
-                Background = new SolidColorBrush(Color.FromRgb(0, 0, 52))
-            };
-
-            okButton.Click += (s, ev) =>
-            {
-                if (passwordBox.Password.Equals("agilico", StringComparison.OrdinalIgnoreCase))
-                {
-                    dialog.DialogResult = true;
-                    dialog.Close();
-                }
-                else
-                {
-                    MessageBox.Show("Invalid password.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            };
-
-            cancelButton.Click += (s, ev) =>
-            {
-                dialog.DialogResult = false;
-                dialog.Close();
+                Owner = this
             };
 
             if (dialog.ShowDialog() == true)
             {
-                BtnNetScan.Visibility = Visibility.Visible;
-                BtnPingTrack.Visibility = Visibility.Visible;
-                BtnPcap.Visibility = Visibility.Visible;
-                BtnLogs.Visibility = Visibility.Visible;
-                BtnSettings.Visibility = Visibility.Visible;
-                BtnProbe.Visibility = Visibility.Visible;
-                MessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                // Compare against SHA-256 hash of the engineer password (not the plaintext)
+                const string HashedEngineerPassword = "d71dd957a89911bd0b4e8182e2ffe6284b89e4354eb0b0a36ae0e8c9ee4dfa7d";
+                using var sha = SHA256.Create();
+                byte[] inputHash = sha.ComputeHash(Encoding.UTF8.GetBytes(dialog.Password));
+                string inputHex = BitConverter.ToString(inputHash).Replace("-", "").ToLowerInvariant();
+
+                if (inputHex == HashedEngineerPassword)
+                {
+                    BtnItTools.Visibility = Visibility.Visible;
+                    BtnNetTools.Visibility = Visibility.Visible;
+                    BtnLogs.Visibility = Visibility.Visible;
+                    BtnSettings.Visibility = Visibility.Visible;
+                    ModernMessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    ModernMessageBox.Show("Invalid password.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -1601,7 +1705,7 @@ namespace AgilicoConnectChecker
                     // Validate IP address
                     if (!System.Net.IPAddress.TryParse(filterIp, out _))
                     {
-                        MessageBox.Show("Please enter a valid IP address to filter by, or leave it blank.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("Please enter a valid IP address to filter by, or leave it blank.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
                 }
@@ -1614,14 +1718,14 @@ namespace AgilicoConnectChecker
                     
                     if (!selectedItem.IsAutomatic && string.IsNullOrEmpty(selectedIp))
                     {
-                        MessageBox.Show("The selected network adapter does not have a configured IPv4 address.", "No IPv4 Configured", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("The selected network adapter does not have a configured IPv4 address.", "No IPv4 Configured", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
                 }
  
                 if (isInactive)
                 {
-                    MessageBox.Show("The selected network adapter is inactive. Please choose an active adapter to capture traffic.", "Adapter Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ModernMessageBox.Show("The selected network adapter is inactive. Please choose an active adapter to capture traffic.", "Adapter Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -1636,11 +1740,11 @@ namespace AgilicoConnectChecker
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    MessageBox.Show(ex.Message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ModernMessageBox.Show(ex.Message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to start packet capture: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ModernMessageBox.Show($"Failed to start packet capture: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -1767,6 +1871,7 @@ namespace AgilicoConnectChecker
             TxtLocalUploadSpeed.Text = "Testing...";
             TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextMutedBrush");
             TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextMutedBrush");
+            if (SpeedTestProgress != null) SpeedTestProgress.Visibility = Visibility.Visible;
 
             try
             {
@@ -1784,17 +1889,26 @@ namespace AgilicoConnectChecker
                 TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+                
+                string logMsg = $"[{DateTime.Now:HH:mm:ss}]   Speed Test: Download {downloadMbps:F1} Mbps | Upload {uploadMbps:F1} Mbps";
+                TxtLogs.AppendText(logMsg + Environment.NewLine);
+                TxtLogs.ScrollToEnd();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 TxtLocalDownloadSpeed.Text = "Skipped/Failed";
                 TxtLocalUploadSpeed.Text = "Skipped/Failed";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
                 TxtLocalUploadSpeed.Foreground = (Brush)FindResource("AccentRedBrush");
+                
+                string logMsg = $"[{DateTime.Now:HH:mm:ss}]   Speed Test: Skipped/Failed ({ex.Message})";
+                TxtLogs.AppendText(logMsg + Environment.NewLine);
+                TxtLogs.ScrollToEnd();
             }
             finally
             {
                 if (BtnRecheckSpeed != null) BtnRecheckSpeed.IsEnabled = true;
+                if (SpeedTestProgress != null) SpeedTestProgress.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1816,8 +1930,8 @@ namespace AgilicoConnectChecker
             
             string logContent = TxtLogs.Text;
             byte[] pcapBytes = _engine.Pcap.GetPcapBytes();
-            string pingTarget = _pingTracker.CurrentTarget;
-            Action<string> pingLogExporter = (path) => _pingTracker.ExportLog(path);
+            string pingTarget = _selectedPingTarget != null ? _selectedPingTarget.Target : "None";
+            Action<string> pingLogExporter = (path) => _selectedPingTarget?.Tracker.ExportLog(path);
 
             var ticketDialog = new TicketDialog(subject, body, logContent, pcapBytes, pingTarget, pingLogExporter, new System.Collections.Generic.List<LanDevice>(_lanDevices))
             {
@@ -1837,7 +1951,7 @@ namespace AgilicoConnectChecker
 
             if (string.IsNullOrWhiteSpace(domain))
             {
-                MessageBox.Show("Please enter a valid domain to resolve.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid domain to resolve.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1855,12 +1969,12 @@ namespace AgilicoConnectChecker
 
                 if (records.Count == 0)
                 {
-                    MessageBox.Show("No DNS SRV records found for the specified domain and service.", "Results", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ModernMessageBox.Show("No DNS SRV records found for the specified domain and service.", "Results", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to resolve SRV records: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Failed to resolve SRV records: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1871,6 +1985,23 @@ namespace AgilicoConnectChecker
 
         private void CbPortProfile_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (TxtPortProfileDesc == null) return;
+
+            var profileItem = CbPortProfile.SelectedItem as ComboBoxItem;
+            var profileName = profileItem?.Content?.ToString() ?? "";
+
+            TxtPortProfileDesc.Text = profileName switch
+            {
+                string s when s.Contains("Agilico") =>
+                    "Tests HTTP (TCP 80), HTTPS (TCP 443), STUN (UDP 3478), SIP signalling (UDP 5060/5061), and NTP (UDP 123) against Agilico Connect endpoints.",
+                string s when s.Contains("3CX") =>
+                    "Tests SIP TCP/UDP (5060), Secure SIP TLS (TCP 5061), 3CX Tunnel TCP/UDP (5090), Web Client (TCP 443), and System Management (TCP 5015). You will be prompted for the 3CX server FQDN.",
+                string s when s.Contains("Teams") =>
+                    "Tests SIP TLS signalling (TCP 5061) to three Microsoft PSTN hubs, and STUN/TURN media ports (UDP 3478–3481) to the Teams transport relay.",
+                string s when s.Contains("Custom") =>
+                    "Enter a custom target host and a list of ports with protocols (e.g. TCP 443, UDP 53) when prompted.",
+                _ => ""
+            };
         }
 
         private async void BtnStartPortProbe_Click(object sender, RoutedEventArgs e)
@@ -1962,7 +2093,7 @@ namespace AgilicoConnectChecker
 
                     if (probes.Count == 0)
                     {
-                        MessageBox.Show("No valid ports parsed. Format should be: Protocol Port (e.g., TCP 80).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ModernMessageBox.Show("No valid ports parsed. Format should be: Protocol Port (e.g., TCP 80).", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                         RestorePortProbeBtn();
                         return;
                     }
@@ -1994,7 +2125,7 @@ namespace AgilicoConnectChecker
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error running port probes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Error running port probes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -2010,46 +2141,14 @@ namespace AgilicoConnectChecker
 
         private string? ShowInputDialog(string title, string instruction, string defaultValue = "")
         {
-            var textBox = new TextBox { Margin = new Thickness(10), Width = 250, Text = defaultValue, Padding = new Thickness(5), VerticalAlignment = VerticalAlignment.Center };
-            var okButton = new Button { Content = "OK", IsDefault = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
-            var cancelButton = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(5), Padding = new Thickness(15, 5, 15, 5) };
-            
-            var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(10) };
-            buttonPanel.Children.Add(okButton);
-            buttonPanel.Children.Add(cancelButton);
-
-            var mainPanel = new StackPanel { Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
-            mainPanel.Children.Add(new TextBlock { Text = instruction, Foreground = Brushes.White, Margin = new Thickness(10), FontSize = 13, FontWeight = FontWeights.SemiBold });
-            mainPanel.Children.Add(textBox);
-            mainPanel.Children.Add(buttonPanel);
-
-            var dialog = new Window
+            var dialog = new InputDialog(title, instruction, defaultValue)
             {
-                Title = title,
-                Content = mainPanel,
-                SizeToContent = SizeToContent.WidthAndHeight,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = this,
-                ResizeMode = ResizeMode.NoResize,
-                WindowStyle = WindowStyle.ToolWindow,
-                Background = new SolidColorBrush(Color.FromRgb(30, 41, 59))
-            };
-
-            okButton.Click += (s, ev) =>
-            {
-                dialog.DialogResult = true;
-                dialog.Close();
-            };
-
-            cancelButton.Click += (s, ev) =>
-            {
-                dialog.DialogResult = false;
-                dialog.Close();
+                Owner = this
             };
 
             if (dialog.ShowDialog() == true)
             {
-                return textBox.Text.Trim();
+                return dialog.InputText;
             }
             return null;
         }
@@ -2111,7 +2210,7 @@ namespace AgilicoConnectChecker
                 client.Timeout = TimeSpan.FromSeconds(3);
                 client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.9");
 
-                string url = $"http://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
+                string url = $"https://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);
 
                 using var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
@@ -2360,7 +2459,21 @@ namespace AgilicoConnectChecker
 
         private async void BtnRefreshSockets_Click(object sender, RoutedEventArgs e)
         {
-            await RefreshSocketsListAsync();
+            BtnRefreshSockets.IsEnabled = false;
+            BtnRefreshSockets.Content = "REFRESHING...";
+            try
+            {
+                await RefreshSocketsListAsync();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to refresh socket list.\n\nError: {ex.Message}", "Socket Monitor Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnRefreshSockets.IsEnabled = true;
+                BtnRefreshSockets.Content = "REFRESH SOCKETS";
+            }
         }
 
         #endregion

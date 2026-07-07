@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public partial class TicketDialog : Window
     {
@@ -63,13 +63,13 @@ namespace AgilicoConnectChecker
 
             if (string.IsNullOrEmpty(email) || !Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
             {
-                MessageBox.Show("Please enter a valid email address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a valid email address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (string.IsNullOrEmpty(subject))
             {
-                MessageBox.Show("Please enter a subject.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ModernMessageBox.Show("Please enter a subject.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -120,7 +120,7 @@ namespace AgilicoConnectChecker
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to prepare attachment files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Failed to prepare attachment files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -165,7 +165,7 @@ namespace AgilicoConnectChecker
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to connect to Outlook client: {ex.Message}. Falling back to default mail link.", "Outlook Connector Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ModernMessageBox.Show($"Failed to connect to Outlook client: {ex.Message}. Falling back to default mail link.", "Outlook Connector Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
 
@@ -174,7 +174,7 @@ namespace AgilicoConnectChecker
             {
                 string mailtoUrl = $"mailto:support@tech.agilico.co.uk?subject={Uri.EscapeDataString(subject)}&body={Uri.EscapeDataString(emailBody)}";
                 
-                MessageBox.Show($"Outlook client was not detected or failed to start. We will open your default email client.\r\n\r\nIMPORTANT: Please manually attach the diagnostic logs from:\r\n{tempDir}", "Outlook Not Detected", MessageBoxButton.OK, MessageBoxImage.Information);
+                ModernMessageBox.Show($"Outlook client was not detected or failed to start. We will open your default email client.\r\n\r\nIMPORTANT: Please manually attach the diagnostic logs from:\r\n{tempDir}", "Outlook Not Detected", MessageBoxButton.OK, MessageBoxImage.Information);
 
                 Process.Start(new ProcessStartInfo(mailtoUrl) { UseShellExecute = true });
                 
@@ -186,7 +186,7 @@ namespace AgilicoConnectChecker
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to open email client: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ModernMessageBox.Show($"Failed to open email client: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

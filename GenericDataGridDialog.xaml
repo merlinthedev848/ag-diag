@@ -1,0 +1,102 @@
+<Window x:Class="agilicomsptoolkit.GenericDataGridDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Audit Viewer" Height="600" Width="900"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    
+    <Border CornerRadius="8" Background="#E60f172a" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.3" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Header -->
+            <Border Grid.Row="0" CornerRadius="8,8,0,0" Background="#000033" Padding="20,15" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="TxtTitle" Text="Audit Viewer" FontSize="15" FontWeight="SemiBold" Foreground="#ffffff" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Content -->
+            <Grid Grid.Row="1" Margin="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock x:Name="TxtDescription" Text="View detailed audit logs." Foreground="#94a3b8" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" x:Name="GridGeneric" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="Column" 
+                          Background="White" BorderBrush="#cbd5e1" BorderThickness="1" RowBackground="White" AlternatingRowBackground="#f8fafc"
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#e2e8f0" SelectionMode="Single" Foreground="#0f172a">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#f1f5f9"/>
+                            <Setter Property="Foreground" Value="#0f172a"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Padding" Value="10,5"/>
+                            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                            <Setter Property="BorderBrush" Value="#cbd5e1"/>
+                        </Style>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Foreground" Value="#0f172a"/>
+                            <Setter Property="Padding" Value="5"/>
+                        </Style>
+                    </DataGrid.Resources>
+                </DataGrid>
+            </Grid>
+            
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="#CC1e293b" CornerRadius="0,0,8,8" Padding="20,15">
+                <Grid>
+                    <!-- Extra Actions (Hidden by default) -->
+                    <StackPanel x:Name="DiskActionsPanel" Orientation="Horizontal" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <Button Content="Run Disk Cleanup" Width="140" Height="35" Background="#10b981" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnRunDiskCleanup_Click" Margin="0,0,10,0">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                        <Button Content="Run Disk Defrag" Width="140" Height="35" Background="#3b82f6" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnRunDiskDefrag_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                    </StackPanel>
+                    
+                    <StackPanel x:Name="SoftwareActionsPanel" Orientation="Horizontal" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <Button x:Name="BtnUpdateSoftware" Content="Update All Software" Width="160" Height="35" Background="#f59e0b" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnUpdateSoftware_Click" Margin="0,0,10,0">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                        <TextBlock x:Name="TxtSoftwareUpdateStatus" Text="Updates available via winget" Foreground="#94a3b8" VerticalAlignment="Center" FontSize="11" Margin="5,0,0,0"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Close" Width="100" Height="35" Background="#000033" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnClose_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

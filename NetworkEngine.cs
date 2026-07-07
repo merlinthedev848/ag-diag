@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using Microsoft.AspNetCore.SignalR.Client;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public class NetworkEngine
     {
@@ -46,7 +46,7 @@ namespace AgilicoConnectChecker
 
         // Live settings loaded from softphone registry
         public string ServerUsername { get; set; } = "";
-        public string ClientToken { get; set; } = "";
+        public string ClientToken { get; private set; } = "";
         public int ClientUserId { get; set; } = 0;
         public string PresenceUrl { get; set; } = "http://v3.presence.eu-beta.hp2k.co.uk/Presence";
         public string SignallingUrl { get; set; } = "http://v1.softsignalling.eu-j.hp2k.co.uk/Signals";
@@ -295,6 +295,7 @@ namespace AgilicoConnectChecker
             public string Gateway { get; set; } = "-";
             public string DnsServers { get; set; } = "-";
             public string Vlan { get; set; } = "Untagged";
+            public string WifiInfo { get; set; } = "-";
             public string PublicIpAddress { get; set; } = "-";
             public bool IsOk { get; set; } = false;
         }
@@ -350,6 +351,10 @@ namespace AgilicoConnectChecker
                         info.Gateway = string.Join(", ", gateways);
                         info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
                         info.Vlan = GetInterfaceVlanId(ni.Id);
+                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                        {
+                            info.WifiInfo = GetWifiDetails();
+                        }
                         info.IsOk = true;
                         return info; 
                     }
@@ -365,6 +370,10 @@ namespace AgilicoConnectChecker
                         info.Gateway = gateways.Count > 0 ? string.Join(", ", gateways) : "None";
                         info.DnsServers = dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "None";
                         info.Vlan = GetInterfaceVlanId(ni.Id);
+                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                        {
+                            info.WifiInfo = GetWifiDetails();
+                        }
                     }
                 }
             }
@@ -399,6 +408,56 @@ namespace AgilicoConnectChecker
             catch { }
 
             return PublicIpAddress;
+        }
+
+        private string GetWifiDetails()
+        {
+            try
+            {
+                var proc = new System.Diagnostics.Process();
+                proc.StartInfo.FileName = "netsh";
+                proc.StartInfo.Arguments = "wlan show interfaces";
+                proc.StartInfo.UseShellExecute = false;
+                proc.StartInfo.RedirectStandardOutput = true;
+                proc.StartInfo.CreateNoWindow = true;
+                proc.Start();
+
+                // Use synchronous read with a timeout — safe inside Task.Run context.
+                // Avoids .Result deadlock risk on SynchronizationContext-bearing threads.
+                bool exited = proc.WaitForExit(3000);
+                if (!exited)
+                {
+                    try { proc.Kill(); } catch { }
+                    proc.WaitForExit(500);
+                }
+                string output = exited ? proc.StandardOutput.ReadToEnd() : "";
+
+                string ssid = "Unknown";
+                string signal = "";
+                string radio = "";
+
+                foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var trimmed = line.Trim();
+                    int colonIdx = trimmed.IndexOf(':');
+                    if (colonIdx < 0) continue;
+
+                    string key = trimmed.Substring(0, colonIdx).Trim();
+                    string val = trimmed.Substring(colonIdx + 1).Trim();
+
+                    if (key == "SSID")
+                        ssid = val;
+                    else if (key == "Signal")
+                        signal = val;
+                    else if (key == "Radio type")
+                        radio = val;
+                }
+
+                if (ssid != "Unknown")
+                    return $"{ssid} ({signal} / {radio})";
+            }
+            catch { }
+            return "Active (Details Unavailable)";
         }
 
         private static string GetInterfaceVlanId(string interfaceGuid)
@@ -658,7 +717,7 @@ namespace AgilicoConnectChecker
                 else
                 {
                     Log("Test 7: Skipped by user selection.");
-                    UpdateProgress("NAT Port Randomness Check", "Skipped", "Skipped by user");
+                    UpdateProgress("NAT Port Translation (Random Port)", "Skipped", "Skipped by user");
                 }
                 if (token.IsCancellationRequested) return false;
 
@@ -697,7 +756,7 @@ namespace AgilicoConnectChecker
                 else
                 {
                     Log("Test 10: Skipped by user selection.");
-                    UpdateProgress("Inbound Signalling & Presence (WebSockets)", "Skipped", "Skipped by user");
+                    UpdateProgress("Inbound Signalling & Presence", "Skipped", "Skipped by user");
                 }
 
                 bool allPassed = dnsPass && httpPass && ntpPass && agilicoStunPass && googleStunPass && natHopsPass && natPortPass && sipAlgPass && rtpQualityPass && signalRPass;
@@ -1328,10 +1387,10 @@ namespace AgilicoConnectChecker
             if (IsSimulationMode)
             {
                 await Task.Delay(800, token);
-                mappedPort = 53891;
+                mappedPort = localPort;
                 Log($"[Simulation] Local Port: {localPort}, STUN Mapped Port: {mappedPort}");
-                Log("Pass: Public interface NAT port is random and different from local port.");
-                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port randomized ({mappedPort})");
+                Log("Pass: The public interface NAT port is preserved (Consistent NAT).");
+                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port preserved ({mappedPort})");
                 return true;
             }
 
@@ -1367,7 +1426,7 @@ namespace AgilicoConnectChecker
             var servers = new[] { "stun-gb-a.hp2k.co.uk", "stun-gb-b.hp2k.co.uk", "stun.l.google.com" };
             foreach (var server in servers)
             {
-                var (ok, ip, mPort) = await QueryStunServerAsync(server, 3478, token);
+                var (ok, ip, mPort) = await QueryStunServerAsync(server, 3478, token, localPort);
                 if (ok)
                 {
                     mappedPort = mPort;
@@ -1388,16 +1447,16 @@ namespace AgilicoConnectChecker
 
             if (mappedPort == localPort)
             {
-                Log("Error: The public interface NAT port is the exact same as the local NAT port.", true);
-                Log("The gateway is preserving the port. The Agilico Network Guidance explicitly requires randomized ports.", true);
-                UpdateProgress("NAT Port Translation (Random Port)", "Failed", $"Fail - Port Preserved ({mappedPort})");
-                return false;
+                Log("Pass: The public interface NAT port is preserved (Consistent NAT).");
+                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port preserved ({mappedPort})");
+                return true;
             }
             else
             {
-                Log("Pass: The public interface NAT port is randomized and different from the local NAT port.");
-                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port randomized ({mappedPort})");
-                return true;
+                Log("Error: The public interface NAT port is randomized and differs from the local UDP port.", true);
+                Log("Symmetric NAT is active. VoIP requires consistent port mapping (port preservation).", true);
+                UpdateProgress("NAT Port Translation (Random Port)", "Failed", $"Fail - Port randomized ({mappedPort})");
+                return false;
             }
         }
 
@@ -1737,12 +1796,12 @@ namespace AgilicoConnectChecker
 
         #region STUN Protocol Helpers
 
-        private async Task<(bool success, string? publicIp, int mappedPort)> QueryStunServerAsync(string server, int port, CancellationToken token)
+        private async Task<(bool success, string? publicIp, int mappedPort)> QueryStunServerAsync(string server, int port, CancellationToken token, int queryPort = 0)
         {
             UdpClient? client = null;
             try
             {
-                client = new UdpClient(0);
+                client = new UdpClient(queryPort);
                 client.Client.SendTimeout = 1500;
                 client.Client.ReceiveTimeout = 1500;
 
@@ -1946,6 +2005,14 @@ namespace AgilicoConnectChecker
             UpdateProgress("Inbound Signalling & Presence", "Running", "Verifying hub WebSocket connections...");
             Log("Test 10: Verifying persistent inbound connections (WebSockets / SignalR)...");
             Log("Checking Signalling, Presence, and Rooms hubs with 2.5-second stability monitoring...");
+ 
+            if (IsSimulationMode)
+            {
+                await Task.Delay(1000, token);
+                UpdateProgress("Inbound Signalling & Presence", "Pass", "WebSocket connection succeeded");
+                Log("[Simulation] persistent WebSocket connection is stable.");
+                return true;
+            }
 
             var signallingResult = await TestSingleSignalRHubAsync("Signalling Hub", SignallingUrl, token);
             if (token.IsCancellationRequested) return false;

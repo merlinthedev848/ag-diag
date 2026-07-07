@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 
-namespace AgilicoConnectChecker;
+namespace agilicomsptoolkit;
 
 public partial class App : Application
 {
@@ -21,14 +21,31 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
             var ex = args.ExceptionObject as Exception;
-            System.Diagnostics.Debug.WriteLine($"AppDomain Unhandled Exception: {ex?.Message}\n{ex?.StackTrace}");
-            MessageBox.Show($"A critical error occurred and the application must close.\n\nError: {ex?.Message}", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            string errorMsg = ex?.Message ?? "Unknown fatal error";
+            System.Diagnostics.Debug.WriteLine($"AppDomain Unhandled Exception: {errorMsg}\n{ex?.StackTrace}");
+            
+            // ModernMessageBox is a WPF window and requires STA thread.
+            // Check if we can safely dispatch to the UI thread, otherwise fallback to standard MessageBox.Show.
+            if (Application.Current != null && Application.Current.Dispatcher != null && !Application.Current.Dispatcher.HasShutdownStarted)
+            {
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ModernMessageBox.Show($"A critical error occurred and the application must close.\n\nError: {errorMsg}", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                    return;
+                }
+                catch { }
+            }
+            
+            MessageBox.Show($"A critical error occurred and the application must close.\n\nError: {errorMsg}", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
         };
 
         DispatcherUnhandledException += (s, args) =>
         {
             System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
-            MessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ModernMessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true; // Prevent app from closing if possible
         };
 
@@ -67,7 +84,7 @@ public partial class App : Application
             }
 
             Console.WriteLine();
-            Console.WriteLine("Agilico Network Diagnostic Tool - Silent Mode Started");
+            Console.WriteLine("Agilico MSP Toolkit - Silent Mode Started");
 
             var engine = new NetworkEngine();
             
@@ -92,9 +109,22 @@ public partial class App : Application
         }
         else
         {
+            // Prevent WPF from initiating shutdown when TermsDialog closes
+            this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             // Launch GUI
-            var mainWindow = new MainWindow();
-            mainWindow.Show();
+            var terms = new TermsDialog();
+            if (terms.ShowDialog() == true)
+            {
+                var mainWindow = new MainWindow();
+                this.MainWindow = mainWindow;
+                this.ShutdownMode = ShutdownMode.OnLastWindowClose;
+                mainWindow.Show();
+            }
+            else
+            {
+                Shutdown();
+            }
         }
     }
 }

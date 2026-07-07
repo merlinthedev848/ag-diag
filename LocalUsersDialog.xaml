@@ -1,0 +1,94 @@
+<Window x:Class="agilicomsptoolkit.LocalUsersDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Local Users &amp; Groups" Height="600" Width="800"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Loaded="Window_Loaded">
+    
+    <Border CornerRadius="8" Background="#E60f172a" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.3" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Header -->
+            <Border Grid.Row="0" CornerRadius="8,8,0,0" Background="#000033" Padding="20,15" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <TextBlock Text="Local Users &amp; Groups" FontSize="15" FontWeight="SemiBold" Foreground="#ffffff" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="TxtStatus" Text="Loading users..." Foreground="#94a3b8" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- Content -->
+            <Grid Grid.Row="1" Margin="20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="ItemsUsers">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- WrapPanel so they form a grid of cards -->
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#1e293b" CornerRadius="8" Padding="15" Margin="0,0,15,15" Width="340">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <!-- Avatar -->
+                                        <Border Grid.Column="0" Width="60" Height="60" CornerRadius="30" Background="#334155" Margin="0,0,15,0" VerticalAlignment="Top">
+                                            <TextBlock Text="👤" FontSize="28" Foreground="#94a3b8" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,2"/>
+                                        </Border>
+
+                                        <!-- Details -->
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="White" FontSize="16" Margin="0,0,0,2"/>
+                                            <TextBlock Text="{Binding FullName}" Foreground="#cbd5e1" FontSize="12" Margin="0,0,0,8" Visibility="{Binding FullNameVisibility}"/>
+                                            
+                                            <!-- Badges -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <Border Background="{Binding StatusBgBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,5,0">
+                                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusFgBrush}" FontSize="11" FontWeight="Bold"/>
+                                                </Border>
+                                                <!-- We could add Admin/Standard badge here later if we fetch group membership, but currently we just fetch Get-LocalUser -->
+                                            </StackPanel>
+                                            
+                                            <TextBlock Text="{Binding Description}" Foreground="#94a3b8" TextWrapping="Wrap" FontSize="11" FontStyle="Italic"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+            
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="#CC1e293b" CornerRadius="0,0,8,8" Padding="20,15">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Close" Width="100" Height="35" Background="#000033" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnClose_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

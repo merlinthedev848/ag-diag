@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$srcDir = "C:\Users\chris.kendall\.gemini\antigravity\scratch\dev"
+$srcDir = "C:\Users\chris.kendall\.gemini\antigravity\scratch\agilico-connect-checker"
 $outDir = "C:\Users\chris.kendall\.gemini\antigravity\scratch\agilico-connect-checker"
 
 if (!(Test-Path $outDir)) {
@@ -15,7 +15,7 @@ Remove-Item "obj\Release" -Recurse -Force -ErrorAction SilentlyContinue
 dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=false -o "bin\Publish\Lite"
 
 Write-Host "Copying to release directory..."
-Copy-Item "bin\Publish\Standalone\AgilicoNetworkDiagnosticTool.exe" -Destination "$outDir\AgilicoNetworkDiagnosticTool-Standalone.exe" -Force
-Copy-Item "bin\Publish\Lite\AgilicoNetworkDiagnosticTool.exe" -Destination "$outDir\AgilicoNetworkDiagnosticTool-Lite.exe" -Force
+Copy-Item "bin\Publish\Standalone\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit.exe" -Force
+Copy-Item "bin\Publish\Lite\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit Lite.exe" -Force
 
 Write-Host "Done!"

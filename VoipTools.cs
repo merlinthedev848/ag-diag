@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public class SrvRecord
     {
@@ -465,7 +465,7 @@ namespace AgilicoConnectChecker
                 $"Call-ID: {callId}\r\n" +
                 $"CSeq: 1 OPTIONS\r\n" +
                 $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
+                $"User-Agent: Agilico MSP Toolkit\r\n" +
                 $"Content-Length: 0\r\n\r\n";
 
             return Encoding.UTF8.GetBytes(sipRegister);

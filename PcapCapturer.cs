@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public class PcapCapturer
     {

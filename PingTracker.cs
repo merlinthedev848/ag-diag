@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public class PingResult
     {
@@ -109,6 +109,14 @@ namespace AgilicoConnectChecker
             lock (_lock)
             {
                 return new List<PingResult>(_allResults);
+            }
+        }
+
+        public PingStats GetCurrentStats()
+        {
+            lock (_lock)
+            {
+                return CalculateStats();
             }
         }
 

@@ -1,0 +1,124 @@
+<Window x:Class="agilicomsptoolkit.SoftwareAuditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Software Audit" Height="600" Width="900"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Loaded="Window_Loaded">
+    
+    <Border CornerRadius="8" Background="#E60f172a" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.3" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Header -->
+            <Border Grid.Row="0" CornerRadius="8,8,0,0" Background="#000033" Padding="20,15" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <TextBlock Text="Software Audit &amp; Updates" FontSize="15" FontWeight="SemiBold" Foreground="#ffffff" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="TxtStatus" Text="Loading installed software..." Foreground="#94a3b8" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <!-- Spinner or indicator can go here -->
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- Content -->
+            <Grid Grid.Row="1" Margin="20">
+                <!-- Styled DataGrid -->
+                <DataGrid x:Name="GridSoftware" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                          Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#0Affffff"
+                          BorderThickness="0" GridLinesVisibility="None" Foreground="#cbd5e1"
+                          ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <DataGrid.Resources>
+                        <!-- Column Header Style -->
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#334155"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Padding" Value="10,8"/>
+                            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                            <Setter Property="BorderBrush" Value="#475569"/>
+                        </Style>
+                        <!-- Cell Style -->
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Padding" Value="10,8"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="DataGridCell">
+                                        <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                                            <ContentPresenter VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#1e40af"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Application Name" Binding="{Binding Name}" Width="*"/>
+                        <DataGridTextColumn Header="Installed Version" Binding="{Binding Version}" Width="150"/>
+                        
+                        <!-- Available Version with dynamic styling for upgrades -->
+                        <DataGridTemplateColumn Header="Available Version" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding UpdateBgBrush}" CornerRadius="4" Padding="5,2" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding AvailableVersion}" Foreground="{Binding UpdateFgBrush}" FontWeight="SemiBold"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+            
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="#CC1e293b" CornerRadius="0,0,8,8" Padding="20,15">
+                <Grid>
+                    <StackPanel x:Name="SoftwareActionsPanel" Orientation="Horizontal" HorizontalAlignment="Left" Visibility="Collapsed">
+                        <Button x:Name="BtnUpdateSoftware" Content="Update All Software" Width="160" Height="35" Background="#f59e0b" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnUpdateSoftware_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                            <!-- Disable Style to fix pure white issue -->
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Close" Width="100" Height="35" Background="#000033" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnClose_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

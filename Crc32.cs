@@ -1,6 +1,6 @@
 using System;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public static class Crc32
     {

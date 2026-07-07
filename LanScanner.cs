@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Linq;
 
-namespace AgilicoConnectChecker
+namespace agilicomsptoolkit
 {
     public class LanDevice
     {
@@ -126,6 +126,7 @@ namespace AgilicoConnectChecker
             
             var pingTasks = new List<Task>();
             var syncLock = new object();
+            using var concurrencySemaphore = new SemaphoreSlim(50, 50);
 
             // Ping all addresses concurrently
             for (uint offset = 1; offset <= hostCount; offset++)
@@ -137,75 +138,85 @@ namespace AgilicoConnectChecker
                 
                 pingTasks.Add(Task.Run(async () =>
                 {
-                    bool isAlive = false;
-                    try
-                    {
-                        using var pinger = new Ping();
-                        var reply = await pinger.SendPingAsync(targetIp, 1000);
-                        isAlive = (reply.Status == IPStatus.Success);
-                    }
-                    catch { }
-
-                    if (isAlive || targetIp == localIp)
+                    await concurrencySemaphore.WaitAsync(token);
+                    try 
                     {
                         if (token.IsCancellationRequested) return;
 
-                        var mac = GetMacAddress(targetIp);
-                        var device = new LanDevice
-                        {
-                            IpAddress = targetIp,
-                            MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
-                        };
-                        
-                        if (token.IsCancellationRequested) return;
-
-                        // Get Hostname immediately with a timeout to avoid hangs
+                        bool isAlive = false;
                         try
                         {
-                            if (device.IpAddress == localIp)
+                            using var pinger = new Ping();
+                            var reply = await pinger.SendPingAsync(targetIp, 1000);
+                            isAlive = (reply.Status == IPStatus.Success);
+                        }
+                        catch { }
+
+                        if (isAlive || targetIp == localIp)
+                        {
+                            if (token.IsCancellationRequested) return;
+
+                            var mac = GetMacAddress(targetIp);
+                            var device = new LanDevice
                             {
-                                device.Hostname = Dns.GetHostName();
-                            }
-                            else
+                                IpAddress = targetIp,
+                                MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
+                            };
+                            
+                            if (token.IsCancellationRequested) return;
+
+                            // Get Hostname immediately with a timeout to avoid hangs
+                            try
                             {
-                                var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
-                                var timeoutTask = Task.Delay(1000, token); // 1-second timeout
-                                var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
-                                if (completedTask == dnsTask)
+                                if (device.IpAddress == localIp)
                                 {
-                                    var hostEntry = await dnsTask;
-                                    device.Hostname = hostEntry.HostName;
+                                    device.Hostname = Dns.GetHostName();
                                 }
                                 else
                                 {
-                                    device.Hostname = "-";
+                                    var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
+                                    var timeoutTask = Task.Delay(1000, token); // 1-second timeout
+                                    var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
+                                    if (completedTask == dnsTask)
+                                    {
+                                        var hostEntry = await dnsTask;
+                                        device.Hostname = hostEntry.HostName;
+                                    }
+                                    else
+                                    {
+                                        device.Hostname = "-";
+                                    }
                                 }
                             }
+                            catch { device.Hostname = "-"; }
+
+                            if (token.IsCancellationRequested) return;
+
+                            // Get Manufacturer immediately
+                            device.Manufacturer = await GetManufacturerAsync(device.MacAddress, token);
+
+                            if (token.IsCancellationRequested) return;
+
+                            lock (syncLock)
+                            {
+                                activeDevices.Add(device);
+                            }
+                            
+                            deviceFoundCallback?.Invoke(device);
                         }
-                        catch { device.Hostname = "-"; }
-
-                        if (token.IsCancellationRequested) return;
-
-                        // Get Manufacturer immediately
-                        device.Manufacturer = await GetManufacturerAsync(device.MacAddress, token);
-
-                        if (token.IsCancellationRequested) return;
 
                         lock (syncLock)
                         {
-                            activeDevices.Add(device);
+                            completed++;
+                            if (completed % 10 == 0 || completed == totalIPs)
+                            {
+                                progressCallback?.Invoke(completed, totalIPs);
+                            }
                         }
-                        
-                        deviceFoundCallback?.Invoke(device);
                     }
-
-                    lock (syncLock)
+                    finally 
                     {
-                        completed++;
-                        if (completed % 10 == 0 || completed == totalIPs)
-                        {
-                            progressCallback?.Invoke(completed, totalIPs);
-                        }
+                        concurrencySemaphore.Release();
                     }
                 }, token));
             }
