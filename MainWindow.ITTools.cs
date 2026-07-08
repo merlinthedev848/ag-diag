@@ -183,5 +183,11 @@ namespace agilicomsptoolkit
                 ModernMessageBox.Show($"Failed to execute tool:\n{ex.Message}", "Tool Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void BtnM365Manager_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new M365ManagerDialog { Owner = this };
+            dialog.ShowDialog();
+        }
     }
 }
