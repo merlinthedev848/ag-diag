@@ -1258,15 +1258,19 @@ namespace agilicomsptoolkit
             {
                 await Task.Delay(2000, token);
                 var rand = new Random();
-                return (Math.Round(50 + rand.NextDouble() * 30, 1), Math.Round(15 + rand.NextDouble() * 10, 1));
+                return (Math.Round(500 + rand.NextDouble() * 100, 1), Math.Round(500 + rand.NextDouble() * 100, 1));
             }
 
             double downloadMbps = 0;
             double uploadMbps = 0;
 
-            using var client = new System.Net.Http.HttpClient();
+            // Configure HttpClient to disable automatic decompression (prevents Accept-Encoding CPU compression bottleneck)
+            var handler = new System.Net.Http.HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.None
+            };
+            using var client = new System.Net.Http.HttpClient(handler);
             client.Timeout = TimeSpan.FromSeconds(15);
-            // Use a standard browser User-Agent to avoid blocks/403s on Cloudflare
             client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
             // 1. Download Test
@@ -1303,49 +1307,36 @@ namespace agilicomsptoolkit
                     }
                 }, downloadToken);
 
-                // Run 4 concurrent download workers with dynamic failover support
+                // Run 4 concurrent download workers distributed across different CDNs to prevent rate-limiting
                 string[] downloadUrls = new string[]
                 {
-                    "https://speed.cloudflare.com/__down?bytes=52428800",
-                    "https://cachefly.cachefly.net/50mb.test",
-                    "http://ipv4.download.thinkbroadband.com/50MB.zip"
+                    "https://speed.cloudflare.com/__down?bytes=100000000",
+                    "https://cachefly.cachefly.net/100mb.test",
+                    "http://ipv4.download.thinkbroadband.com/100MB.zip",
+                    "https://speed.cloudflare.com/__down?bytes=100000000"
                 };
-                int currentUrlIndex = 0;
-                object urlLock = new object();
 
                 var downloadTasks = new List<Task>();
                 for (int i = 0; i < 4; i++)
                 {
                     int workerId = i;
+                    string targetUrl = downloadUrls[workerId % downloadUrls.Length];
+
                     downloadTasks.Add(Task.Run(async () =>
                     {
+                        byte[] buffer = new byte[131072]; // 128KB buffer for high throughput
                         while (!downloadToken.IsCancellationRequested)
                         {
-                            string targetUrl;
-                            lock (urlLock)
-                            {
-                                targetUrl = downloadUrls[currentUrlIndex];
-                            }
-
                             try
                             {
                                 using var response = await client.GetAsync(targetUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, downloadToken);
-                                
                                 if (!response.IsSuccessStatusCode)
                                 {
-                                    lock (urlLock)
-                                    {
-                                        if (currentUrlIndex < downloadUrls.Length - 1 && downloadUrls[currentUrlIndex] == targetUrl)
-                                        {
-                                            currentUrlIndex++;
-                                            System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Failover status {response.StatusCode} on {targetUrl}. Falling back to: {downloadUrls[currentUrlIndex]}");
-                                        }
-                                    }
+                                    await Task.Delay(100, downloadToken);
                                     continue;
                                 }
 
                                 using var stream = await response.Content.ReadAsStreamAsync(downloadToken);
-                                byte[] buffer = new byte[65536]; // 64KB
                                 int bytesRead;
                                 while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, downloadToken)) > 0)
                                 {
@@ -1356,15 +1347,7 @@ namespace agilicomsptoolkit
                             catch (Exception ex)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Error: {ex.Message}");
-                                lock (urlLock)
-                                {
-                                    if (currentUrlIndex < downloadUrls.Length - 1 && downloadUrls[currentUrlIndex] == targetUrl)
-                                    {
-                                        currentUrlIndex++;
-                                        System.Diagnostics.Debug.WriteLine($"[DL Worker {workerId}] Failover on exception on {targetUrl}. Falling back to: {downloadUrls[currentUrlIndex]}");
-                                    }
-                                }
-                                try { await Task.Delay(100, downloadToken); } catch { break; } // Avoid tight loop on error
+                                try { await Task.Delay(200, downloadToken); } catch { break; }
                             }
                         }
                     }, downloadToken));
@@ -1385,14 +1368,14 @@ namespace agilicomsptoolkit
                 System.Diagnostics.Debug.WriteLine($"Download test failed: {ex.Message}");
             }
 
-            // Update UI to show final download speed or prepare upload
+            // Update UI to show final download speed
             _ = Dispatcher.BeginInvoke(() =>
             {
                 TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
             });
 
-            // 2. Upload Test (4 streams * 25MB = 100MB)
+            // 2. Upload Test (continuous 6-second upload window)
             try
             {
                 using var ctsUpload = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -1426,9 +1409,9 @@ namespace agilicomsptoolkit
                     }
                 }, uploadToken);
 
-                // Run 4 concurrent upload workers using the shared client
+                // Run 4 concurrent upload workers using the shared client in a continuous loop
                 var uploadTasks = new List<Task>();
-                byte[] uploadBuffer = new byte[26214400]; // 25MB
+                byte[] uploadBuffer = new byte[16777216]; // 16MB buffer payload per request
                 Random.Shared.NextBytes(uploadBuffer);
 
                 for (int i = 0; i < 4; i++)
@@ -1436,26 +1419,31 @@ namespace agilicomsptoolkit
                     int workerId = i;
                     uploadTasks.Add(Task.Run(async () =>
                     {
-                        try
+                        while (!uploadToken.IsCancellationRequested)
                         {
-                            using var memoryStream = new System.IO.MemoryStream(uploadBuffer);
-                            using var progressStream = new ProgressStream(memoryStream, (bytesRead) =>
+                            try
                             {
-                                System.Threading.Interlocked.Add(ref totalUploaded, bytesRead);
-                            });
-                            using var content = new System.Net.Http.StreamContent(progressStream);
-                            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://speed.cloudflare.com/__up")
+                                using var memoryStream = new System.IO.MemoryStream(uploadBuffer);
+                                using var progressStream = new ProgressStream(memoryStream, (bytesRead) =>
+                                {
+                                    System.Threading.Interlocked.Add(ref totalUploaded, bytesRead);
+                                });
+                                using var content = new System.Net.Http.StreamContent(progressStream);
+                                using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://speed.cloudflare.com/__up")
+                                {
+                                    Content = content
+                                };
+                                
+                                // Do NOT set TransferEncodingChunked = true (enables Content-Length header for high-performance streaming)
+                                using var response = await client.SendAsync(request, uploadToken);
+                                response.EnsureSuccessStatusCode();
+                            }
+                            catch (OperationCanceledException) { break; }
+                            catch (Exception ex)
                             {
-                                Content = content
-                            };
-                            request.Headers.TransferEncodingChunked = true;
-                            using var response = await client.SendAsync(request, uploadToken);
-                            response.EnsureSuccessStatusCode();
-                        }
-                        catch (OperationCanceledException) { }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Upload worker {workerId} error: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"Upload worker {workerId} error: {ex.Message}");
+                                try { await Task.Delay(200, uploadToken); } catch { break; }
+                            }
                         }
                     }, uploadToken));
                 }
@@ -1483,6 +1471,7 @@ namespace agilicomsptoolkit
 
             return (Math.Round(downloadMbps, 1), Math.Round(uploadMbps, 1));
         }
+
 
         private async void BtnStartTrace_Click(object sender, RoutedEventArgs e)
         {
