@@ -52,6 +52,9 @@ namespace agilicomsptoolkit
                 {
                     TxtModuleStatus.Text = "✅ M365 (Microsoft.Graph) and Exchange Online modules are installed.";
                     TxtModuleStatus.Foreground = Brushes.LightGreen;
+                    BtnConnectExchange.IsEnabled = true;
+                    BtnConnectGraph.IsEnabled = true;
+                    BtnRunScript.IsEnabled = true;
                 }
                 else
                 {
@@ -61,6 +64,10 @@ namespace agilicomsptoolkit
                     TxtModuleStatus.Text = $"⚠ Missing modules: {missing.Trim()}. Click below to install.";
                     TxtModuleStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f97316")); // Warning orange
                     BtnInstallModules.IsEnabled = true;
+                    
+                    BtnConnectExchange.IsEnabled = false;
+                    BtnConnectGraph.IsEnabled = false;
+                    BtnRunScript.IsEnabled = false;
                 }
             }
             catch (Exception ex)
@@ -78,13 +85,24 @@ namespace agilicomsptoolkit
             
             if (result != MessageBoxResult.Yes) return;
 
-            string script = "Write-Host 'Starting installation...' -ForegroundColor Cyan; " +
+            string script = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " +
+                            "Write-Host 'Configuring Package Provider...' -ForegroundColor Cyan; " +
+                            "if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) { " +
+                            "  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force " +
+                            "}; " +
+                            "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; " +
+                            "Write-Host 'Installing ExchangeOnlineManagement module...' -ForegroundColor Cyan; " +
                             "Install-Module -Name ExchangeOnlineManagement -Force -AllowClobber -Scope CurrentUser; " +
+                            "Write-Host 'Installing Microsoft.Graph module...' -ForegroundColor Cyan; " +
                             "Install-Module -Name Microsoft.Graph -Force -AllowClobber -Scope CurrentUser; " +
-                            "Write-Host 'Installation complete. Press any key to close.' -ForegroundColor Green; " +
-                            "Read-Host";
+                            "Write-Host 'Installation complete! Checking module status:' -ForegroundColor Green; " +
+                            "Get-Module -ListAvailable ExchangeOnlineManagement, Microsoft.Graph | Select-Object Name, Version; " +
+                            "Write-Host 'Press Enter to return to toolkit...'; Read-Host";
 
-            RunPowerShellInteractive(script);
+            RunPowerShellInteractive(script, async () => {
+                await CheckPowerShellModulesAsync();
+                GeneratePreviewScript();
+            });
         }
 
         private void BtnConnectExchange_Click(object sender, RoutedEventArgs e)
@@ -335,7 +353,7 @@ namespace agilicomsptoolkit
             });
         }
 
-        private void RunPowerShellInteractive(string scriptContent)
+        private void RunPowerShellInteractive(string scriptContent, Action? onExit = null)
         {
             try
             {
@@ -345,12 +363,21 @@ namespace agilicomsptoolkit
 
                 string arguments = $"-NoProfile -NoExit -ExecutionPolicy Bypass -File \"{tempFile}\"";
 
-                Process.Start(new ProcessStartInfo
+                var proc = Process.Start(new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
                     Arguments = arguments,
                     UseShellExecute = true
                 });
+
+                if (proc != null && onExit != null)
+                {
+                    proc.EnableRaisingEvents = true;
+                    proc.Exited += (s, ev) =>
+                    {
+                        Dispatcher.Invoke(onExit);
+                    };
+                }
             }
             catch (Exception ex)
             {
