@@ -550,8 +550,10 @@ namespace agilicomsptoolkit
 
         public async Task<bool> RunDiagnosticsAsync()
         {
-            _cts = new CancellationTokenSource();
-            var token = _cts.Token;
+            var localCts = new CancellationTokenSource();
+            var oldCts = Interlocked.Exchange(ref _cts, localCts);
+            oldCts?.Dispose();
+            var token = localCts.Token;
 
             Log("Starting Agilico Network Diagnostic Tool...");
             Log("=================================================================");
@@ -764,6 +766,7 @@ namespace agilicomsptoolkit
                 // Scoring System
                 int totalPossible = 0;
                 int totalEarned = 0;
+                // Note: Agilico STUN (weights[3]) is informational only, so it contributes 0 to the score.
                 int[] weights = new int[] { 15, 15, 5, 0, 5, 5, 5, 15, 15, 10 };
                 bool[] results = new bool[] { dnsPass, httpPass, ntpPass, agilicoStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, signalRPass };
 
@@ -798,6 +801,11 @@ namespace agilicomsptoolkit
                 Log($"Critical error during diagnostics: {ex.Message}", true);
                 OnComplete?.Invoke(false, 0);
                 return false;
+            }
+            finally
+            {
+                Interlocked.CompareExchange(ref _cts, null, localCts);
+                localCts.Dispose();
             }
         }
 
@@ -954,8 +962,16 @@ namespace agilicomsptoolkit
                         return true;
                     }
                 }
+                else
+                {
+                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                }
                 Log($"Google DNS {dnsServer} did not return a valid response.", true);
                 return false;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -1037,7 +1053,15 @@ namespace agilicomsptoolkit
                     await connectTask;
                     return client.Connected;
                 }
+                else
+                {
+                    _ = connectTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                }
                 return false;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -1148,13 +1172,22 @@ namespace agilicomsptoolkit
                         ulong intPart = (ulong)result.Buffer[40] << 24 | (ulong)result.Buffer[41] << 16 | (ulong)result.Buffer[42] << 8 | (ulong)result.Buffer[43];
                         ulong fractPart = (ulong)result.Buffer[44] << 24 | (ulong)result.Buffer[45] << 16 | (ulong)result.Buffer[46] << 8 | (ulong)result.Buffer[47];
 
-                        var milliseconds = (intPart * 1000) + ((fractPart * 1000) / 0x100000000L);
-                        var networkDateTime = (new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)).AddMilliseconds((long)milliseconds);
+                        var networkDateTime = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                            .AddSeconds((double)intPart)
+                            .AddSeconds((double)fractPart / 0x100000000L);
 
                         return (true, networkDateTime);
                     }
                 }
+                else
+                {
+                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                }
                 return (false, null);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -1394,21 +1427,24 @@ namespace agilicomsptoolkit
                 return true;
             }
 
-            // Bind local port 5060 or ephemeral equivalent for testing
-            UdpClient? client = null;
+            // Bind local port 5060 or ephemeral equivalent to determine availability
             try
             {
-                client = new UdpClient(localPort);
-                Log($"Bound to local UDP port {localPort}.");
+                using (var testClient = new UdpClient(localPort))
+                {
+                    Log($"Local UDP port {localPort} is available.");
+                }
             }
             catch (SocketException)
             {
                 Log($"Local UDP port {localPort} is in use. Auto-selecting an ephemeral port for testing...");
                 try
                 {
-                    client = new UdpClient(0);
-                    localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
-                    Log($"Bound successfully to local UDP port {localPort}.");
+                    using (var testClient = new UdpClient(0))
+                    {
+                        localPort = ((IPEndPoint)testClient.Client.LocalEndPoint!).Port;
+                    }
+                    Log($"Selected local UDP port {localPort} for testing.");
                 }
                 catch (Exception ex)
                 {
@@ -1417,15 +1453,12 @@ namespace agilicomsptoolkit
                     return false;
                 }
             }
-            finally
-            {
-                client?.Close();
-            }
 
-            // Contact a STUN server to check mapped port
+            // Contact STUN servers to check mapped port using the determined localPort
             var servers = new[] { "stun-gb-a.hp2k.co.uk", "stun-gb-b.hp2k.co.uk", "stun.l.google.com" };
             foreach (var server in servers)
             {
+                if (token.IsCancellationRequested) return false;
                 var (ok, ip, mPort) = await QueryStunServerAsync(server, 3478, token, localPort);
                 if (ok)
                 {
@@ -1646,7 +1679,7 @@ namespace agilicomsptoolkit
                     }
                     else // STUN
                     {
-                        new Random().NextBytes(transactionId);
+                        Random.Shared.NextBytes(transactionId);
                         payload = BuildStunRequest(transactionId, false, false);
                     }
 
@@ -1796,21 +1829,25 @@ namespace agilicomsptoolkit
 
         #region STUN Protocol Helpers
 
-        private async Task<(bool success, string? publicIp, int mappedPort)> QueryStunServerAsync(string server, int port, CancellationToken token, int queryPort = 0)
+        private async Task<(bool success, string? publicIp, int mappedPort)> QueryStunServerAsync(string server, int port, CancellationToken token, int queryPort = 0, UdpClient? existingClient = null)
         {
-            UdpClient? client = null;
+            UdpClient? client = existingClient;
+            bool disposeClient = (existingClient == null);
             try
             {
-                client = new UdpClient(queryPort);
-                client.Client.SendTimeout = 1500;
-                client.Client.ReceiveTimeout = 1500;
+                if (client == null)
+                {
+                    client = new UdpClient(queryPort);
+                    client.Client.SendTimeout = 1500;
+                    client.Client.ReceiveTimeout = 1500;
+                }
 
                 var ipAddresses = await Dns.GetHostAddressesAsync(server, token);
                 if (ipAddresses.Length == 0) return (false, null, 0);
 
                 var endPoint = new IPEndPoint(ipAddresses[0], port);
                 byte[] transactionId = new byte[12];
-                new Random().NextBytes(transactionId);
+                Random.Shared.NextBytes(transactionId);
                 byte[] stunRequest = BuildStunRequest(transactionId, changeIp: false, changePort: false);
 
                 string localIp = GetLocalIpAddress();
@@ -1839,7 +1876,16 @@ namespace agilicomsptoolkit
                         }
                     }
                 }
+                else
+                {
+                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                    token.ThrowIfCancellationRequested();
+                }
                 return (false, null, 0);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -1847,7 +1893,10 @@ namespace agilicomsptoolkit
             }
             finally
             {
-                client?.Close();
+                if (disposeClient)
+                {
+                    client?.Close();
+                }
             }
         }
 
@@ -1927,7 +1976,6 @@ namespace agilicomsptoolkit
                     {
                         options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     })
-                    .WithAutomaticReconnect()
                     .Build();
 
                 var connectTask = connection.StartAsync(token);
@@ -1993,7 +2041,7 @@ namespace agilicomsptoolkit
             {
                 if (connection != null)
                 {
-                    try { await connection.StopAsync(token); } catch { }
+                    try { await connection.StopAsync(CancellationToken.None); } catch { }
                     try { await connection.DisposeAsync(); } catch { }
                 }
             }
@@ -2009,7 +2057,7 @@ namespace agilicomsptoolkit
             if (IsSimulationMode)
             {
                 await Task.Delay(1000, token);
-                UpdateProgress("Inbound Signalling & Presence", "Pass", "WebSocket connection succeeded");
+                UpdateProgress("Inbound Signalling & Presence", "Passed", "WebSocket connection succeeded");
                 Log("[Simulation] persistent WebSocket connection is stable.");
                 return true;
             }
@@ -2031,7 +2079,7 @@ namespace agilicomsptoolkit
 
             if (allPassed)
             {
-                UpdateProgress("Inbound Signalling & Presence", "Pass", "WebSocket connection succeeded");
+                UpdateProgress("Inbound Signalling & Presence", "Passed", "WebSocket connection succeeded");
                 Log("Test 10: PASSED. All persistent inbound WebSocket connections are permitted and stable.");
                 return true;
             }
@@ -2042,7 +2090,7 @@ namespace agilicomsptoolkit
                 if (!presenceResult.ok) failedHubs += "Presence; ";
                 if (!roomsResult.ok) failedHubs += "Rooms; ";
 
-                UpdateProgress("Inbound Signalling & Presence", "Fail", $"Fail - {failedHubs.TrimEnd(';', ' ')} blocked/dropped");
+                UpdateProgress("Inbound Signalling & Presence", "Failed", $"Fail - {failedHubs.TrimEnd(';', ' ')} blocked/dropped");
                 Log($"Test 10: FAILED. Persistent inbound WebSocket connections are failing: {failedHubs.TrimEnd(';', ' ')}", true);
                 return false;
             }

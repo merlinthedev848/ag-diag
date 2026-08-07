@@ -13,7 +13,7 @@ public partial class App : Application
     private static extern bool AttachConsole(int dwProcessId);
     private const int ATTACH_PARENT_PROCESS = -1;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -67,45 +67,7 @@ public partial class App : Application
 
         if (silentMode)
         {
-            if (Console.IsOutputRedirected)
-            {
-                // Re-initialize Console.Out to point to the redirected standard output handle
-                var standardOutput = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
-                Console.SetOut(standardOutput);
-                Console.SetError(standardOutput);
-            }
-            else
-            {
-                // Attach to the parent console to output stdout
-                AttachConsole(ATTACH_PARENT_PROCESS);
-                var standardOutput = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
-                Console.SetOut(standardOutput);
-                Console.SetError(standardOutput);
-            }
-
-            Console.WriteLine();
-            Console.WriteLine("Agilico MSP Toolkit - Silent Mode Started");
-
-            var engine = new NetworkEngine();
-            
-            // Hook logs to console
-            engine.OnLog += (msg, isErr) =>
-            {
-                Console.WriteLine($"[{(isErr ? "FAIL" : "INFO")}] {msg}");
-            };
-
-            engine.OnProgress += (test, status, details) =>
-            {
-                Console.WriteLine($"[PROGRESS] {test}: {details}");
-            };
-
-            bool success = await engine.RunDiagnosticsAsync();
-            
-            Console.WriteLine();
-            Console.WriteLine(success ? "Result: PASS" : "Result: FAIL");
-            Console.WriteLine("Exiting silent mode.");
-            
-            Environment.Exit(success ? 0 : 1);
+            RunSilentModeAsync(e);
         }
         else
         {
@@ -126,6 +88,76 @@ public partial class App : Application
                 Shutdown();
             }
         }
+    }
+
+    private void RunSilentModeAsync(StartupEventArgs e)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                bool isOutputRedirected = Console.IsOutputRedirected;
+                StreamWriter? standardOutput = null;
+
+                if (isOutputRedirected)
+                {
+                    // Re-initialize Console.Out to point to the redirected standard output handle
+                    standardOutput = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
+                    Console.SetOut(standardOutput);
+                    Console.SetError(standardOutput);
+                }
+                else
+                {
+                    // Attach to the parent console to output stdout
+                    if (AttachConsole(ATTACH_PARENT_PROCESS))
+                    {
+                        standardOutput = new StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true };
+                        Console.SetOut(standardOutput);
+                        Console.SetError(standardOutput);
+                    }
+                }
+
+                try
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Agilico MSP Toolkit - Silent Mode Started");
+
+                    var engine = new NetworkEngine();
+                    
+                    // Hook logs to console
+                    engine.OnLog += (msg, isErr) =>
+                    {
+                        Console.WriteLine($"[{(isErr ? "FAIL" : "INFO")}] {msg}");
+                    };
+
+                    engine.OnProgress += (test, status, details) =>
+                    {
+                        Console.WriteLine($"[PROGRESS] {test}: {details}");
+                    };
+
+                    bool success = await engine.RunDiagnosticsAsync();
+                    
+                    Console.WriteLine();
+                    Console.WriteLine(success ? "Result: PASS" : "Result: FAIL");
+                    Console.WriteLine("Exiting silent mode.");
+                    
+                    Environment.Exit(success ? 0 : 1);
+                }
+                finally
+                {
+                    standardOutput?.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    Console.Error.WriteLine($"Fatal error in silent mode: {ex}");
+                }
+                catch { }
+                Environment.Exit(1);
+            }
+        });
     }
 }
 

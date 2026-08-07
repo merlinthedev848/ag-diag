@@ -11,6 +11,10 @@
         MinHeight="900" MinWidth="1174"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
+        AllowDrop="True"
+        PreviewDragEnter="Window_PreviewDragOver"
+        PreviewDragOver="Window_PreviewDragOver"
+        Drop="Window_Drop"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent">
@@ -63,6 +67,9 @@
                     </Button>
                     <Button x:Name="BtnNetTools" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconRJ45}" Click="BtnNetTools_Click" Visibility="Collapsed">
                         <TextBlock Text="Net Tools" FontSize="11" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button x:Name="BtnConverter" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconAudio}" Click="BtnConverter_Click" Visibility="Collapsed">
+                        <TextBlock Text="Converter" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                     <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
                         <TextBlock Text="Results" FontSize="11" FontWeight="SemiBold"/>
@@ -1833,6 +1840,207 @@
                     </Grid>
                 </TabItem>
 
+                <!-- TAB 3: CONVERTER -->
+                <TabItem>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="20" VerticalAlignment="Top">
+                            <Grid.RowDefinitions>
+                                <!-- Top Row: Full Width Audio Converter Hero Card -->
+                                <RowDefinition Height="Auto"/>
+                                <!-- Bottom Row: 2-Column Layout (Status & Specifications) -->
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- ROW 0: Full Width Audio Converter Hero Card -->
+                            <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                                <Grid Margin="20">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                        <TextBlock Text="Audio Converter" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBlock Text="Convert audio and video files into exact Mono 8kHz 16-bit PCM WAV format for 3CX compatibility." 
+                                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Hero Drag & Drop Zone (Full Width) -->
+                                    <Border Grid.Row="1" x:Name="DropZoneBorder" 
+                                            Height="140"
+                                            BorderThickness="2" CornerRadius="8" 
+                                            Background="#f8fafc" Cursor="Hand"
+                                            AllowDrop="True"
+                                            PreviewDragEnter="DropZoneBorder_DragEnter"
+                                            PreviewDragOver="DropZoneBorder_DragOver"
+                                            DragEnter="DropZoneBorder_DragEnter"
+                                            DragOver="DropZoneBorder_DragOver"
+                                            DragLeave="DropZoneBorder_DragLeave"
+                                            Drop="DropZoneBorder_Drop"
+                                            MouseLeftButtonDown="DropZoneBorder_MouseLeftButtonDown"
+                                            Margin="0,0,0,12">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush" Value="#cbd5e1"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#f1f5f9"/>
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentGreenBrush}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <Path Data="{StaticResource IconAudio}" Fill="#475569" Width="36" Height="36" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                                <TextBlock Text="Drag &amp; Drop Media File Here" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+                                                <TextBlock Text="Supports MP3, MP4, M4A, WAV, OGG, FLAC, AAC, MKV, AVI, MOV &amp; more" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                                <Button x:Name="BtnBrowseMedia" Content="BROWSE FILES" Style="{StaticResource ActionButtonStyle}" Click="BtnBrowseMedia_Click" HorizontalAlignment="Center" Padding="18,5"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Live Conversion Progress Box (Full Width) -->
+                                    <Border Grid.Row="2" Background="#f8fafc" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                                        <StackPanel>
+                                            <TextBlock x:Name="TxtConvertingFileName" Text="No file selected" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,6"/>
+                                            <ProgressBar x:Name="PrgConversion" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource AccentGreenBrush}" Background="#e2e8f0" BorderThickness="0" Margin="0,0,0,6"/>
+                                            <TextBlock x:Name="TxtConversionResult" Text="Ready to convert files." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- ROW 1: 2-Column Layout (Conversion Status & Output Specifications) -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <!-- Left Column: Conversion Status (50%) -->
+                                    <ColumnDefinition Width="1*"/>
+                                    <!-- Right Column: Output Specifications (50%) -->
+                                    <ColumnDefinition Width="1*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left Card: Conversion Status -->
+                                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,8,0" VerticalAlignment="Stretch">
+                                    <Grid Margin="20">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                            <TextBlock Text="Conversion Status" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                            <TextBlock Text="Validation &amp; processing pipeline." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1">
+                                            <!-- Step 1 -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" x:Name="ChkStep1" IsEnabled="False" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Audio Format Validation" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="TxtStep1Status" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Step 2 -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" x:Name="ChkStep2" IsEnabled="False" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Metadata Removal (ID3/Art)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="TxtStep2Status" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Step 3 -->
+                                            <Grid Margin="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" x:Name="ChkStep3" IsEnabled="False" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Transcode (PCM 8kHz Mono)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="TxtStep3Status" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Right Card: Output Specifications -->
+                                <Border Grid.Column="1" Style="{StaticResource CardStyle}" Margin="8,0,0,0" VerticalAlignment="Stretch">
+                                    <Grid Margin="20">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                            <TextBlock Text="Output Specifications" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
+                                            <TextBlock Text="Target configuration required for 3CX compatibility." FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1">
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Format:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="WAV" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Channels:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="Mono (1 Channel)" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Sample Rate:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="8000 Hz" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Bit Depth:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="16-bit signed PCM" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Metadata:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextDarkBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="Stripped (Bitexact)" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
                 <!-- TAB 4: RESULTS -->
                 <TabItem>
                     <Border Style="{StaticResource CardStyle}">
@@ -2108,6 +2316,7 @@
                         </ScrollViewer>
                     </Border>
                 </TabItem>
+
             </TabControl>
         </Grid>
     </Grid>

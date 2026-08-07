@@ -22,3 +22,4 @@ test_run.log
 *.old
 
 publish/
+publish_output/

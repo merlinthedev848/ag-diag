@@ -36,29 +36,33 @@ namespace agilicomsptoolkit
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Name, LoadPercentage, NumberOfCores, MaxClockSpeed FROM Win32_Processor");
-                foreach (var obj in searcher.Get())
+                using var collection = searcher.Get();
+                foreach (ManagementObject obj in collection)
                 {
-                    string name = obj["Name"]?.ToString() ?? "Unknown CPU";
-                    string loadStr = obj["LoadPercentage"]?.ToString() ?? "0";
-                    string cores = obj["NumberOfCores"]?.ToString() ?? "0";
-                    string clock = obj["MaxClockSpeed"]?.ToString() ?? "0";
-
-                    bool healthy = true;
-                    string status = "Healthy";
-                    if (int.TryParse(loadStr, out int load) && load > 95)
+                    using (obj)
                     {
-                        healthy = false;
-                        status = "Critical Load";
+                        string name = obj["Name"]?.ToString() ?? "Unknown CPU";
+                        string loadStr = obj["LoadPercentage"]?.ToString() ?? "0";
+                        string cores = obj["NumberOfCores"]?.ToString() ?? "0";
+                        string clock = obj["MaxClockSpeed"]?.ToString() ?? "0";
+
+                        bool healthy = true;
+                        string status = "Healthy";
+                        if (int.TryParse(loadStr, out int load) && load > 95)
+                        {
+                            healthy = false;
+                            status = "Critical Load";
+                        }
+
+                        results.Add(new HardwareItem
+                        {
+                            ComponentType = "Processor (CPU)",
+                            Name = name,
+                            Status = status,
+                            Details = $"Cores: {cores} | Max Speed: {clock} MHz | Current Load: {loadStr}%",
+                            IsHealthy = healthy
+                        });
                     }
-
-                    results.Add(new HardwareItem
-                    {
-                        ComponentType = "Processor (CPU)",
-                        Name = name,
-                        Status = status,
-                        Details = $"Cores: {cores} | Max Speed: {clock} MHz | Current Load: {loadStr}%",
-                        IsHealthy = healthy
-                    });
                 }
             }
             catch (Exception ex)
@@ -72,20 +76,24 @@ namespace agilicomsptoolkit
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Capacity, Speed, Manufacturer FROM Win32_PhysicalMemory");
+                using var collection = searcher.Get();
                 long totalBytes = 0;
                 int moduleCount = 0;
                 string speed = "";
                 string mfg = "";
 
-                foreach (var obj in searcher.Get())
+                foreach (ManagementObject obj in collection)
                 {
-                    if (long.TryParse(obj["Capacity"]?.ToString(), out long cap))
+                    using (obj)
                     {
-                        totalBytes += cap;
+                        if (long.TryParse(obj["Capacity"]?.ToString(), out long cap))
+                        {
+                            totalBytes += cap;
+                        }
+                        speed = obj["Speed"]?.ToString() ?? speed;
+                        mfg = obj["Manufacturer"]?.ToString() ?? mfg;
+                        moduleCount++;
                     }
-                    speed = obj["Speed"]?.ToString() ?? speed;
-                    mfg = obj["Manufacturer"]?.ToString() ?? mfg;
-                    moduleCount++;
                 }
 
                 if (moduleCount > 0)
@@ -100,6 +108,17 @@ namespace agilicomsptoolkit
                         IsHealthy = true
                     });
                 }
+                else
+                {
+                    results.Add(new HardwareItem
+                    {
+                        ComponentType = "Physical Memory (RAM)",
+                        Name = "No Memory Detected",
+                        Status = "Unknown",
+                        Details = "No RAM modules reported by WMI.",
+                        IsHealthy = false
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -112,28 +131,32 @@ namespace agilicomsptoolkit
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Model, Size, Status, MediaType FROM Win32_DiskDrive");
-                foreach (var obj in searcher.Get())
+                using var collection = searcher.Get();
+                foreach (ManagementObject obj in collection)
                 {
-                    string model = obj["Model"]?.ToString() ?? "Unknown Drive";
-                    string status = obj["Status"]?.ToString() ?? "Unknown";
-                    string mediaType = obj["MediaType"]?.ToString() ?? "Unknown Media";
-                    
-                    double gb = 0;
-                    if (long.TryParse(obj["Size"]?.ToString(), out long sizeBytes))
+                    using (obj)
                     {
-                        gb = sizeBytes / (1024.0 * 1024.0 * 1024.0);
-                    }
+                        string model = obj["Model"]?.ToString() ?? "Unknown Drive";
+                        string status = obj["Status"]?.ToString() ?? "Unknown";
+                        string mediaType = obj["MediaType"]?.ToString() ?? "Unknown Media";
+                        
+                        double gb = 0;
+                        if (long.TryParse(obj["Size"]?.ToString(), out long sizeBytes))
+                        {
+                            gb = sizeBytes / (1024.0 * 1024.0 * 1024.0);
+                        }
 
-                    bool healthy = status.Equals("OK", StringComparison.OrdinalIgnoreCase);
-                    
-                    results.Add(new HardwareItem
-                    {
-                        ComponentType = "Storage (Disk)",
-                        Name = model,
-                        Status = healthy ? "Healthy (SMART OK)" : $"Warning ({status})",
-                        Details = $"Capacity: {Math.Round(gb, 1)} GB | Type: {mediaType}",
-                        IsHealthy = healthy
-                    });
+                        bool healthy = status.Equals("OK", StringComparison.OrdinalIgnoreCase);
+                        
+                        results.Add(new HardwareItem
+                        {
+                            ComponentType = "Storage (Disk)",
+                            Name = model,
+                            Status = healthy ? "Healthy (SMART OK)" : $"Warning ({status})",
+                            Details = $"Capacity: {Math.Round(gb, 1)} GB | Type: {mediaType}",
+                            IsHealthy = healthy
+                        });
+                    }
                 }
             }
             catch (Exception ex)
@@ -147,43 +170,46 @@ namespace agilicomsptoolkit
             try
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Name, EstimatedChargeRemaining, DesignCapacity, FullChargeCapacity, BatteryStatus FROM Win32_Battery");
-                var collection = searcher.Get();
+                using var collection = searcher.Get();
                 if (collection.Count == 0) return; // Desktop PC, no battery
 
-                foreach (var obj in searcher.Get())
+                foreach (ManagementObject obj in collection)
                 {
-                    string name = obj["Name"]?.ToString() ?? "System Battery";
-                    string chargeRemaining = obj["EstimatedChargeRemaining"]?.ToString() ?? "Unknown";
-                    
-                    double designCap = 0;
-                    double fullCap = 0;
-                    if (double.TryParse(obj["DesignCapacity"]?.ToString(), out double dc)) designCap = dc;
-                    if (double.TryParse(obj["FullChargeCapacity"]?.ToString(), out double fc)) fullCap = fc;
-
-                    string details = $"Current Charge: {chargeRemaining}%";
-                    bool healthy = true;
-                    string status = "Healthy";
-
-                    if (designCap > 0 && fullCap > 0)
+                    using (obj)
                     {
-                        double healthPercent = (fullCap / designCap) * 100.0;
-                        details += $" | Wear Level: {Math.Round(100.0 - healthPercent, 1)}% (Health: {Math.Round(healthPercent, 1)}%)";
+                        string name = obj["Name"]?.ToString() ?? "System Battery";
+                        string chargeRemaining = obj["EstimatedChargeRemaining"]?.ToString() ?? "Unknown";
                         
-                        if (healthPercent < 50)
-                        {
-                            healthy = false;
-                            status = "Degraded (Replace soon)";
-                        }
-                    }
+                        double designCap = 0;
+                        double fullCap = 0;
+                        if (double.TryParse(obj["DesignCapacity"]?.ToString(), out double dc)) designCap = dc;
+                        if (double.TryParse(obj["FullChargeCapacity"]?.ToString(), out double fc)) fullCap = fc;
 
-                    results.Add(new HardwareItem
-                    {
-                        ComponentType = "Battery",
-                        Name = name,
-                        Status = status,
-                        Details = details,
-                        IsHealthy = healthy
-                    });
+                        string details = $"Current Charge: {chargeRemaining}%";
+                        bool healthy = true;
+                        string status = "Healthy";
+
+                        if (designCap > 0 && fullCap > 0)
+                        {
+                            double healthPercent = (fullCap / designCap) * 100.0;
+                            details += $" | Wear Level: {Math.Round(100.0 - healthPercent, 1)}% (Health: {Math.Round(healthPercent, 1)}%)";
+                            
+                            if (healthPercent < 50)
+                            {
+                                healthy = false;
+                                status = "Degraded (Replace soon)";
+                            }
+                        }
+
+                        results.Add(new HardwareItem
+                        {
+                            ComponentType = "Battery",
+                            Name = name,
+                            Status = status,
+                            Details = details,
+                            IsHealthy = healthy
+                        });
+                    }
                 }
             }
             catch

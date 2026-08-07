@@ -76,11 +76,17 @@ namespace agilicomsptoolkit
             this.Close();
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            EnableDragAndDropAdminBypass();
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
+                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnConverter, BtnHelp, BtnLogs, BtnSettings };
                 GridLanDevices.ItemsSource = _lanDevices;
                 GridPingTargets.ItemsSource = _pingTargets;
                 GridTraceHops.ItemsSource = _traceHops;
@@ -88,6 +94,9 @@ namespace agilicomsptoolkit
                 GridPortProber.ItemsSource = _portProbeResults;
                 GridActiveSockets.ItemsSource = _displayedSockets;
                 
+                // Enable drag and drop across UAC privilege boundaries
+                EnableDragAndDropAdminBypass();
+
                 // Initialize view
                 SelectTab(0, BtnDashboard);
                 ResetTestStatuses();
@@ -241,9 +250,9 @@ namespace agilicomsptoolkit
                 }
             }
         }
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnSettings);
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnHelp);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnLogs);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnSettings);
 
         private void SelectProbeTab(int index, Button activeButton)
         {
@@ -1003,6 +1012,12 @@ namespace agilicomsptoolkit
 
         private void UpdatePingKpis()
         {
+            if (Dispatcher.CheckAccess() == false)
+            {
+                Dispatcher.BeginInvoke(new Action(UpdatePingKpis));
+                return;
+            }
+
             int total = _pingTargets.Count;
             int online = _pingTargets.Count(t => t.Status == "Online");
             int offline = _pingTargets.Count(t => t.Status == "Offline/Timeout" || t.Status == "Timeout" || (t.Tracker.IsRunning && t.CurrentLatency.Contains("Timeout")));
@@ -1025,13 +1040,10 @@ namespace agilicomsptoolkit
             }
             double overallAvg = latencyCount > 0 ? (totalLatency / latencyCount) : 0;
 
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (TxtKpiTotalTargets != null) TxtKpiTotalTargets.Text = total.ToString();
-                if (TxtKpiOnlineTargets != null) TxtKpiOnlineTargets.Text = online.ToString();
-                if (TxtKpiOfflineTargets != null) TxtKpiOfflineTargets.Text = offline.ToString();
-                if (TxtKpiAvgLatency != null) TxtKpiAvgLatency.Text = overallAvg > 0 ? $"{Math.Round(overallAvg, 1)} ms" : "0.0 ms";
-            }));
+            if (TxtKpiTotalTargets != null) TxtKpiTotalTargets.Text = total.ToString();
+            if (TxtKpiOnlineTargets != null) TxtKpiOnlineTargets.Text = online.ToString();
+            if (TxtKpiOfflineTargets != null) TxtKpiOfflineTargets.Text = offline.ToString();
+            if (TxtKpiAvgLatency != null) TxtKpiAvgLatency.Text = overallAvg > 0 ? $"{Math.Round(overallAvg, 1)} ms" : "0.0 ms";
         }
 
         private void DrawPingGraph(List<PingResult> recentPings, PingStats stats)
@@ -1497,8 +1509,9 @@ namespace agilicomsptoolkit
 
             _traceCts?.Cancel();
             _traceCts?.Dispose();
-            _traceCts = new CancellationTokenSource();
-            var token = _traceCts.Token;
+            var localCts = new CancellationTokenSource();
+            _traceCts = localCts;
+            var token = localCts.Token;
 
             try
             {
@@ -1536,31 +1549,41 @@ namespace agilicomsptoolkit
 
                                 _ = Task.Run(async () =>
                                 {
+                                    if (token.IsCancellationRequested) return;
                                     if (reply.Address != null)
                                     {
                                         var ipStr = reply.Address.ToString();
-                                        var hostTask = System.Net.Dns.GetHostEntryAsync(reply.Address);
-                                        var geoTask = LookupGeoIpAndAsnAsync(ipStr);
-
-                                        string hostname = "-";
                                         try
                                         {
-                                            var entry = await hostTask;
-                                            hostname = entry.HostName;
+                                            var hostTask = System.Net.Dns.GetHostEntryAsync(reply.Address);
+                                            var geoTask = LookupGeoIpAndAsnAsync(ipStr);
+
+                                            string hostname = "-";
+                                            try
+                                            {
+                                                var entry = await hostTask;
+                                                hostname = entry.HostName;
+                                            }
+                                            catch { }
+
+                                            if (token.IsCancellationRequested) return;
+
+                                            var (asn, location) = await geoTask;
+
+                                            if (token.IsCancellationRequested) return;
+
+                                            _ = Dispatcher.BeginInvoke(new Action(() =>
+                                            {
+                                                if (token.IsCancellationRequested) return;
+                                                hopResult.Hostname = hostname;
+                                                hopResult.Asn = asn;
+                                                hopResult.Location = location;
+                                                GridTraceHops.Items.Refresh();
+                                            }));
                                         }
                                         catch { }
-
-                                        var (asn, location) = await geoTask;
-
-                                        _ = Dispatcher.BeginInvoke(new Action(() =>
-                                        {
-                                            hopResult.Hostname = hostname;
-                                            hopResult.Asn = asn;
-                                            hopResult.Location = location;
-                                            GridTraceHops.Items.Refresh();
-                                        }));
                                     }
-                                });
+                                }, token);
 
                                 if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
                                 {
@@ -1593,9 +1616,11 @@ namespace agilicomsptoolkit
             catch (OperationCanceledException) { }
             finally
             {
-                // Always dispose the CTS to release OS resources, then restore UI
-                _traceCts?.Dispose();
-                _traceCts = null;
+                localCts.Dispose();
+                if (_traceCts == localCts)
+                {
+                    _traceCts = null;
+                }
                 BtnStartTrace.Visibility = Visibility.Visible;
                 BtnStopTrace.Visibility = Visibility.Collapsed;
                 TxtTraceTarget.IsEnabled = true;
@@ -1605,8 +1630,6 @@ namespace agilicomsptoolkit
         private void BtnStopTrace_Click(object sender, RoutedEventArgs e)
         {
             _traceCts?.Cancel();
-            _traceCts?.Dispose();
-            _traceCts = null;
         }
 
         private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
@@ -1632,9 +1655,11 @@ namespace agilicomsptoolkit
             {
                 BtnItTools.Visibility = Visibility.Collapsed;
                 BtnNetTools.Visibility = Visibility.Collapsed;
+                BtnConverter.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
                 
-                if (PageTabControl.SelectedIndex != 0 && PageTabControl.SelectedIndex != 5 && PageTabControl.SelectedIndex != 6)
+                if (PageTabControl.SelectedIndex == 1 || PageTabControl.SelectedIndex == 2 || 
+                    PageTabControl.SelectedIndex == 3 || PageTabControl.SelectedIndex == 6)
                 {
                     SelectTab(0, BtnDashboard);
                 }
@@ -1660,6 +1685,7 @@ namespace agilicomsptoolkit
                 {
                     BtnItTools.Visibility = Visibility.Visible;
                     BtnNetTools.Visibility = Visibility.Visible;
+                    BtnConverter.Visibility = Visibility.Visible;
                     BtnLogs.Visibility = Visibility.Visible;
                     BtnSettings.Visibility = Visibility.Visible;
                     ModernMessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);

@@ -8,17 +8,17 @@ using System.Threading.Tasks;
 
 namespace agilicomsptoolkit
 {
-    public class PcapCapturer
+    public class PcapCapturer : IDisposable
     {
         private readonly MemoryStream _outputStream;
         private readonly object _lock = new object();
         private bool _isWriting = false;
 
         private int _packetCount = 0;
-        private int _totalBytes = 0;
+        private long _totalBytes = 0;
         private DateTime? _startTime;
 
-        private Socket? _rawSocket;
+        private volatile Socket? _rawSocket;
         private Task? _captureTask;
         private CancellationTokenSource? _captureCts;
         private string? _ipFilter;
@@ -34,7 +34,7 @@ namespace agilicomsptoolkit
             get { lock (_lock) return _packetCount; }
         }
 
-        public int TotalBytes
+        public long TotalBytes
         {
             get { lock (_lock) return _totalBytes; }
         }
@@ -69,44 +69,51 @@ namespace agilicomsptoolkit
                 _startTime = DateTime.UtcNow;
                 _ipFilter = ipFilter;
                 _isWriting = true;
+            }
 
-                if (startRawSniffer)
-                {
-                    StartRawSocketSniffer(adapterIp);
-                }
+            if (startRawSniffer)
+            {
+                StartRawSocketSniffer(adapterIp);
             }
         }
 
         public void Stop()
         {
             CancellationTokenSource? oldCts = null;
+            Socket? socketToClose = null;
             lock (_lock)
             {
                 _isWriting = false;
-                try
+                if (_captureCts != null)
                 {
-                    if (_captureCts != null)
-                    {
-                        oldCts = _captureCts;
-                        oldCts.Cancel();
-                    }
-                    _rawSocket?.Close();
+                    oldCts = _captureCts;
+                    _captureCts = null;
                 }
-                catch { }
-
-                _captureCts = null;
+                socketToClose = _rawSocket;
                 _rawSocket = null;
                 _captureTask = null;
             }
 
             if (oldCts != null)
             {
-                // Dispose token source after a delay to ensure any asynchronous capture loop handles cancellation cleanly
+                try { oldCts.Cancel(); } catch { }
+                // Dispose after a delay to ensure any asynchronous capture loop handles cancellation cleanly
                 Task.Delay(500).ContinueWith(_ =>
                 {
                     try { oldCts.Dispose(); } catch { }
                 });
             }
+
+            if (socketToClose != null)
+            {
+                try { socketToClose.Close(); } catch { }
+            }
+        }
+
+        public void Dispose()
+        {
+            Stop();
+            _outputStream.Dispose();
         }
 
         public byte[] GetPcapBytes()
@@ -243,7 +250,7 @@ namespace agilicomsptoolkit
                     _packetCount++;
                     _totalBytes += 16 + capLength;
                 }
-                catch { }
+                catch { _isWriting = false; }
             }
         }
 
@@ -355,7 +362,14 @@ namespace agilicomsptoolkit
                 {
                     if (token.IsCancellationRequested || _rawSocket == null)
                         break;
-                    await Task.Delay(10, token);
+                    try
+                    {
+                        await Task.Delay(10, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -391,7 +405,7 @@ namespace agilicomsptoolkit
                     _packetCount++;
                     _totalBytes += 16 + capLength;
                 }
-                catch { }
+                catch { _isWriting = false; }
             }
         }
 

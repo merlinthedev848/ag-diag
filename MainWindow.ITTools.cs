@@ -16,11 +16,11 @@ namespace agilicomsptoolkit
                     this.IsEnabled = false;
                     await Task.Run(() =>
                     {
-                        var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
+                        using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
                         p1?.WaitForExit(5000);
-                        var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
+                        using var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
                         p2?.WaitForExit(5000);
-                        var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
+                        using var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
                         p3?.WaitForExit(10000);
                     });
                     
@@ -129,11 +129,23 @@ namespace agilicomsptoolkit
                 using var process = System.Diagnostics.Process.Start(startInfo);
                 if (process == null) return;
                 
-                string output = await process.StandardOutput.ReadToEndAsync();
+                var outTask = process.StandardOutput.ReadToEndAsync();
+                var errTask = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                string output = await outTask;
+                string err = await errTask;
                 
                 if (string.IsNullOrWhiteSpace(output))
                 {
-                    ModernMessageBox.Show("Command returned no tabular data.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    if (!string.IsNullOrWhiteSpace(err))
+                    {
+                        ModernMessageBox.Show($"Command failed with error:\n{err}", "Audit Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        ModernMessageBox.Show("Command returned no tabular data.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
                     return;
                 }
 
@@ -167,8 +179,12 @@ namespace agilicomsptoolkit
                 using var process = System.Diagnostics.Process.Start(startInfo);
                 if (process == null) return;
                 
-                string output = await process.StandardOutput.ReadToEndAsync();
-                string err = await process.StandardError.ReadToEndAsync();
+                var outTask = process.StandardOutput.ReadToEndAsync();
+                var errTask = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                string output = await outTask;
+                string err = await errTask;
                 
                 if (string.IsNullOrWhiteSpace(output) && !string.IsNullOrWhiteSpace(err))
                     output = $"Error Output:\n{err}";

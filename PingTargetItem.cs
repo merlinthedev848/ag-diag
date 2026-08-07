@@ -40,64 +40,62 @@ namespace agilicomsptoolkit
 
         private void Tracker_OnPingResult(PingResult result, PingStats stats)
         {
-            bool success = result.Status == System.Net.NetworkInformation.IPStatus.Success;
-            
-            // Calculate status from stats/result
-            if (success)
+            System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
             {
-                Status = "Online";
-                StatusColor = GreenBrush;
-            }
-            else
-            {
-                Status = "Offline/Timeout";
-                StatusColor = RedBrush;
-            }
-
-            CurrentLatency = $"{stats.Current} ms";
-            AvgLatency = $"{Math.Round(stats.Average, 1)} ms";
-            MinMaxLatency = $"{stats.Min} / {stats.Max} ms";
-            PacketLoss = $"{Math.Round(stats.LossPercentage, 1)}%";
-            Jitter = $"{Math.Round(stats.Jitter, 1)} ms";
-            
-            // Color-code the current latency
-            if (success && stats.Current >= 0)
-            {
-                if (stats.Current < 50)
-                    LatencyColor = DarkGreenBrush;
-                else if (stats.Current < 150)
-                    LatencyColor = AmberBrush;
+                bool success = result.Status == System.Net.NetworkInformation.IPStatus.Success;
+                
+                // Calculate status from stats/result
+                if (success)
+                {
+                    Status = "Online";
+                    StatusColor = GreenBrush;
+                }
                 else
+                {
+                    Status = "Offline/Timeout";
+                    StatusColor = RedBrush;
+                }
+
+                CurrentLatency = $"{stats.Current} ms";
+                AvgLatency = $"{Math.Round(stats.Average, 1)} ms";
+                MinMaxLatency = stats.Min == long.MaxValue || stats.Max == long.MinValue || (stats.Min == 0 && stats.Max == 0) ? "- / - ms" : $"{stats.Min} / {stats.Max} ms";
+                PacketLoss = $"{Math.Round(stats.LossPercentage, 1)}%";
+                Jitter = $"{Math.Round(stats.Jitter, 1)} ms";
+                
+                // Color-code the current latency
+                if (success && stats.Current >= 0)
+                {
+                    if (stats.Current < 50)
+                        LatencyColor = DarkGreenBrush;
+                    else if (stats.Current < 150)
+                        LatencyColor = AmberBrush;
+                    else
+                        LatencyColor = DarkRedBrush;
+                }
+                else
+                {
                     LatencyColor = DarkRedBrush;
-            }
-            else
-            {
-                LatencyColor = DarkRedBrush;
-            }
-            
-            // Update uptime percentage
-            var allResults = Tracker.GetAllResults();
-            if (allResults.Count > 0)
-            {
-                int successCount = allResults.Count(r => r.Status == System.Net.NetworkInformation.IPStatus.Success);
-                double uptime = (double)successCount / allResults.Count * 100.0;
+                }
+                
+                // Update uptime percentage
+                double uptime = 100.0 - stats.LossPercentage;
                 UptimePercent = $"{Math.Round(uptime, 1)}%";
                 
                 // Color-code uptime
                 if (uptime >= 99.0) UptimeColor = DarkGreenBrush;
                 else if (uptime >= 90.0) UptimeColor = AmberBrush;
                 else UptimeColor = DarkRedBrush;
-            }
-            
-            // Update status history timeline (last N results)
-            _statusHistoryList.Add(success);
-            if (_statusHistoryList.Count > MaxHistoryLength)
-                _statusHistoryList.RemoveAt(0);
-            // Create a snapshot copy for UI binding
-            StatusHistory = new List<bool>(_statusHistoryList);
-            
-            // Notify UI to update the graph if it's selected (handled externally)
-            OnPingResultReceived?.Invoke(this, new PingResultEventArgs { Result = result, Stats = stats });
+                
+                // Update status history timeline (last N results)
+                _statusHistoryList.Add(success);
+                if (_statusHistoryList.Count > MaxHistoryLength)
+                    _statusHistoryList.RemoveAt(0);
+                // Create a snapshot copy for UI binding
+                StatusHistory = new List<bool>(_statusHistoryList);
+                
+                // Notify UI to update the graph if it's selected (handled externally)
+                OnPingResultReceived?.Invoke(this, new PingResultEventArgs(result, stats));
+            });
         }
         
         public event EventHandler<PingResultEventArgs>? OnPingResultReceived;
@@ -223,7 +221,13 @@ namespace agilicomsptoolkit
     
     public class PingResultEventArgs : EventArgs
     {
-        public PingResult Result { get; set; } = null!;
-        public PingStats Stats { get; set; } = null!;
+        public PingResult Result { get; }
+        public PingStats Stats { get; }
+
+        public PingResultEventArgs(PingResult result, PingStats stats)
+        {
+            Result = result;
+            Stats = stats;
+        }
     }
 }

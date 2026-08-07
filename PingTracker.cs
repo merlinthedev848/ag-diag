@@ -31,7 +31,7 @@ namespace agilicomsptoolkit
 
     public class PingTracker
     {
-        private CancellationTokenSource? _cts;
+        private volatile CancellationTokenSource? _cts;
         private readonly List<PingResult> _allResults = new List<PingResult>();
         private readonly List<PingResult> _recentResults = new List<PingResult>();
         private const int MaxRecentCount = 60;
@@ -76,7 +76,18 @@ namespace agilicomsptoolkit
                 _lastSuccessfulLatency = null;
 
                 var token = _cts.Token;
-                Task.Run(() => RunPingLoopAsync(target, intervalMs, token), token);
+                var localCts = _cts;
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await RunPingLoopAsync(target, intervalMs, token);
+                    }
+                    finally
+                    {
+                        localCts.Dispose();
+                    }
+                }, token);
             }
         }
 
@@ -90,9 +101,11 @@ namespace agilicomsptoolkit
             }
             if (oldCts != null)
             {
-                oldCts.Cancel();
-                // Dispose after a delay to let the background loop exit
-                Task.Delay(500).ContinueWith(_ => oldCts.Dispose());
+                try
+                {
+                    oldCts.Cancel();
+                }
+                catch (ObjectDisposedException) { }
             }
         }
 
@@ -156,6 +169,10 @@ namespace agilicomsptoolkit
                 lock (_lock)
                 {
                     _allResults.Add(result);
+                    if (_allResults.Count > 10000)
+                    {
+                        _allResults.RemoveAt(0);
+                    }
                     _recentResults.Add(result);
                     if (_recentResults.Count > MaxRecentCount)
                     {
