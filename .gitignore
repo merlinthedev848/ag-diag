@@ -23,3 +23,8 @@ test_run.log
 
 publish/
 publish_output/
+
+# Generated release artifacts
+*.exe
+*.pdb
+*.zip

@@ -20,7 +20,7 @@
     <Authors>Chris Kendall</Authors>
     <Company>Agilico</Company>
     <Product>Agilico MSP Toolkit</Product>
-    <Copyright>Copyright © 2026 Agilico. All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 2026 Agilico. All rights reserved.</Copyright>
     <Description>Network diagnostic and IT engineering toolkit for Agilico Connect Windows App.</Description>
     <Version>4.0.0</Version>
     <AssemblyVersion>4.0.0</AssemblyVersion>
@@ -36,10 +36,6 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="ffmpeg.exe" />
   </ItemGroup>
 
 </Project>

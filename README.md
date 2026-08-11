@@ -1,4 +1,4 @@
-﻿# Agilico Network Diagnostic Tool (v3.5.6)
+# Agilico MSP Toolkit (v4.0.0)
 
 An advanced, premium-themed desktop diagnostic application built for Windows, designed to verify local and outbound network readiness for the **Agilico Connect** application. It conducts deep packet analysis, network path tracing, port connectivity probing, and VoIP simulation, providing IT engineers and end-users with instant, actionable diagnostics.
 
@@ -87,26 +87,21 @@ A self-healing utility built directly into the Settings panel:
 
 The project publishes two distinct binaries to make it versatile for all environments:
 
-1. **Standalone Version (`AgilicoNetworkDiagnosticTool-Standalone.exe`)**
+1. **Standalone Version (`Agilico MSP Toolkit.exe`)**
    - Self-contained executable including all runtime dependencies.
    - Run immediately on any Windows machine without pre-installed runtimes.
-   - Packaged as a `.zip` archive (`AgilicoNetworkDiagnosticTool-Standalone.zip`).
    
-2. **Lite Version (`AgilicoNetworkDiagnosticTool-Lite.exe`)**
+2. **Lite Version (`Agilico MSP Toolkit Lite.exe`)**
    - Framework-dependent executable.
    - Extremely small footprint (requires .NET 8 Desktop Runtime to be installed on the machine).
-   - Packaged as a `.zip` archive (`AgilicoNetworkDiagnosticTool-Lite.zip`).
+   - Does not include the removed Audio Converter or bundled FFmpeg payload.
 
 ---
 
 ## How to Build
 
-Run the following commands inside the repository to publish both versions:
+Run the publish script inside the repository to publish both versions:
 
 ```powershell
-# Standalone publish
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "bin\Publish\Standalone"
-
-# Lite publish
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=false -p:IncludeNativeLibrariesForSelfExtract=false -o "bin\Publish\Lite"
+.\publish.ps1
 ```

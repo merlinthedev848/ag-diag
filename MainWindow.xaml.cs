@@ -76,17 +76,11 @@ namespace agilicomsptoolkit
             this.Close();
         }
 
-        protected override void OnSourceInitialized(EventArgs e)
-        {
-            base.OnSourceInitialized(e);
-            EnableDragAndDropAdminBypass();
-        }
-
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnConverter, BtnHelp, BtnLogs, BtnSettings };
+                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
                 GridLanDevices.ItemsSource = _lanDevices;
                 GridPingTargets.ItemsSource = _pingTargets;
                 GridTraceHops.ItemsSource = _traceHops;
@@ -94,9 +88,6 @@ namespace agilicomsptoolkit
                 GridPortProber.ItemsSource = _portProbeResults;
                 GridActiveSockets.ItemsSource = _displayedSockets;
                 
-                // Enable drag and drop across UAC privilege boundaries
-                EnableDragAndDropAdminBypass();
-
                 // Initialize view
                 SelectTab(0, BtnDashboard);
                 ResetTestStatuses();
@@ -250,9 +241,9 @@ namespace agilicomsptoolkit
                 }
             }
         }
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnSettings);
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnHelp);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnLogs);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnSettings);
 
         private void SelectProbeTab(int index, Button activeButton)
         {
@@ -1655,11 +1646,10 @@ namespace agilicomsptoolkit
             {
                 BtnItTools.Visibility = Visibility.Collapsed;
                 BtnNetTools.Visibility = Visibility.Collapsed;
-                BtnConverter.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
                 
                 if (PageTabControl.SelectedIndex == 1 || PageTabControl.SelectedIndex == 2 || 
-                    PageTabControl.SelectedIndex == 3 || PageTabControl.SelectedIndex == 6)
+                    PageTabControl.SelectedIndex == 5)
                 {
                     SelectTab(0, BtnDashboard);
                 }
@@ -1685,7 +1675,6 @@ namespace agilicomsptoolkit
                 {
                     BtnItTools.Visibility = Visibility.Visible;
                     BtnNetTools.Visibility = Visibility.Visible;
-                    BtnConverter.Visibility = Visibility.Visible;
                     BtnLogs.Visibility = Visibility.Visible;
                     BtnSettings.Visibility = Visibility.Visible;
                     ModernMessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2223,7 +2212,7 @@ namespace agilicomsptoolkit
             {
                 using var client = new System.Net.Http.HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoNetworkDiagnosticTool/3.5.9");
+                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoMSPToolkit/4.0.0");
 
                 string url = $"https://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
                 string json = await client.GetStringAsync(url);

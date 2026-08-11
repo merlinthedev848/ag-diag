@@ -17,10 +17,7 @@ dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish lite failed with code $LASTEXITCODE" }
 
 Write-Host "Copying to release directory..."
-Copy-Item "$srcDir\ffmpeg.exe" -Destination "bin\Publish\Standalone\ffmpeg.exe" -Force -ErrorAction SilentlyContinue
-Copy-Item "$srcDir\ffmpeg.exe" -Destination "bin\Publish\Lite\ffmpeg.exe" -Force -ErrorAction SilentlyContinue
 Copy-Item "bin\Publish\Standalone\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit.exe" -Force
 Copy-Item "bin\Publish\Lite\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit Lite.exe" -Force
-Copy-Item "$srcDir\ffmpeg.exe" -Destination "$outDir\ffmpeg.exe" -Force -ErrorAction SilentlyContinue
 
 Write-Host "Done! Outputs copied to: $outDir"
