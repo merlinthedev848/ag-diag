@@ -1996,16 +1996,29 @@ namespace agilicomsptoolkit
 
             TxtPortProfileDesc.Text = profileName switch
             {
-                string s when s.Contains("Agilico") =>
+                string s when s == "Agilico Connect" =>
                     "Tests HTTP (TCP 80), HTTPS (TCP 443), STUN (UDP 3478), SIP signalling (UDP 5060/5061), and NTP (UDP 123) against Agilico Connect endpoints.",
-                string s when s.Contains("3CX") =>
-                    "Tests SIP TCP/UDP (5060), Secure SIP TLS (TCP 5061), 3CX Tunnel TCP/UDP (5090), Web Client (TCP 443), and System Management (TCP 5015). You will be prompted for the 3CX server FQDN.",
+                string s when s.Contains("Linphone") =>
+                    "Runs a PBX-style firewall check against Agilico service hosts and Linphone SIP targets: DNS, STUN, SIP ALG, SIP signalling, web services, NTP, and summarized even-port RTP media ranges.",
                 string s when s.Contains("Teams") =>
                     "Tests SIP TLS signalling (TCP 5061) to three Microsoft PSTN hubs, and STUN/TURN media ports (UDP 3478–3481) to the Teams transport relay.",
                 string s when s.Contains("Custom") =>
                     "Enter a custom target host and a list of ports with protocols (e.g. TCP 443, UDP 53) when prompted.",
                 _ => ""
             };
+        }
+
+        private static string GetHostFromUrl(string value)
+        {
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && !string.IsNullOrWhiteSpace(uri.Host))
+            {
+                return uri.Host;
+            }
+
+            return value.Trim()
+                .Replace("https://", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("http://", "", StringComparison.OrdinalIgnoreCase)
+                .Split('/')[0];
         }
 
         private async void BtnStartPortProbe_Click(object sender, RoutedEventArgs e)
@@ -2024,42 +2037,71 @@ namespace agilicomsptoolkit
 
             try
             {
-                List<(string target, int port, string serviceName, string protocol)> probes = new();
+                List<Func<CancellationToken, Task<PortProbeResult>>> probes = new();
 
-                if (profileName.Contains("Agilico"))
+                if (profileName == "Agilico Connect")
                 {
-                    probes.Add(("customerportal.hp2k.co.uk", 80, "Web Portal HTTP", "TCP"));
-                    probes.Add(("customerportal.hp2k.co.uk", 443, "Web Portal HTTPS", "TCP"));
-                    probes.Add(("stun-gb-a.hp2k.co.uk", 3478, "STUN Service Primary", "UDP"));
-                    probes.Add(("customerportal.hp2k.co.uk", 5060, "SIP UDP Signaling", "UDP"));
-                    probes.Add(("customerportal.hp2k.co.uk", 5061, "Secure SIP TLS Signaling", "UDP"));
-                    probes.Add(("uk.pool.ntp.org", 123, "NTP Time Server", "UDP"));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("customerportal.hp2k.co.uk", 80, "Web Portal HTTP", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("customerportal.hp2k.co.uk", 443, "Web Portal HTTPS", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("stun-gb-a.hp2k.co.uk", 3478, "STUN Service Primary", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("sip.linphone.org", 5060, "Linphone SIP UDP Signalling", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("sip.linphone.org", 5060, "Linphone SIP TCP Signalling", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("uk.pool.ntp.org", 123, "NTP Time Server", ct, treatTimeoutAsOpen: true));
                 }
-                else if (profileName.Contains("3CX"))
+                else if (profileName.Contains("Linphone"))
                 {
-                    var target3cx = ShowInputDialog("3CX Server Target", "Enter FQDN or IP of your 3CX Phone System:", "company.3cx.co.uk");
-                    if (string.IsNullOrEmpty(target3cx))
+                    string[] agilicoHosts =
                     {
-                        RestorePortProbeBtn();
-                        return;
+                        "customerportal.hp2k.co.uk",
+                        "stun-gb-a.hp2k.co.uk",
+                        "stun-gb-b.hp2k.co.uk",
+                        "stun-eu-a.hp2k.co.uk",
+                        "stun-eu-b.hp2k.co.uk",
+                        GetHostFromUrl(_engine.PresenceUrl),
+                        GetHostFromUrl(_engine.SignallingUrl),
+                        GetHostFromUrl(_engine.RoomsUrl)
+                    };
+                    string[] linphoneHosts = { "sip.linphone.org", "sip2sip.info" };
+
+                    foreach (var host in agilicoHosts.Concat(linphoneHosts).Where(h => !string.IsNullOrWhiteSpace(h)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        string resolvedHost = host;
+                        probes.Add(ct => VoipTools.ProbeDnsResolutionAsync(resolvedHost, "DNS resolution", ct));
                     }
-                    probes.Add((target3cx, 5060, "SIP TCP Signaling", "TCP"));
-                    probes.Add((target3cx, 5060, "SIP UDP Signaling", "UDP"));
-                    probes.Add((target3cx, 5061, "Secure SIP TLS Signaling", "TCP"));
-                    probes.Add((target3cx, 5090, "3CX Tunnel (TCP)", "TCP"));
-                    probes.Add((target3cx, 5090, "3CX Tunnel (UDP)", "UDP"));
-                    probes.Add((target3cx, 443, "Web Client / Provisioning", "TCP"));
-                    probes.Add((target3cx, 5015, "3CX System Management", "TCP"));
+
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("customerportal.hp2k.co.uk", 80, "Agilico Portal HTTP", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("customerportal.hp2k.co.uk", 443, "Agilico Portal HTTPS", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync(GetHostFromUrl(_engine.PresenceUrl), 80, "Presence Service HTTP", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync(GetHostFromUrl(_engine.SignallingUrl), 80, "Soft Signalling HTTP", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync(GetHostFromUrl(_engine.RoomsUrl), 80, "Rooms Service HTTP", ct));
+
+                    foreach (var stunHost in agilicoHosts.Where(h => h.StartsWith("stun-", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        string resolvedHost = stunHost;
+                        probes.Add(ct => VoipTools.ProbeUdpPortAsync(resolvedHost, 3478, "Agilico STUN UDP 3478", ct));
+                    }
+
+                    foreach (var sipHost in linphoneHosts)
+                    {
+                        string resolvedHost = sipHost;
+                        probes.Add(ct => VoipTools.ProbeUdpPortAsync(resolvedHost, 5060, "Linphone SIP UDP 5060 / SIP ALG", ct));
+                        probes.Add(ct => VoipTools.ProbeTcpPortAsync(resolvedHost, 5060, "Linphone SIP TCP 5060", ct));
+                        probes.Add(ct => VoipTools.ProbeTcpPortAsync(resolvedHost, 5061, "Linphone SIP TLS TCP 5061", ct));
+                    }
+
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("uk.pool.ntp.org", 123, "NTP UDP 123", ct, treatTimeoutAsOpen: true));
+                    probes.Add(ct => VoipTools.ProbeUdpPortRangeAsync("stun-gb-a.hp2k.co.uk", 9000, 9398, 2, "Agilico RTP media range", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortRangeAsync("sip.linphone.org", 10600, 10998, 2, "Linphone RTP media range", ct));
                 }
                 else if (profileName.Contains("Microsoft Teams"))
                 {
-                    probes.Add(("sip.pstnhub.microsoft.com", 5061, "Teams SIP TLS Primary", "TCP"));
-                    probes.Add(("sip2.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 1", "TCP"));
-                    probes.Add(("sip3.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 2", "TCP"));
-                    probes.Add(("world.tr.teams.microsoft.com", 3478, "Teams Media STUN 3478", "UDP"));
-                    probes.Add(("world.tr.teams.microsoft.com", 3479, "Teams Media STUN 3479", "UDP"));
-                    probes.Add(("world.tr.teams.microsoft.com", 3480, "Teams Media STUN 3480", "UDP"));
-                    probes.Add(("world.tr.teams.microsoft.com", 3481, "Teams Media STUN 3481", "UDP"));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("sip.pstnhub.microsoft.com", 5061, "Teams SIP TLS Primary", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("sip2.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 1", ct));
+                    probes.Add(ct => VoipTools.ProbeTcpPortAsync("sip3.pstnhub.microsoft.com", 5061, "Teams SIP TLS Backup 2", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("world.tr.teams.microsoft.com", 3478, "Teams Media STUN 3478", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("world.tr.teams.microsoft.com", 3479, "Teams Media STUN 3479", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("world.tr.teams.microsoft.com", 3480, "Teams Media STUN 3480", ct));
+                    probes.Add(ct => VoipTools.ProbeUdpPortAsync("world.tr.teams.microsoft.com", 3481, "Teams Media STUN 3481", ct));
                 }
                 else // Custom Port Range
                 {
@@ -2086,12 +2128,14 @@ namespace agilicomsptoolkit
                             var proto = tokens[0].ToUpper();
                             if ((proto == "TCP" || proto == "UDP") && int.TryParse(tokens[1], out int p) && p > 0 && p <= 65535)
                             {
-                                probes.Add((customTarget, p, $"Custom Service {proto}", proto));
+                                probes.Add(proto == "TCP"
+                                    ? ct => VoipTools.ProbeTcpPortAsync(customTarget, p, $"Custom Service {proto}", ct)
+                                    : ct => VoipTools.ProbeUdpPortAsync(customTarget, p, $"Custom Service {proto}", ct));
                             }
                         }
                         else if (tokens.Length == 1 && int.TryParse(tokens[0], out int p) && p > 0 && p <= 65535)
                         {
-                            probes.Add((customTarget, p, "Custom Service TCP", "TCP"));
+                            probes.Add(ct => VoipTools.ProbeTcpPortAsync(customTarget, p, "Custom Service TCP", ct));
                         }
                     }
 
@@ -2104,18 +2148,7 @@ namespace agilicomsptoolkit
                 }
 
                 // Run all probes concurrently and stream results to UI
-                var probeTasks = new List<Task<PortProbeResult>>();
-                foreach (var p in probes)
-                {
-                    if (p.protocol == "TCP")
-                    {
-                        probeTasks.Add(VoipTools.ProbeTcpPortAsync(p.target, p.port, p.serviceName, token));
-                    }
-                    else
-                    {
-                        probeTasks.Add(VoipTools.ProbeUdpPortAsync(p.target, p.port, p.serviceName, token));
-                    }
-                }
+                var probeTasks = probes.Select(probe => probe(token)).ToList();
 
                 while (probeTasks.Count > 0)
                 {

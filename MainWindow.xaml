@@ -1504,7 +1504,7 @@
                                             <TextBlock Text="Select Profile: " VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
                                             <ComboBox x:Name="CbPortProfile" Grid.Column="1" Height="32" Padding="8,4" SelectionChanged="CbPortProfile_SelectionChanged">
                                                 <ComboBoxItem Content="Agilico Connect" IsSelected="True"/>
-                                                <ComboBoxItem Content="3CX Phone System"/>
+                                                <ComboBoxItem Content="Agilico / Linphone Firewall Check"/>
                                                 <ComboBoxItem Content="Microsoft Teams"/>
                                                 <ComboBoxItem Content="Custom Port Range"/>
                                             </ComboBox>

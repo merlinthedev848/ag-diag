@@ -27,8 +27,9 @@ namespace agilicomsptoolkit
         public string Target { get; set; } = string.Empty;
         public string Status { get; set; } = "Closed"; // Open, Blocked, Unresponsive
         public double? RttMs { get; set; }
+        public string? PortRangeDisplay { get; set; }
 
-        public string PortDisplay => $"{Protocol} {Port}";
+        public string PortDisplay => !string.IsNullOrWhiteSpace(PortRangeDisplay) ? $"{Protocol} {PortRangeDisplay}" : $"{Protocol} {Port}";
         public string RttDisplay => RttMs.HasValue ? $"{RttMs.Value:F1} ms" : "-";
     }
 
@@ -276,6 +277,34 @@ namespace agilicomsptoolkit
 
         #region Outbound Firewall Port Prober
 
+        public static async Task<PortProbeResult> ProbeDnsResolutionAsync(string target, string serviceName, CancellationToken token)
+        {
+            var result = new PortProbeResult
+            {
+                Port = 0,
+                Protocol = "DNS",
+                PortRangeDisplay = "Resolve",
+                ServiceName = serviceName,
+                Target = target,
+                Status = "Blocked"
+            };
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var addresses = await Dns.GetHostAddressesAsync(target, token);
+                sw.Stop();
+                result.Status = addresses.Length > 0 ? "Open" : "Blocked";
+                result.RttMs = sw.Elapsed.TotalMilliseconds;
+            }
+            catch
+            {
+                result.Status = "Blocked";
+            }
+
+            return result;
+        }
+
         public static async Task<PortProbeResult> ProbeTcpPortAsync(string target, int port, string serviceName, CancellationToken token)
         {
             var result = new PortProbeResult
@@ -327,7 +356,7 @@ namespace agilicomsptoolkit
             return result;
         }
 
-        public static async Task<PortProbeResult> ProbeUdpPortAsync(string target, int port, string serviceName, CancellationToken token)
+        public static async Task<PortProbeResult> ProbeUdpPortAsync(string target, int port, string serviceName, CancellationToken token, bool treatTimeoutAsOpen = false)
         {
             var result = new PortProbeResult
             {
@@ -410,7 +439,7 @@ namespace agilicomsptoolkit
                 {
                     // UDP timeout is common if remote is not listening or ignores payload.
                     // If no ICMP error was returned, we mark as Unresponsive (likely permitted outbound).
-                    result.Status = "Unresponsive";
+                    result.Status = treatTimeoutAsOpen ? "Open" : "Unresponsive";
                 }
             }
             catch (SocketException ex)
@@ -424,6 +453,95 @@ namespace agilicomsptoolkit
                 {
                     result.Status = "Blocked";
                 }
+            }
+            catch
+            {
+                result.Status = "Blocked";
+            }
+
+            return result;
+        }
+
+        public static async Task<PortProbeResult> ProbeUdpPortRangeAsync(
+            string target,
+            int startPort,
+            int endPort,
+            int step,
+            string serviceName,
+            CancellationToken token,
+            int maxConcurrency = 32)
+        {
+            var result = new PortProbeResult
+            {
+                Port = startPort,
+                Protocol = "UDP",
+                PortRangeDisplay = $"{startPort}-{endPort}",
+                ServiceName = serviceName,
+                Target = target,
+                Status = "Blocked"
+            };
+
+            if (startPort <= 0 || endPort > 65535 || startPort > endPort || step <= 0)
+            {
+                return result;
+            }
+
+            try
+            {
+                var addresses = await Dns.GetHostAddressesAsync(target, token);
+                if (addresses.Length == 0)
+                {
+                    return result;
+                }
+
+                var ports = new List<int>();
+                for (int port = startPort; port <= endPort; port += step)
+                {
+                    ports.Add(port);
+                }
+
+                int openOrSent = 0;
+                int blocked = 0;
+                double totalMs = 0;
+                object totalsLock = new();
+                using var throttler = new SemaphoreSlim(maxConcurrency);
+
+                var tasks = ports.Select(async port =>
+                {
+                    await throttler.WaitAsync(token);
+                    try
+                    {
+                        var probe = await ProbeUdpPortAsync(target, port, $"{serviceName} {port}", token, treatTimeoutAsOpen: true);
+                        if (probe.Status == "Blocked")
+                        {
+                            Interlocked.Increment(ref blocked);
+                        }
+                        else
+                        {
+                            Interlocked.Increment(ref openOrSent);
+                        }
+
+                        if (probe.RttMs.HasValue)
+                        {
+                            lock (totalsLock)
+                            {
+                                totalMs += probe.RttMs.Value;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        throttler.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks);
+
+                result.Status = blocked == 0 ? "Open" : openOrSent > 0 ? "Unresponsive" : "Blocked";
+                result.ServiceName = blocked == 0
+                    ? $"{serviceName} ({ports.Count} even ports sent)"
+                    : $"{serviceName} ({openOrSent}/{ports.Count} sent, {blocked} blocked)";
+                result.RttMs = openOrSent > 0 && totalMs > 0 ? totalMs / openOrSent : null;
             }
             catch
             {
