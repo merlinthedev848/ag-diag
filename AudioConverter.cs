@@ -36,6 +36,7 @@ namespace agilicomsptoolkit
                 {
                     FileName = ffmpegPath,
                     Arguments = arguments,
+                    WorkingDirectory = Path.GetDirectoryName(ffmpegPath) ?? AppDomain.CurrentDomain.BaseDirectory,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardError = true
@@ -114,11 +115,14 @@ namespace agilicomsptoolkit
             string appDataDir = Path.Combine(localAppData, "AgilicoToolkit");
             string appDataPath = Path.Combine(appDataDir, "ffmpeg.exe");
 
+            if (File.Exists(appDataPath)) return appDataPath;
+
             // 4. Try extracting from Embedded Assembly Resource if missing
             try
             {
-                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                string resourceName = assembly.GetManifestResourceNames()
+                var assembly = typeof(AudioConverter).Assembly;
+                string[] manifestNames = assembly.GetManifestResourceNames();
+                string resourceName = manifestNames
                     .FirstOrDefault(n => n.EndsWith("ffmpeg.exe", StringComparison.OrdinalIgnoreCase)) ?? "";
 
                 if (!string.IsNullOrEmpty(resourceName))
@@ -139,7 +143,10 @@ namespace agilicomsptoolkit
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Embedded FFmpeg extraction error: {ex.Message}");
+            }
 
             if (File.Exists(appDataPath)) return appDataPath;
 
@@ -154,8 +161,12 @@ namespace agilicomsptoolkit
             }
             catch { }
 
-            // 6. Fallback to system PATH
-            return "ffmpeg.exe";
+            // 6. Check System path fallback
+            string systemPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ffmpeg.exe");
+            if (File.Exists(systemPath)) return systemPath;
+
+            throw new FileNotFoundException(
+                $"ffmpeg.exe not found at '{path1}' or '{appDataPath}'. Please ensure ffmpeg.exe is present in the application folder.");
         }
     }
 }
