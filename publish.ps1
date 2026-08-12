@@ -2,18 +2,19 @@ $ErrorActionPreference = "Stop"
 $srcDir = $PSScriptRoot
 $outDir = Join-Path $PSScriptRoot "publish_output"
 
+
 if (!(Test-Path "$outDir")) {
     New-Item -ItemType Directory -Path "$outDir" | Out-Null
 }
 
 Write-Host "Publishing Standalone (Self-Contained) version..."
 Set-Location "$srcDir"
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=true -o "bin\Publish\Standalone"
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IsFullVersion=true -o "bin\Publish\Standalone"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish standalone failed with code $LASTEXITCODE" }
 
 Write-Host "Publishing Lite (Framework-Dependent) version..."
 Remove-Item "obj\Release" -Recurse -Force -ErrorAction SilentlyContinue
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=false -o "bin\Publish\Lite"
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=false -p:IsFullVersion=false -o "bin\Publish\Lite"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish lite failed with code $LASTEXITCODE" }
 
 Write-Host "Copying to release directory..."

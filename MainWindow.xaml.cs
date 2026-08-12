@@ -80,7 +80,11 @@ namespace agilicomsptoolkit
         {
             try
             {
+#if FULL_VERSION
+                _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnConverter, BtnHelp, BtnLogs, BtnSettings };
+#else
                 _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
+#endif
                 GridLanDevices.ItemsSource = _lanDevices;
                 GridPingTargets.ItemsSource = _pingTargets;
                 GridTraceHops.ItemsSource = _traceHops;
