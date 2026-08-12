@@ -245,9 +245,9 @@ namespace agilicomsptoolkit
                 }
             }
         }
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(3, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnSettings);
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnHelp);
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnLogs);
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnSettings);
 
         private void SelectProbeTab(int index, Button activeButton)
         {
@@ -1653,7 +1653,7 @@ namespace agilicomsptoolkit
                 BtnSettings.Visibility = Visibility.Collapsed;
                 
                 if (PageTabControl.SelectedIndex == 1 || PageTabControl.SelectedIndex == 2 || 
-                    PageTabControl.SelectedIndex == 5)
+                    PageTabControl.SelectedIndex == 3 || PageTabControl.SelectedIndex == 6)
                 {
                     SelectTab(0, BtnDashboard);
                 }

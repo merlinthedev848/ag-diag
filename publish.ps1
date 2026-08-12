@@ -9,7 +9,7 @@ if (!(Test-Path "$outDir")) {
 
 Write-Host "Publishing Standalone (Self-Contained) version..."
 Set-Location "$srcDir"
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IsFullVersion=true -o "bin\Publish\Standalone"
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IsFullVersion=true -o "bin\Publish\Standalone"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish standalone failed with code $LASTEXITCODE" }
 
 Write-Host "Publishing Lite (Framework-Dependent) version..."
