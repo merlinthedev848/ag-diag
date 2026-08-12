@@ -19,9 +19,10 @@ foreach ($arch in $architectures) {
     dotnet publish -c Release -r $arch --self-contained false -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=false -p:IsFullVersion=false -o "bin\Publish\Lite\$arch"
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish lite failed for $arch with code $LASTEXITCODE" }
 
-    Write-Host "Copying to release directory..."
-    Copy-Item "bin\Publish\Standalone\$arch\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit-$arch.exe" -Force
-    Copy-Item "bin\Publish\Lite\$arch\Agilico MSP Toolkit.exe" -Destination "$outDir\Agilico MSP Toolkit Lite-$arch.exe" -Force
+    Write-Host "Zipping outputs for $arch..."
+    # DO NOT rename the executable. WPF Single-File apps crash if the .exe is renamed!
+    Compress-Archive -Path "bin\Publish\Standalone\$arch\Agilico MSP Toolkit.exe" -DestinationPath "$outDir\AgilicoNetworkDiagnosticTool-Standalone-$arch.zip" -Force
+    Compress-Archive -Path "bin\Publish\Lite\$arch\Agilico MSP Toolkit.exe" -DestinationPath "$outDir\AgilicoNetworkDiagnosticTool-Lite-$arch.zip" -Force
 }
 
 Write-Host "Done! Outputs copied to: $outDir"
