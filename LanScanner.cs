@@ -123,105 +123,93 @@ namespace agilicomsptoolkit
 
             int totalIPs = (int)hostCount;
             int completed = 0;
-            
-            var pingTasks = new List<Task>();
             var syncLock = new object();
-            using var concurrencySemaphore = new SemaphoreSlim(50, 50);
 
-            // Ping all addresses concurrently
-            for (uint offset = 1; offset <= hostCount; offset++)
+            // Ping all addresses concurrently using Parallel.ForEachAsync
+            var options = new ParallelOptions 
+            { 
+                MaxDegreeOfParallelism = 50, 
+                CancellationToken = token 
+            };
+
+            await Parallel.ForEachAsync(Enumerable.Range(1, (int)hostCount), options, async (offset, ct) =>
             {
-                if (token.IsCancellationRequested) break;
-                
-                uint targetAddr = networkAddr + offset;
+                uint targetAddr = networkAddr + (uint)offset;
                 string targetIp = $"{(targetAddr >> 24) & 0xFF}.{(targetAddr >> 16) & 0xFF}.{(targetAddr >> 8) & 0xFF}.{targetAddr & 0xFF}";
                 
-                pingTasks.Add(Task.Run(async () =>
+                bool isAlive = false;
+                try
                 {
-                    await concurrencySemaphore.WaitAsync(token);
-                    try 
+                    using var pinger = new Ping();
+                    var reply = await pinger.SendPingAsync(targetIp, 1000);
+                    isAlive = (reply.Status == IPStatus.Success);
+                }
+                catch { }
+
+                if (isAlive || targetIp == localIp)
+                {
+                    if (ct.IsCancellationRequested) return;
+
+                    // SendARP blocks synchronously, but MaxDegreeOfParallelism will handle it efficiently
+                    string mac = "";
+                    await Task.Run(() => { mac = GetMacAddress(targetIp); }, ct);
+                    
+                    var device = new LanDevice
                     {
-                        if (token.IsCancellationRequested) return;
+                        IpAddress = targetIp,
+                        MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
+                    };
+                    
+                    if (ct.IsCancellationRequested) return;
 
-                        bool isAlive = false;
-                        try
+                    // Get Hostname
+                    try
+                    {
+                        if (device.IpAddress == localIp)
                         {
-                            using var pinger = new Ping();
-                            var reply = await pinger.SendPingAsync(targetIp, 1000);
-                            isAlive = (reply.Status == IPStatus.Success);
+                            device.Hostname = Dns.GetHostName();
                         }
-                        catch { }
-
-                        if (isAlive || targetIp == localIp)
+                        else
                         {
-                            if (token.IsCancellationRequested) return;
-
-                            var mac = GetMacAddress(targetIp);
-                            var device = new LanDevice
+                            var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
+                            var timeoutTask = Task.Delay(1000, ct);
+                            var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
+                            if (completedTask == dnsTask)
                             {
-                                IpAddress = targetIp,
-                                MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
-                            };
-                            
-                            if (token.IsCancellationRequested) return;
-
-                            // Get Hostname immediately with a timeout to avoid hangs
-                            try
-                            {
-                                if (device.IpAddress == localIp)
-                                {
-                                    device.Hostname = Dns.GetHostName();
-                                }
-                                else
-                                {
-                                    var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
-                                    var timeoutTask = Task.Delay(1000, token); // 1-second timeout
-                                    var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
-                                    if (completedTask == dnsTask)
-                                    {
-                                        var hostEntry = await dnsTask;
-                                        device.Hostname = hostEntry.HostName;
-                                    }
-                                    else
-                                    {
-                                        device.Hostname = "-";
-                                    }
-                                }
+                                var hostEntry = await dnsTask;
+                                device.Hostname = hostEntry.HostName;
                             }
-                            catch { device.Hostname = "-"; }
-
-                            if (token.IsCancellationRequested) return;
-
-                            // Get Manufacturer immediately
-                            device.Manufacturer = await GetManufacturerAsync(device.MacAddress, token);
-
-                            if (token.IsCancellationRequested) return;
-
-                            lock (syncLock)
+                            else
                             {
-                                activeDevices.Add(device);
-                            }
-                            
-                            deviceFoundCallback?.Invoke(device);
-                        }
-
-                        lock (syncLock)
-                        {
-                            completed++;
-                            if (completed % 10 == 0 || completed == totalIPs)
-                            {
-                                progressCallback?.Invoke(completed, totalIPs);
+                                device.Hostname = "-";
                             }
                         }
                     }
-                    finally 
-                    {
-                        concurrencySemaphore.Release();
-                    }
-                }, token));
-            }
+                    catch { device.Hostname = "-"; }
 
-            await Task.WhenAll(pingTasks);
+                    if (ct.IsCancellationRequested) return;
+
+                    device.Manufacturer = await GetManufacturerAsync(device.MacAddress, ct);
+
+                    if (ct.IsCancellationRequested) return;
+
+                    lock (syncLock)
+                    {
+                        activeDevices.Add(device);
+                    }
+                    
+                    deviceFoundCallback?.Invoke(device);
+                }
+
+                lock (syncLock)
+                {
+                    completed++;
+                    if (completed % 10 == 0 || completed == totalIPs)
+                    {
+                        progressCallback?.Invoke(completed, totalIPs);
+                    }
+                }
+            });
 
             return activeDevices.OrderBy(d => 
             {

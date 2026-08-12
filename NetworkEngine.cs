@@ -219,7 +219,8 @@ namespace agilicomsptoolkit
 
                     string descLower = adapterDesc.ToLower();
                     string nameLower = adapterName.ToLower();
-                    bool isVpn = nameLower.Contains("vpn") || nameLower.Contains("tap") || nameLower.Contains("tun") || nameLower.Contains("globalprotect") || 
+                    bool isVpn = ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel || ni.NetworkInterfaceType == NetworkInterfaceType.Ppp || 
+                        nameLower.Contains("vpn") || nameLower.Contains("tap") || nameLower.Contains("tun") || nameLower.Contains("globalprotect") || 
                         nameLower.Contains("cisco") || nameLower.Contains("anyconnect") || nameLower.Contains("fortinet") || nameLower.Contains("forticlient") || 
                         nameLower.Contains("wireguard") || nameLower.Contains("tailscale") || nameLower.Contains("zerotier") || nameLower.Contains("checkpoint") || 
                         nameLower.Contains("sonicwall") || nameLower.Contains("pulse") || descLower.Contains("vpn") || descLower.Contains("tap") || 
@@ -337,7 +338,8 @@ namespace agilicomsptoolkit
 
                     string desc = ni.Description.ToLower();
                     string name = ni.Name.ToLower();
-                    bool isVpn = name.Contains("vpn") || name.Contains("tap") || name.Contains("tun") || name.Contains("globalprotect") || 
+                    bool isVpn = ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel || ni.NetworkInterfaceType == NetworkInterfaceType.Ppp || 
+                        name.Contains("vpn") || name.Contains("tap") || name.Contains("tun") || name.Contains("globalprotect") || 
                         name.Contains("cisco") || name.Contains("anyconnect") || name.Contains("fortinet") || name.Contains("forticlient") || 
                         name.Contains("wireguard") || name.Contains("tailscale") || name.Contains("zerotier") || name.Contains("checkpoint") || 
                         name.Contains("sonicwall") || name.Contains("pulse") || desc.Contains("vpn") || desc.Contains("tap") || 
