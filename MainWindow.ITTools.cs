@@ -14,15 +14,15 @@ namespace agilicomsptoolkit
                 try
                 {
                     this.IsEnabled = false;
-                    await Task.Run(() =>
-                    {
-                        using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
-                        p1?.WaitForExit(5000);
-                        using var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
-                        p2?.WaitForExit(5000);
-                        using var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
-                        p3?.WaitForExit(10000);
-                    });
+                    
+                    using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
+                    if (p1 != null) await p1.WaitForExitAsync();
+                    
+                    using var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
+                    if (p2 != null) await p2.WaitForExitAsync();
+                    
+                    using var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
+                    if (p3 != null) await p3.WaitForExitAsync();
                     
                     ModernMessageBox.Show("Network configuration successfully reset and renewed.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }

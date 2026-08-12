@@ -1,0 +1,2933 @@
+﻿using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace agilicomsptoolkit
+{
+    public class LogicalDiskInfo
+    {
+        public string DeviceID { get; set; } = string.Empty;
+        public string VolumeName { get; set; } = string.Empty;
+        public string SizeText { get; set; } = string.Empty;
+        public string PercentageText { get; set; } = string.Empty;
+        public GridLength FillWidthStar { get; set; }
+        public GridLength EmptyWidthStar { get; set; }
+        public Brush FillBrush { get; set; } = Brushes.Transparent;
+        public Brush TextBrush { get; set; } = Brushes.Transparent;
+    }
+
+    public partial class DiskManagementDialog : Window
+    {
+        public ObservableCollection<LogicalDiskInfo> Disks { get; set; } = new ObservableCollection<LogicalDiskInfo>();
+
+        public DiskManagementDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            LoadDisks();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void LoadDisks()
+        {
+            Disks.Clear();
+            try
+            {
+                DriveInfo[] drives = DriveInfo.GetDrives();
+                foreach (DriveInfo d in drives)
+                {
+                    if (d.IsReady && d.DriveType == DriveType.Fixed)
+                    {
+                        double totalGb = Math.Round(d.TotalSize / 1024.0 / 1024.0 / 1024.0, 2);
+                        double freeGb = Math.Round(d.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0, 2);
+                        double usedGb = totalGb - freeGb;
+                        
+                        double usedPercent = totalGb > 0 ? (usedGb / totalGb) * 100.0 : 0;
+                        double freePercent = 100.0 - usedPercent;
+
+                        Brush fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3b82f6")); // Blue
+                        Brush textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#94a3b8")); // Slate 400
+
+                        if (usedPercent >= 90)
+                        {
+                            fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444")); // Red
+                            textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444"));
+                        }
+                        else if (usedPercent >= 80)
+                        {
+                            fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b")); // Orange
+                            textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b"));
+                        }
+
+                        Disks.Add(new LogicalDiskInfo
+                        {
+                            DeviceID = d.Name.TrimEnd('\\'),
+                            VolumeName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local Disk" : d.VolumeLabel,
+                            SizeText = $"{usedGb:F1} GB used of {totalGb:F1} GB",
+                            PercentageText = $"{Math.Round(usedPercent)}% Used ({freeGb:F1} GB Free)",
+                            FillWidthStar = new GridLength(usedPercent, GridUnitType.Star),
+                            EmptyWidthStar = new GridLength(freePercent, GridUnitType.Star),
+                            FillBrush = fillBrush,
+                            TextBrush = textBrush
+                        });
+                    }
+                }
+                ItemsDisks.ItemsSource = Disks;
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load disk info: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRunDiskCleanup_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to run Disk Cleanup?", "Confirm Action", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Cleanup utility.");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cleanmgr.exe",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch Disk Cleanup: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRunDiskDefrag_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to run Disk Defragmenter?", "Confirm Action", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Defragmenter utility.");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "dfrgui.exe",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch Disk Defragmenter: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public partial class EngineerPasswordDialog : Window
+    {
+        public string Password => TxtPassword.Password;
+
+        public EngineerPasswordDialog()
+        {
+            InitializeComponent();
+            TxtPassword.Focus();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void BtnOk_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+            Close();
+        }
+
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Linq;
+
+namespace agilicomsptoolkit
+{
+    public class EventLogInfo
+    {
+        public string Source { get; set; } = string.Empty;
+        public string TimeGenerated { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        
+        public string IconGlyph { get; set; } = string.Empty;
+        public Brush IconBgBrush { get; set; } = Brushes.Transparent;
+        public Brush IconFgBrush { get; set; } = Brushes.Transparent;
+
+        private static readonly Brush ErrorBg = CreateFrozenBrush("#7f1d1d");
+        private static readonly Brush ErrorFg = CreateFrozenBrush("#ef4444");
+        private static readonly Brush WarnBg = CreateFrozenBrush("#78350f");
+        private static readonly Brush WarnFg = CreateFrozenBrush("#f59e0b");
+        private static readonly Brush InfoBg = CreateFrozenBrush("#1e3a8a");
+        private static readonly Brush InfoFg = CreateFrozenBrush("#3b82f6");
+
+        private static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public void SetStatusStyle(string entryTypeStr, int entryTypeInt)
+        {
+            if (entryTypeStr.Contains("Error", StringComparison.OrdinalIgnoreCase) || entryTypeInt == 1)
+            {
+                IconGlyph = "âœ–";
+                IconBgBrush = ErrorBg;
+                IconFgBrush = ErrorFg;
+            }
+            else if (entryTypeStr.Contains("Warning", StringComparison.OrdinalIgnoreCase) || entryTypeInt == 2)
+            {
+                IconGlyph = "âš ";
+                IconBgBrush = WarnBg;
+                IconFgBrush = WarnFg;
+            }
+            else
+            {
+                IconGlyph = "â„¹";
+                IconBgBrush = InfoBg;
+                IconFgBrush = InfoFg;
+            }
+        }
+    }
+
+    public partial class EventLogDialog : Window
+    {
+        public ObservableCollection<EventLogInfo> Logs { get; set; } = new ObservableCollection<EventLogInfo>();
+
+        public EventLogDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadEventLogsAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async System.Threading.Tasks.Task LoadEventLogsAsync()
+        {
+            Logs.Clear();
+            int errCount = 0;
+            int warnCount = 0;
+            int infoCount = 0;
+
+            try
+            {
+                string jsonCommand = "Get-EventLog -LogName System -Newest 50 | Select-Object TimeGenerated, EntryType, Source, Message | ConvertTo-Json -Compress";
+                
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{jsonCommand}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    using var doc = JsonDocument.Parse(output);
+                    var logList = new System.Collections.Generic.List<EventLogInfo>();
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var element in doc.RootElement.EnumerateArray())
+                        {
+                            ParseLogElement(element, logList, ref errCount, ref warnCount, ref infoCount);
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        ParseLogElement(doc.RootElement, logList, ref errCount, ref warnCount, ref infoCount);
+                    }
+
+                    foreach (var log in logList)
+                    {
+                        Logs.Add(log);
+                    }
+
+                    TxtErrors.Text = errCount.ToString();
+                    TxtWarnings.Text = warnCount.ToString();
+                    TxtInfos.Text = infoCount.ToString();
+                    ItemsLogs.ItemsSource = Logs;
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load event logs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnSearchSolution_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is EventLogInfo log)
+            {
+                try
+                {
+                    // Escape query string - get first line of message for better search
+                    string cleanMessage = log.Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                    string query = Uri.EscapeDataString($"Windows Event Log {log.Source} {cleanMessage}");
+                    string url = $"https://www.google.com/search?q={query}";
+                    
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Failed to open search: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void ParseLogElement(JsonElement element, System.Collections.Generic.List<EventLogInfo> list, ref int errCount, ref int warnCount, ref int infoCount)
+        {
+            string source = element.GetProperty("Source").GetString() ?? "Unknown";
+            string msg = element.GetProperty("Message").GetString() ?? "";
+            
+            string timeStr = "";
+            if (element.TryGetProperty("TimeGenerated", out var timeProp))
+            {
+                if (timeProp.ValueKind == JsonValueKind.String)
+                {
+                    if (DateTime.TryParse(timeProp.GetString(), out DateTime dt))
+                        timeStr = dt.ToString("g");
+                    else
+                        timeStr = timeProp.GetString() ?? "";
+                }
+                else if (timeProp.ValueKind == JsonValueKind.Object && timeProp.TryGetProperty("DateTime", out var dtObj))
+                {
+                    timeStr = dtObj.GetString() ?? "";
+                }
+            }
+
+            int entryTypeInt = 4;
+            string entryTypeStr = "Information";
+            
+            if (element.TryGetProperty("EntryType", out var entryTypeProp))
+            {
+                if (entryTypeProp.ValueKind == JsonValueKind.Number)
+                {
+                    entryTypeInt = entryTypeProp.GetInt32();
+                    if (entryTypeInt == 1) entryTypeStr = "Error";
+                    else if (entryTypeInt == 2) entryTypeStr = "Warning";
+                }
+                else if (entryTypeProp.ValueKind == JsonValueKind.String)
+                {
+                    entryTypeStr = entryTypeProp.GetString() ?? "Information";
+                }
+            }
+
+            var logInfo = new EventLogInfo
+            {
+                Source = source,
+                TimeGenerated = timeStr,
+                Message = msg
+            };
+
+            logInfo.SetStatusStyle(entryTypeStr, entryTypeInt);
+
+            if (entryTypeStr.Contains("Error", StringComparison.OrdinalIgnoreCase) || entryTypeInt == 1) errCount++;
+            else if (entryTypeStr.Contains("Warning", StringComparison.OrdinalIgnoreCase) || entryTypeInt == 2) warnCount++;
+            else infoCount++;
+
+            list.Add(logInfo);
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace agilicomsptoolkit
+{
+    public class FirewallProfileInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string StatusText { get; set; } = string.Empty;
+        public string InboundAction { get; set; } = string.Empty;
+        public string OutboundAction { get; set; } = string.Empty;
+
+        private static readonly Brush ActiveIconBg = CreateFrozenBrush("#064e3b");
+        private static readonly Brush ActiveIconFg = CreateFrozenBrush("#10b981");
+        private static readonly Brush ActiveBadgeBg = CreateFrozenBrush("#10b981");
+        
+        private static readonly Brush InactiveIconBg = CreateFrozenBrush("#7f1d1d");
+        private static readonly Brush InactiveIconFg = CreateFrozenBrush("#ef4444");
+        private static readonly Brush InactiveBadgeBg = CreateFrozenBrush("#ef4444");
+
+        public static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public Brush IconBgBrush => StatusText == "ON" ? ActiveIconBg : InactiveIconBg;
+        public Brush IconFgBrush => StatusText == "ON" ? ActiveIconFg : InactiveIconFg;
+        public Brush BadgeBgBrush => StatusText == "ON" ? ActiveBadgeBg : InactiveBadgeBg;
+        public Brush BadgeFgBrush => Brushes.White;
+        public Color GlowColor => StatusText == "ON" ? (Color)ColorConverter.ConvertFromString("#10b981") : (Color)ColorConverter.ConvertFromString("#ef4444");
+    }
+
+    public partial class FirewallStatusDialog : Window
+    {
+        public ObservableCollection<FirewallProfileInfo> Profiles { get; set; } = new ObservableCollection<FirewallProfileInfo>();
+
+        public FirewallStatusDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadFirewallStatusAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async System.Threading.Tasks.Task LoadFirewallStatusAsync()
+        {
+            Profiles.Clear();
+            try
+            {
+                string jsonCommand = "Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction | ConvertTo-Json -Compress";
+                
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{jsonCommand}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    using var doc = JsonDocument.Parse(output);
+                    int activeCount = 0;
+                    var profileList = new System.Collections.Generic.List<FirewallProfileInfo>();
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var element in doc.RootElement.EnumerateArray())
+                        {
+                            ParseProfileElement(element, profileList, ref activeCount);
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        ParseProfileElement(doc.RootElement, profileList, ref activeCount);
+                    }
+
+                    foreach (var p in profileList)
+                    {
+                        Profiles.Add(p);
+                    }
+
+                    ItemsProfiles.ItemsSource = Profiles;
+
+                    if (activeCount == 3)
+                        TxtOverallStatus.Text = "System is fully protected. All firewall profiles are active.";
+                    else if (activeCount > 0)
+                        TxtOverallStatus.Text = $"System is partially protected. {activeCount} of 3 profiles active.";
+                    else
+                    {
+                        TxtOverallStatus.Text = "WARNING: Windows Firewall is completely disabled!";
+                        TxtOverallStatus.Foreground = FirewallProfileInfo.CreateFrozenBrush("#ef4444");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load firewall status: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ParseProfileElement(JsonElement element, System.Collections.Generic.List<FirewallProfileInfo> list, ref int activeCount)
+        {
+            string name = element.GetProperty("Name").GetString() ?? "Unknown";
+            int enabledVal = element.GetProperty("Enabled").GetInt32();
+            bool isEnabled = enabledVal == 1;
+            
+            string inbound = element.GetProperty("DefaultInboundAction").GetInt32() == 1 ? "Allow" : "Block";
+            string outbound = element.GetProperty("DefaultOutboundAction").GetInt32() == 1 ? "Allow" : "Block";
+
+            if (isEnabled) activeCount++;
+
+            var info = new FirewallProfileInfo
+            {
+                Name = name,
+                InboundAction = inbound,
+                OutboundAction = outbound,
+                StatusText = isEnabled ? "ON" : "OFF"
+            };
+
+            list.Add(info);
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Data;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Diagnostics;
+
+namespace agilicomsptoolkit
+{
+    public partial class GenericDataGridDialog : Window
+    {
+        public GenericDataGridDialog(string title, string description, string jsonPayload)
+        {
+            InitializeComponent();
+            TxtTitle.Text = title;
+            TxtDescription.Text = description;
+            
+            if (title.Contains("Disk Management", StringComparison.OrdinalIgnoreCase))
+            {
+                DiskActionsPanel.Visibility = Visibility.Visible;
+            }
+            else if (title.Contains("Software Audit", StringComparison.OrdinalIgnoreCase))
+            {
+                CheckForUpdatesAsync();
+            }
+
+            LoadData(jsonPayload);
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void LoadData(string jsonPayload)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(jsonPayload))
+                {
+                    ModernMessageBox.Show("No data was returned.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                DataTable table = new DataTable();
+                using (JsonDocument doc = JsonDocument.Parse(jsonPayload))
+                {
+                    JsonElement root = doc.RootElement;
+
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        if (root.GetArrayLength() == 0) return;
+
+                        // Create columns from the first element
+                        JsonElement firstObj = root[0];
+                        foreach (JsonProperty prop in firstObj.EnumerateObject())
+                        {
+                            table.Columns.Add(prop.Name, typeof(string));
+                        }
+
+                        // Add rows
+                        foreach (JsonElement rowObj in root.EnumerateArray())
+                        {
+                            DataRow row = table.NewRow();
+                            foreach (JsonProperty prop in rowObj.EnumerateObject())
+                            {
+                                row[prop.Name] = prop.Value.ToString();
+                            }
+                            table.Rows.Add(row);
+                        }
+                    }
+                    else if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        // Single object
+                        foreach (JsonProperty prop in root.EnumerateObject())
+                        {
+                            table.Columns.Add(prop.Name, typeof(string));
+                        }
+                        DataRow row = table.NewRow();
+                        foreach (JsonProperty prop in root.EnumerateObject())
+                        {
+                            row[prop.Name] = prop.Value.ToString();
+                        }
+                        table.Rows.Add(row);
+                    }
+                }
+
+                GridGeneric.ItemsSource = table.DefaultView;
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to parse output data: {ex.Message}", "Parsing Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void BtnRunDiskCleanup_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to run Disk Cleanup?", "Confirm Action", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Cleanup utility.");
+                
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cleanmgr.exe",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch Disk Cleanup: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRunDiskDefrag_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to run Disk Defragmenter?", "Confirm Action", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Defragmenter utility.");
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "dfrgui.exe",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch Disk Defragmenter: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void CheckForUpdatesAsync()
+        {
+            try
+            {
+                SoftwareActionsPanel.Visibility = Visibility.Visible;
+                TxtSoftwareUpdateStatus.Text = "Checking for updates...";
+                BtnUpdateSoftware.IsEnabled = false;
+
+                var procInfo = new ProcessStartInfo
+                {
+                    FileName = "winget",
+                    Arguments = "upgrade",
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+
+                using var proc = Process.Start(procInfo);
+                if (proc == null) return;
+                
+                string output = await proc.StandardOutput.ReadToEndAsync();
+                await proc.WaitForExitAsync();
+
+                if (output.Contains("upgrades available", StringComparison.OrdinalIgnoreCase))
+                {
+                    TxtSoftwareUpdateStatus.Text = "Updates available via winget";
+                    BtnUpdateSoftware.IsEnabled = true;
+                }
+                else
+                {
+                    SoftwareActionsPanel.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch
+            {
+                SoftwareActionsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BtnUpdateSoftware_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to update all available software?\n\nThis may close running applications and take several minutes.", "Confirm Update", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Initiated global software update via winget.");
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c winget upgrade --all & pause",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch winget: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+}
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public partial class HardwareReportDialog : Window
+    {
+        public HardwareReportDialog(List<HardwareItem> items)
+        {
+            InitializeComponent();
+            
+            if (Application.Current != null && Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded && Application.Current.MainWindow != this)
+            {
+                this.Owner = Application.Current.MainWindow;
+            }
+
+            HardwareList.ItemsSource = items;
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                this.DragMove();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public partial class InputDialog : Window
+    {
+        public string InputText => TxtInput.Text;
+
+        public InputDialog(string title, string instruction, string defaultValue = "")
+        {
+            InitializeComponent();
+            TxtTitle.Text = title;
+            TxtInstruction.Text = instruction;
+            TxtInput.Text = defaultValue;
+            
+            Loaded += (s, e) => 
+            {
+                TxtInput.Focus();
+                TxtInput.SelectAll();
+            };
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            DragMove();
+        }
+
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void BtnOk_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace agilicomsptoolkit
+{
+    public class LocalUserInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public Visibility FullNameVisibility => string.IsNullOrWhiteSpace(FullName) ? Visibility.Collapsed : Visibility.Visible;
+        public string Description { get; set; } = string.Empty;
+        
+        public string StatusText { get; set; } = string.Empty;
+        
+        private static readonly Brush EnabledBg = CreateFrozenBrush("#064e3b");
+        private static readonly Brush EnabledFg = CreateFrozenBrush("#10b981");
+        private static readonly Brush DisabledBg = CreateFrozenBrush("#7f1d1d");
+        private static readonly Brush DisabledFg = CreateFrozenBrush("#ef4444");
+
+        private static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public Brush StatusBgBrush => StatusText == "ENABLED" ? EnabledBg : DisabledBg;
+        public Brush StatusFgBrush => StatusText == "ENABLED" ? EnabledFg : DisabledFg;
+    }
+
+    public partial class LocalUsersDialog : Window
+    {
+        public ObservableCollection<LocalUserInfo> Users { get; set; } = new ObservableCollection<LocalUserInfo>();
+
+        public LocalUsersDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadUsersAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async System.Threading.Tasks.Task LoadUsersAsync()
+        {
+            Users.Clear();
+            try
+            {
+                string jsonCommand = "Get-LocalUser | Select-Object Name, Enabled, FullName, Description | ConvertTo-Json -Compress";
+                
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{jsonCommand}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    using var doc = JsonDocument.Parse(output);
+                    int activeCount = 0;
+                    var userList = new System.Collections.Generic.List<LocalUserInfo>();
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var element in doc.RootElement.EnumerateArray())
+                        {
+                            ParseUserElement(element, userList, ref activeCount);
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        ParseUserElement(doc.RootElement, userList, ref activeCount);
+                    }
+
+                    foreach (var u in userList)
+                    {
+                        Users.Add(u);
+                    }
+
+                    ItemsUsers.ItemsSource = Users;
+                    TxtStatus.Text = $"{Users.Count} Local Accounts ({activeCount} Enabled)";
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load users: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                TxtStatus.Text = "Error loading users";
+            }
+        }
+
+        private void ParseUserElement(JsonElement element, System.Collections.Generic.List<LocalUserInfo> list, ref int activeCount)
+        {
+            string name = element.GetProperty("Name").GetString() ?? "Unknown";
+            string fullName = "";
+            if (element.TryGetProperty("FullName", out var fnProp) && fnProp.ValueKind == JsonValueKind.String)
+                fullName = fnProp.GetString() ?? "";
+                
+            string desc = "";
+            if (element.TryGetProperty("Description", out var dProp) && dProp.ValueKind == JsonValueKind.String)
+                desc = dProp.GetString() ?? "";
+
+            bool isEnabled = false;
+            if (element.TryGetProperty("Enabled", out var eProp))
+            {
+                if (eProp.ValueKind == JsonValueKind.True) isEnabled = true;
+                else if (eProp.ValueKind == JsonValueKind.False) isEnabled = false;
+                else if (eProp.ValueKind == JsonValueKind.Number) isEnabled = eProp.GetInt32() == 1;
+            }
+
+            var userInfo = new LocalUserInfo
+            {
+                Name = name,
+                FullName = fullName,
+                Description = desc,
+                StatusText = isEnabled ? "ENABLED" : "DISABLED"
+            };
+
+            if (isEnabled) activeCount++;
+
+            list.Add(userInfo);
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace agilicomsptoolkit
+{
+    public partial class M365ManagerDialog : Window
+    {
+        public M365ManagerDialog()
+        {
+            InitializeComponent();
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await CheckPowerShellModulesAsync();
+            GeneratePreviewScript();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private async Task CheckPowerShellModulesAsync()
+        {
+            TxtModuleStatus.Text = "Checking local module availability...";
+            BtnInstallModules.IsEnabled = false;
+
+            try
+            {
+                string script = "Get-Module -ListAvailable ExchangeOnlineManagement, Microsoft.Graph | Select-Object Name | ConvertTo-Json -Compress";
+                var output = await RunPowerShellSilentAsync(script);
+                
+                bool exchangeFound = output.Contains("ExchangeOnlineManagement", StringComparison.OrdinalIgnoreCase);
+                bool graphFound = output.Contains("Microsoft.Graph", StringComparison.OrdinalIgnoreCase);
+
+                if (exchangeFound && graphFound)
+                {
+                    TxtModuleStatus.Text = "âœ… M365 (Microsoft.Graph) and Exchange Online modules are installed.";
+                    TxtModuleStatus.Foreground = Brushes.LightGreen;
+                    BtnConnectExchange.IsEnabled = true;
+                    BtnConnectGraph.IsEnabled = true;
+                    BtnRunScript.IsEnabled = true;
+                }
+                else
+                {
+                    string missing = "";
+                    if (!exchangeFound) missing += "ExchangeOnlineManagement ";
+                    if (!graphFound) missing += "Microsoft.Graph ";
+                    TxtModuleStatus.Text = $"âš  Missing modules: {missing.Trim()}. Click below to install.";
+                    TxtModuleStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f97316")); // Warning orange
+                    BtnInstallModules.IsEnabled = true;
+                    
+                    BtnConnectExchange.IsEnabled = false;
+                    BtnConnectGraph.IsEnabled = false;
+                    BtnRunScript.IsEnabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtModuleStatus.Text = $"Failed to check modules: {ex.Message}";
+                BtnInstallModules.IsEnabled = true;
+            }
+        }
+
+        private void BtnInstallModules_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show(
+                "Installing M365 modules requires an active internet connection and may take a few minutes.\n\nThis will open an administrative PowerShell window. Continue?",
+                "Install Modules", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            
+            if (result != MessageBoxResult.Yes) return;
+
+            string script = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " +
+                            "Write-Host 'Configuring Package Provider...' -ForegroundColor Cyan; " +
+                            "if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) { " +
+                            "  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force " +
+                            "}; " +
+                            "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; " +
+                            "Write-Host 'Installing ExchangeOnlineManagement module...' -ForegroundColor Cyan; " +
+                            "Install-Module -Name ExchangeOnlineManagement -Force -AllowClobber -Scope CurrentUser; " +
+                            "Write-Host 'Installing Microsoft.Graph module...' -ForegroundColor Cyan; " +
+                            "Install-Module -Name Microsoft.Graph -Force -AllowClobber -Scope CurrentUser; " +
+                            "Write-Host 'Installation complete! Checking module status:' -ForegroundColor Green; " +
+                            "Get-Module -ListAvailable ExchangeOnlineManagement, Microsoft.Graph | Select-Object Name, Version; " +
+                            "Write-Host 'Press Enter to return to toolkit...'; Read-Host";
+
+            RunPowerShellInteractive(script, async () => {
+                await CheckPowerShellModulesAsync();
+                GeneratePreviewScript();
+            });
+        }
+
+        private void BtnConnectExchange_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Write-Host 'Connecting to Exchange Online...' -ForegroundColor Cyan; " +
+                            "Import-Module ExchangeOnlineManagement; " +
+                            "Connect-ExchangeOnline; " +
+                            "if (Get-ConnectionInfo) { Write-Host 'Successfully Connected to Exchange Online!' -ForegroundColor Green } else { Write-Host 'Connection failed.' -ForegroundColor Red }; " +
+                            "Write-Host 'Press Enter to return to toolkit...'; Read-Host";
+
+            RunPowerShellInteractive(script);
+            
+            // Assume connected for UI feedback (in real situations, user will complete it in console)
+            TxtExchangeStatus.Text = "ðŸŸ¢ Pre-authenticated";
+            TxtExchangeStatus.Foreground = Brushes.LightGreen;
+        }
+
+        private void BtnConnectGraph_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Write-Host 'Connecting to Microsoft Graph...' -ForegroundColor Cyan; " +
+                            "Import-Module Microsoft.Graph; " +
+                            "Connect-MgGraph -Scopes 'User.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.AccessAsUser.All'; " +
+                            "Write-Host 'Successfully Connected to Microsoft Graph!' -ForegroundColor Green; " +
+                            "Write-Host 'Press Enter to return to toolkit...'; Read-Host";
+
+            RunPowerShellInteractive(script);
+
+            TxtGraphStatus.Text = "ðŸŸ¢ Pre-authenticated";
+            TxtGraphStatus.Foreground = Brushes.LightGreen;
+        }
+
+        private void BtnGeneratePass_Click(object sender, RoutedEventArgs e)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+            var random = new Random();
+            var password = new string(Enumerable.Repeat(chars, 12)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+            
+            TxtResetPassword.Text = password;
+        }
+
+        private void FormInputChanged(object sender, EventArgs e)
+        {
+            GeneratePreviewScript();
+        }
+
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            GeneratePreviewScript();
+        }
+
+        private void GeneratePreviewScript()
+        {
+            if (TxtScriptPreview == null || MainTabControl == null) return;
+
+            var selectedTab = MainTabControl.SelectedItem as TabItem;
+            if (selectedTab == null) return;
+
+            var sb = new StringBuilder();
+
+            if (selectedTab.Header.ToString() == "Connections & Setup")
+            {
+                sb.AppendLine("# M365 Connection and Module verification script");
+                sb.AppendLine("Import-Module ExchangeOnlineManagement");
+                sb.AppendLine("Import-Module Microsoft.Graph");
+                sb.AppendLine("Connect-ExchangeOnline");
+                sb.AppendLine("Connect-MgGraph -Scopes 'User.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.AccessAsUser.All'");
+            }
+            else if (selectedTab.Header.ToString() == "Delegations")
+            {
+                string mailbox = string.IsNullOrWhiteSpace(TxtMailboxUPN.Text) ? "<user@domain.com>" : TxtMailboxUPN.Text.Trim();
+                string delegateUser = string.IsNullOrWhiteSpace(TxtDelegateUPN.Text) ? "<delegate@domain.com>" : TxtDelegateUPN.Text.Trim();
+
+                sb.AppendLine("# Microsoft 365 Mailbox & Calendar Delegation");
+                sb.AppendLine("Import-Module ExchangeOnlineManagement");
+                sb.AppendLine("Connect-ExchangeOnline");
+                sb.AppendLine();
+
+                string mailPerm = (ComboMailboxPerm.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "None";
+                if (mailPerm != "None")
+                {
+                    sb.AppendLine($"# Granting Mailbox Permission: {mailPerm}");
+                    if (mailPerm == "FullAccess")
+                    {
+                        sb.AppendLine($"Add-MailboxPermission -Identity \"{mailbox}\" -User \"{delegateUser}\" -AccessRights FullAccess -InheritanceType All");
+                    }
+                    else if (mailPerm == "SendAs")
+                    {
+                        sb.AppendLine($"Add-RecipientPermission -Identity \"{mailbox}\" -Trustee \"{delegateUser}\" -AccessRights SendAs -Confirm:$false");
+                    }
+                    else if (mailPerm == "SendOnBehalf")
+                    {
+                        sb.AppendLine($"Set-Mailbox -Identity \"{mailbox}\" -GrantSendOnBehalfTo \"{delegateUser}\"");
+                    }
+                    sb.AppendLine();
+                }
+
+                string calPerm = (ComboCalendarPerm.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "None";
+                if (calPerm != "None")
+                {
+                    string permValue = calPerm.Split(' ')[0]; // Extract Editor, Owner, etc.
+                    sb.AppendLine($"# Granting Calendar Folder Permission: {permValue}");
+                    sb.AppendLine($"$targetPath = \"{mailbox}:\\Calendar\"");
+                    sb.AppendLine("try {");
+                    sb.AppendLine($"    Add-MailboxFolderPermission -Identity $targetPath -User \"{delegateUser}\" -AccessRights {permValue} -ErrorAction Stop");
+                    sb.AppendLine("} catch {");
+                    sb.AppendLine($"    Set-MailboxFolderPermission -Identity $targetPath -User \"{delegateUser}\" -AccessRights {permValue}");
+                    sb.AppendLine("}");
+                }
+            }
+            else if (selectedTab.Header.ToString() == "User Security")
+            {
+                string user = string.IsNullOrWhiteSpace(TxtSecurityUserUPN.Text) ? "<user@domain.com>" : TxtSecurityUserUPN.Text.Trim();
+                string pass = TxtResetPassword.Text;
+
+                sb.AppendLine("# Microsoft 365 Account Security & Password Management");
+                sb.AppendLine("Import-Module Microsoft.Graph");
+                sb.AppendLine("Connect-MgGraph -Scopes 'User.ReadWrite.All', 'Directory.AccessAsUser.All'");
+                sb.AppendLine();
+
+                if (!string.IsNullOrWhiteSpace(pass))
+                {
+                    bool forceChange = ChkForceChange.IsChecked ?? false;
+                    sb.AppendLine("# Reset password block");
+                    sb.AppendLine("$params = @{");
+                    sb.AppendLine("    passwordProfile = @{");
+                    sb.AppendLine($"        forceChangePasswordNextSignIn = ${forceChange.ToString().ToLower()}");
+                    sb.AppendLine($"        password = \"{pass}\"");
+                    sb.AppendLine("    }");
+                    sb.AppendLine("}");
+                    sb.AppendLine($"Update-MgUser -UserId \"{user}\" -BodyParameter $params");
+                    sb.AppendLine();
+                }
+
+                if (ChkRevokeSessions.IsChecked ?? false)
+                {
+                    sb.AppendLine("# Revoke all active login sessions");
+                    sb.AppendLine($"Revoke-MgUserSignInSession -UserId \"{user}\"");
+                    sb.AppendLine();
+                }
+
+                string accountState = (ComboAccountState.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Keep Current State";
+                if (accountState != "Keep Current State")
+                {
+                    bool enabled = accountState.StartsWith("Enabled");
+                    sb.AppendLine($"# Set account status: Enabled = {enabled}");
+                    sb.AppendLine($"Update-MgUser -UserId \"{user}\" -AccountEnabled ${enabled.ToString().ToLower()}");
+                }
+            }
+            else if (selectedTab.Header.ToString() == "Teams & Groups")
+            {
+                string group = string.IsNullOrWhiteSpace(TxtGroupUPN.Text) ? "<Group-UPN-or-GUID>" : TxtGroupUPN.Text.Trim();
+                string member = string.IsNullOrWhiteSpace(TxtGroupMemberUPN.Text) ? "<user@domain.com>" : TxtGroupMemberUPN.Text.Trim();
+                string operation = (ComboGroupOp.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Add to Group / Team";
+                bool isOwner = RadioOwner.IsChecked ?? false;
+
+                sb.AppendLine("# Microsoft 365 Group & Teams Member Manager");
+                sb.AppendLine("Import-Module Microsoft.Graph");
+                sb.AppendLine("Connect-MgGraph -Scopes 'Group.ReadWrite.All'");
+                sb.AppendLine();
+
+                sb.AppendLine($"# Target: Group/Team '{group}', User '{member}'");
+                sb.AppendLine($"$targetUser = Get-MgUser -UserId \"{member}\"");
+                
+                if (operation.StartsWith("Add"))
+                {
+                    if (isOwner)
+                    {
+                        sb.AppendLine($"Add-MgGroupOwnerByRef -GroupId \"{group}\" -OdataId $targetUser.Id");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"Add-MgGroupMemberByRef -GroupId \"{group}\" -OdataId $targetUser.Id");
+                    }
+                }
+                else
+                {
+                    if (isOwner)
+                    {
+                        sb.AppendLine($"Remove-MgGroupOwnerByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"Remove-MgGroupMemberByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id");
+                    }
+                }
+            }
+
+            TxtScriptPreview.Text = sb.ToString();
+        }
+
+        private void BtnCopyScript_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Clipboard.SetText(TxtScriptPreview.Text);
+                TxtStatus.Text = "Script copied to clipboard!";
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to copy script: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRunScript_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show(
+                "This will launch a visible, interactive PowerShell window to run the generated commands.\n\nYou may be prompted to sign into Microsoft 365 to authenticate.\n\nExecute script?",
+                "Run Script", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            if (Owner is MainWindow mainWindow)
+            {
+                mainWindow.LogAuditAction("Executed Microsoft 365 / Teams automation script.");
+            }
+
+            RunPowerShellInteractive(TxtScriptPreview.Text);
+        }
+
+        private async Task<string> RunPowerShellSilentAsync(string command)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{command}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    using var proc = Process.Start(startInfo);
+                    if (proc == null) return string.Empty;
+
+                    string stdout = proc.StandardOutput.ReadToEnd();
+                    proc.WaitForExit(5000);
+                    return stdout;
+                }
+                catch
+                {
+                    return string.Empty;
+                }
+            });
+        }
+
+        private void RunPowerShellInteractive(string scriptContent, Action? onExit = null)
+        {
+            try
+            {
+                // Create a temporary script file to run or execute as command block
+                string tempFile = Path.Combine(Path.GetTempPath(), "m365_automation.ps1");
+                File.WriteAllText(tempFile, scriptContent, Encoding.UTF8);
+
+                string arguments = $"-NoProfile -NoExit -ExecutionPolicy Bypass -File \"{tempFile}\"";
+
+                var proc = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = arguments,
+                    UseShellExecute = true
+                });
+
+                if (proc != null && onExit != null)
+                {
+                    proc.EnableRaisingEvents = true;
+                    proc.Exited += (s, ev) =>
+                    {
+                        Dispatcher.Invoke(onExit);
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch PowerShell: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public class NetworkAdapterInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public partial class NicOptimizerDialog : Window
+    {
+        public ObservableCollection<NetworkAdapterInfo> Adapters { get; set; } = new ObservableCollection<NetworkAdapterInfo>();
+
+        public NicOptimizerDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadAdaptersAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async Task LoadAdaptersAsync()
+        {
+            Adapters.Clear();
+            try
+            {
+                // Only get physical adapters (Virtual=False) that are up or disconnected
+                string jsonCommand = "Get-NetAdapter -Physical | Select-Object Name, InterfaceDescription, Status | ConvertTo-Json -Compress";
+                
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{jsonCommand}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    using var doc = JsonDocument.Parse(output);
+                    
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var element in doc.RootElement.EnumerateArray())
+                        {
+                            Adapters.Add(new NetworkAdapterInfo 
+                            { 
+                                Name = element.GetProperty("Name").GetString() ?? "Unknown", 
+                                Description = element.GetProperty("InterfaceDescription").GetString() ?? "", 
+                                Status = element.GetProperty("Status").GetString() ?? "" 
+                            });
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        // Single item returned
+                        Adapters.Add(new NetworkAdapterInfo 
+                        { 
+                            Name = doc.RootElement.GetProperty("Name").GetString() ?? "Unknown", 
+                            Description = doc.RootElement.GetProperty("InterfaceDescription").GetString() ?? "", 
+                            Status = doc.RootElement.GetProperty("Status").GetString() ?? "" 
+                        });
+                    }
+
+                    GridAdapters.ItemsSource = Adapters;
+                    TxtStatus.Text = $"{Adapters.Count} physical adapters found.";
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load adapters: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void BtnOptimize_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show(
+                "WARNING: Optimizing network adapters will briefly reset your network connection.\n\nDo you want to proceed and optimize all physical adapters?", 
+                "Confirm NIC Optimization", 
+                MessageBoxButton.YesNo, 
+                MessageBoxImage.Warning);
+                
+            if (result == MessageBoxResult.Yes)
+            {
+                BtnOptimize.IsEnabled = false;
+                TxtStatus.Text = "Applying optimizations...";
+                
+                try
+                {
+                    await Task.Run(() =>
+                    {
+                        string[] commands = new[]
+                        {
+                            "Enable-NetAdapterRss -Name '*' -ErrorAction SilentlyContinue",
+                            "Disable-NetAdapterLso -Name '*' -ErrorAction SilentlyContinue",
+                            "netsh int tcp set global autotuninglevel=normal",
+                            "netsh int tcp set heuristics disabled",
+                            "netsh int tcp set global ecncapability=enabled"
+                        };
+
+                        string script = string.Join(" ; ", commands);
+                        
+                        var process = new Process
+                        {
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = "powershell.exe",
+                                Arguments = $"-NoProfile -Command \"{script}\"",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            }
+                        };
+                        process.Start();
+                        process.WaitForExit();
+                    });
+
+                    ModernMessageBox.Show("All physical network adapters have been optimized for maximum VoIP performance.\nLSO Disabled, RSS Enabled, and TCP Heuristics Tuned.", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TxtStatus.Text = "Optimization applied.";
+                    
+                    if (Owner is MainWindow mainWindow) 
+                    {
+                        mainWindow.LogAuditAction("Executed NIC Optimizer routine on physical network adapters.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Failed to apply optimizations: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    BtnOptimize.IsEnabled = true;
+                }
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public partial class ResourceMonitorDialog : Window
+    {
+        public class ProcessInfo
+        {
+            public string Name { get; set; } = "";
+            public int Id { get; set; }
+            public double MemoryMB { get; set; }
+            public string Title { get; set; } = "";
+        }
+
+        private ObservableCollection<ProcessInfo> _processes = new();
+
+        public ResourceMonitorDialog()
+        {
+            InitializeComponent();
+            GridProcesses.ItemsSource = _processes;
+            LoadProcesses();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void LoadProcesses()
+        {
+            try
+            {
+                _processes.Clear();
+                var procs = Process.GetProcesses()
+                    .Select(p => {
+                        double mem = 0;
+                        try { mem = Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1); } catch { }
+                        string title = "";
+                        try { title = p.MainWindowTitle; } catch { }
+                        return new ProcessInfo
+                        {
+                            Name = p.ProcessName,
+                            Id = p.Id,
+                            MemoryMB = mem,
+                            Title = title
+                        };
+                    })
+                    .Where(p => p.MemoryMB > 10) // Filter out tiny background tasks for cleaner view
+                    .OrderByDescending(p => p.MemoryMB)
+                    .Take(50) // Show top 50
+                    .ToList();
+
+                foreach (var p in procs)
+                {
+                    _processes.Add(p);
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load processes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            LoadProcesses();
+        }
+
+        private void BtnKill_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridProcesses.SelectedItem is ProcessInfo selected)
+            {
+                var result = ModernMessageBox.Show($"Are you sure you want to forcibly terminate {selected.Name} (PID {selected.Id})?\n\nUnsaved data will be lost.", "Confirm End Task", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        var p = Process.GetProcessById(selected.Id);
+                        p.Kill();
+                        ModernMessageBox.Show($"Successfully terminated {selected.Name}.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                        LoadProcesses();
+                    }
+                    catch (Exception ex)
+                    {
+                        ModernMessageBox.Show($"Could not terminate process: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            else
+            {
+                ModernMessageBox.Show("Please select a process from the list first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public partial class ResultDialog : Window
+    {
+        public ResultDialog(string title, string output)
+        {
+            InitializeComponent();
+            TxtTitle.Text = title;
+            TxtOutput.Text = output;
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void BtnCopy_Click(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(TxtOutput.Text);
+            ModernMessageBox.Show("Results copied to clipboard.", "Copied", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.ServiceProcess;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace agilicomsptoolkit
+{
+    public class ServiceItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        public ServiceController Controller { get; set; } = null!;
+        public string DisplayName => Controller.DisplayName;
+        public string ServiceName => Controller.ServiceName;
+        public string StartType => Controller.StartType.ToString();
+        
+        public string Status => Controller.Status.ToString();
+        
+        private static readonly Brush RunningStatusBrush = CreateFrozenBrush("#10b981");
+        private static readonly Brush StoppedStatusBrush = CreateFrozenBrush("#94a3b8");
+        private static readonly Brush StopActionBrush = CreateFrozenBrush("#ef4444");
+        private static readonly Brush StartActionBrush = CreateFrozenBrush("#3b82f6");
+
+        private static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public Brush StatusColorBrush => Status == "Running" ? RunningStatusBrush : StoppedStatusBrush;
+            
+        public Color StatusGlowColor => Status == "Running" 
+            ? (Color)ColorConverter.ConvertFromString("#10b981") 
+            : Colors.Transparent;
+
+        public string ActionText => Status == "Running" ? "Stop" : "Start";
+        
+        public Brush ActionBgBrush => Status == "Running" ? StopActionBrush : StartActionBrush;
+
+        public void RefreshProperties()
+        {
+            OnPropertyChanged(nameof(Status));
+            OnPropertyChanged(nameof(StatusColorBrush));
+            OnPropertyChanged(nameof(StatusGlowColor));
+            OnPropertyChanged(nameof(ActionText));
+            OnPropertyChanged(nameof(ActionBgBrush));
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public partial class ServiceManagerDialog : Window
+    {
+        public ObservableCollection<ServiceItem> Services { get; set; } = new ObservableCollection<ServiceItem>();
+
+        public ServiceManagerDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            LoadServices();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void LoadServices()
+        {
+            try
+            {
+                var systemServices = ServiceController.GetServices().OrderBy(s => s.DisplayName).ToList();
+                Services.Clear();
+                foreach (var s in systemServices)
+                {
+                    Services.Add(new ServiceItem { Controller = s });
+                }
+                GridServices.ItemsSource = Services;
+                TxtStatus.Text = $"{Services.Count} services loaded.";
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load services: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            LoadServices();
+        }
+
+        private void BtnAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is ServiceItem item)
+            {
+                if (item.Status == "Running")
+                {
+                    // STOP SERVICE
+                    var result = ModernMessageBox.Show($"Are you sure you want to stop '{item.DisplayName}'?\n\nStopping critical services may cause system instability.", "Confirm Stop", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                    if (result != MessageBoxResult.Yes) return;
+
+                    try
+                    {
+                        if (!item.Controller.CanStop)
+                        {
+                            ModernMessageBox.Show("This service cannot be stopped.", "Not Supported", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        item.Controller.Stop();
+                        item.Controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                        item.Controller.Refresh();
+                        item.RefreshProperties();
+                        
+                        if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction($"Stopped Windows Service: {item.DisplayName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        ModernMessageBox.Show($"Failed to stop service. Ensure you are running as Administrator.\n\nDetails: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                else
+                {
+                    // START SERVICE
+                    var result = ModernMessageBox.Show($"Are you sure you want to start '{item.DisplayName}'?", "Confirm Start", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (result != MessageBoxResult.Yes) return;
+
+                    try
+                    {
+                        item.Controller.Start();
+                        item.Controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                        item.Controller.Refresh();
+                        item.RefreshProperties();
+                        
+                        if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction($"Started Windows Service: {item.DisplayName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        ModernMessageBox.Show($"Failed to start service. Ensure you are running as Administrator.\n\nDetails: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Microsoft.Win32;
+using System.Collections.Generic;
+
+namespace agilicomsptoolkit
+{
+    public class SoftwareInfo : System.ComponentModel.INotifyPropertyChanged
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
+        
+        private string _availableVersion = "-";
+        public string AvailableVersion
+        {
+            get => _availableVersion;
+            set { _availableVersion = value; OnPropertyChanged(nameof(AvailableVersion)); }
+        }
+
+        private Brush _updateBgBrush = Brushes.Transparent;
+        public Brush UpdateBgBrush
+        {
+            get => _updateBgBrush;
+            set { _updateBgBrush = value; OnPropertyChanged(nameof(UpdateBgBrush)); }
+        }
+
+        private static readonly Brush DefaultUpdateFgBrush = CreateFrozenBrush("#94a3b8");
+        private Brush _updateFgBrush = DefaultUpdateFgBrush;
+        public Brush UpdateFgBrush
+        {
+            get => _updateFgBrush;
+            set { _updateFgBrush = value; OnPropertyChanged(nameof(UpdateFgBrush)); }
+        }
+
+        public static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public partial class SoftwareAuditDialog : Window
+    {
+        public ObservableCollection<SoftwareInfo> SoftwareList { get; set; } = new ObservableCollection<SoftwareInfo>();
+        private bool _updatesAvailable = false;
+
+        public SoftwareAuditDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadInstalledSoftwareAsync();
+            _ = CheckForUpdatesAsync(); // run in background
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async Task LoadInstalledSoftwareAsync()
+        {
+            SoftwareList.Clear();
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var list = new List<SoftwareInfo>();
+                    ReadUninstallRegistry(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", list);
+                    ReadUninstallRegistry(Registry.LocalMachine, @"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall", list);
+                    ReadUninstallRegistry(Registry.CurrentUser, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", list);
+
+                    var sortedList = list.OrderBy(s => s.Name).ToList();
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        foreach (var item in sortedList)
+                        {
+                            SoftwareList.Add(item);
+                        }
+                        GridSoftware.ItemsSource = SoftwareList;
+                        TxtStatus.Text = $"Loaded {SoftwareList.Count} applications. Checking for updates...";
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load software: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ReadUninstallRegistry(RegistryKey baseKey, string subKeyPath, List<SoftwareInfo> list)
+        {
+            try
+            {
+                using var key = baseKey.OpenSubKey(subKeyPath);
+                if (key == null) return;
+
+                foreach (var subkeyName in key.GetSubKeyNames())
+                {
+                    try
+                    {
+                        using var subkey = key.OpenSubKey(subkeyName);
+                        if (subkey == null) continue;
+
+                        string name = subkey.GetValue("DisplayName")?.ToString() ?? "";
+                        string version = subkey.GetValue("DisplayVersion")?.ToString() ?? "-";
+
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            if (!list.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                list.Add(new SoftwareInfo { Name = name, Version = version });
+                            }
+                        }
+                    }
+                    catch { /* skip unreadable entries */ }
+                }
+            }
+            catch { /* skip unreadable parent keys */ }
+        }
+
+        private async Task CheckForUpdatesAsync()
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "winget.exe",
+                        Arguments = "upgrade",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                int updateCount = 0;
+                string[] lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                
+                bool parsing = false;
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith("Name ") && line.Contains("Id ") && line.Contains("Version ") && line.Contains("Available "))
+                    {
+                        parsing = true;
+                        continue;
+                    }
+
+                    if (parsing && !string.IsNullOrWhiteSpace(line))
+                    {
+                        if (line.StartsWith("-") || line.Contains("upgrades available")) continue;
+
+                        var match = Regex.Match(line, @"^(.+?)\s+([A-Za-z0-9\.\-_]+)\s+([0-9\.\-]+)\s+([0-9\.\-]+)\s+");
+                        if (match.Success)
+                        {
+                            string name = match.Groups[1].Value.Trim();
+                            string availableVersion = match.Groups[4].Value.Trim();
+
+                            // Find in our list
+                            var item = SoftwareList.FirstOrDefault(s => s.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase) || name.StartsWith(s.Name, StringComparison.OrdinalIgnoreCase));
+                            if (item != null)
+                            {
+                                var orangeBrush = SoftwareInfo.CreateFrozenBrush("#f59e0b");
+                                Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    item.AvailableVersion = availableVersion;
+                                    item.UpdateBgBrush = orangeBrush;
+                                    item.UpdateFgBrush = Brushes.White;
+                                });
+                                updateCount++;
+                                _updatesAvailable = true;
+                            }
+                        }
+                    }
+                }
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (_updatesAvailable)
+                    {
+                        TxtStatus.Text = $"{updateCount} updates available.";
+                        SoftwareActionsPanel.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        TxtStatus.Text = "All software is up to date.";
+                    }
+                });
+            }
+            catch (Exception)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    TxtStatus.Text = "Failed to check for updates.";
+                });
+            }
+        }
+
+        private void BtnUpdateSoftware_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("Are you sure you want to update all available software?\n\nThis may close running applications and take several minutes.", "Confirm Update", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Initiated global software update via winget.");
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c winget upgrade --all & pause",
+                    UseShellExecute = true
+                });
+                
+                BtnUpdateSoftware.IsEnabled = false;
+                BtnUpdateSoftware.Content = "Updating...";
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to launch winget: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Microsoft.Win32;
+using System.Threading.Tasks;
+
+namespace agilicomsptoolkit
+{
+    public class StartupItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Command { get; set; } = string.Empty;
+        public string User { get; set; } = string.Empty;
+        
+        // Internal tracking
+        public string RegPath { get; set; } = string.Empty;
+        public RegistryHive Hive { get; set; }
+        
+        private string _state = string.Empty;
+        public string State 
+        { 
+            get => _state; 
+            set { _state = value; OnPropertyChanged(nameof(State)); RefreshProperties(); } 
+        }
+
+        private static readonly Brush EnabledStatusBrush = CreateFrozenBrush("#10b981");
+        private static readonly Brush DisabledStatusBrush = CreateFrozenBrush("#94a3b8");
+        private static readonly Brush DisableActionBgBrush = CreateFrozenBrush("#ef4444");
+        private static readonly Brush EnableActionBgBrush = CreateFrozenBrush("#3b82f6");
+
+        private static Brush CreateFrozenBrush(string hexColor)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            return brush;
+        }
+
+        public Brush StatusColorBrush => State == "Enabled" ? EnabledStatusBrush : DisabledStatusBrush;
+            
+        public Color StatusGlowColor => State == "Enabled" 
+            ? (Color)ColorConverter.ConvertFromString("#10b981") 
+            : Colors.Transparent;
+
+        public string ActionText => State == "Enabled" ? "Disable" : "Enable";
+        
+        public Brush ActionBgBrush => State == "Enabled" ? DisableActionBgBrush : EnableActionBgBrush;
+
+        public void RefreshProperties()
+        {
+            OnPropertyChanged(nameof(StatusColorBrush));
+            OnPropertyChanged(nameof(StatusGlowColor));
+            OnPropertyChanged(nameof(ActionText));
+            OnPropertyChanged(nameof(ActionBgBrush));
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public partial class StartupManagerDialog : Window
+    {
+        public ObservableCollection<StartupItem> StartupApps { get; set; } = new ObservableCollection<StartupItem>();
+
+        public StartupManagerDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+            Loaded += Window_Loaded;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadStartupAppsAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async Task LoadStartupAppsAsync()
+        {
+            StartupApps.Clear();
+            try
+            {
+                var tempApps = new List<StartupItem>();
+                await Task.Run(() =>
+                {
+                    LoadRegistryKey(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Run", RegistryHive.CurrentUser, "Enabled", tempApps);
+                    LoadRegistryKey(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Run-Disabled", RegistryHive.CurrentUser, "Disabled", tempApps);
+                    
+                    LoadRegistryKey(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", RegistryHive.LocalMachine, "Enabled", tempApps);
+                    LoadRegistryKey(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run-Disabled", RegistryHive.LocalMachine, "Disabled", tempApps);
+                });
+
+                foreach (var app in tempApps)
+                {
+                    StartupApps.Add(app);
+                }
+                
+                GridStartup.ItemsSource = StartupApps;
+                TxtStatus.Text = $"{StartupApps.Count} startup apps loaded.";
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to load startup apps: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadRegistryKey(RegistryKey baseKey, string subKeyPath, RegistryHive hive, string state, List<StartupItem> list)
+        {
+            try
+            {
+                using var key = baseKey.OpenSubKey(subKeyPath);
+                if (key == null) return;
+
+                foreach (var valueName in key.GetValueNames())
+                {
+                    var value = key.GetValue(valueName)?.ToString() ?? string.Empty;
+                    list.Add(new StartupItem
+                    {
+                        Name = valueName,
+                        Command = value,
+                        User = hive == RegistryHive.CurrentUser ? "Current User" : "System (All Users)",
+                        RegPath = subKeyPath,
+                        Hive = hive,
+                        State = state
+                    });
+                }
+            }
+            catch { /* Ignore access denied errors on some keys */ }
+        }
+
+        private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadStartupAppsAsync();
+        }
+
+        private void BtnAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is StartupItem item)
+            {
+                try
+                {
+                    string targetState = item.State == "Enabled" ? "Disabled" : "Enabled";
+                    string currentKeyPath = item.RegPath;
+                    string targetKeyPath = targetState == "Enabled" 
+                        ? currentKeyPath.Replace("-Disabled", "")
+                        : currentKeyPath.EndsWith("-Disabled") ? currentKeyPath : currentKeyPath + "-Disabled";
+
+                    RegistryKey baseKey = item.Hive == RegistryHive.CurrentUser ? Registry.CurrentUser : Registry.LocalMachine;
+
+                    // Ensure target key exists
+                    using (var createKey = baseKey.CreateSubKey(targetKeyPath)) { }
+
+                    // Move value
+                    using (var sourceKey = baseKey.OpenSubKey(currentKeyPath, true))
+                    using (var targetKey = baseKey.OpenSubKey(targetKeyPath, true))
+                    {
+                        if (sourceKey != null && targetKey != null)
+                        {
+                            var value = sourceKey.GetValue(item.Name);
+                            if (value != null)
+                            {
+                                targetKey.SetValue(item.Name, value, sourceKey.GetValueKind(item.Name));
+                                sourceKey.DeleteValue(item.Name);
+                                
+                                item.RegPath = targetKeyPath;
+                                item.State = targetState;
+                                
+                                if (Owner is MainWindow mainWindow) 
+                                {
+                                    mainWindow.LogAuditAction($"Successfully {item.State.ToLower()} startup app: {item.Name}");
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    ModernMessageBox.Show("Administrator privileges are required to modify system-wide (All Users) startup apps.", "Access Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Failed to toggle startup app: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System.Windows;
+
+namespace agilicomsptoolkit;
+
+public partial class TermsDialog : Window
+{
+    public TermsDialog()
+    {
+        InitializeComponent();
+    }
+
+    private void BtnAgree_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = true;
+    }
+
+    private void BtnCancel_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Diagnostics;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Windows;
+
+namespace agilicomsptoolkit
+{
+    public partial class TicketDialog : Window
+    {
+        private readonly string _logContent;
+        private readonly byte[]? _pcapBytes;
+        private readonly string _pingTrackerTarget;
+        private readonly Action<string>? _pingLogExporter;
+        private readonly List<LanDevice>? _lanDevices;
+
+        public TicketDialog(string defaultSubject, string defaultBody, string logContent, byte[]? pcapBytes, string pingTrackerTarget, Action<string>? pingLogExporter, List<LanDevice>? lanDevices)
+        {
+            InitializeComponent();
+            
+            _logContent = logContent;
+            _pcapBytes = pcapBytes;
+            _pingTrackerTarget = pingTrackerTarget;
+            _pingLogExporter = pingLogExporter;
+            _lanDevices = lanDevices;
+
+            // Pre-fill fields
+            TxtSubject.Text = defaultSubject;
+            TxtDescription.Text = defaultBody;
+            TxtEmail.Text = ""; // User fills their email
+
+            // Update attachments label based on what is available
+            var attachmentsText = "Attaching: diagnostic_report.txt";
+            if (_pcapBytes != null && _pcapBytes.Length > 0)
+            {
+                attachmentsText += ", network_capture.pcap";
+            }
+            if (!string.IsNullOrEmpty(_pingTrackerTarget))
+            {
+                attachmentsText += ", ping_history.csv";
+            }
+            if (_lanDevices != null && _lanDevices.Count > 0)
+            {
+                attachmentsText += ", network_scan_report.csv";
+            }
+            TxtAttachmentsInfo.Text = attachmentsText;
+        }
+
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private void BtnCreateDraft_Click(object sender, RoutedEventArgs e)
+        {
+            var email = TxtEmail.Text.Trim();
+            var subject = TxtSubject.Text.Trim();
+            var description = TxtDescription.Text.Trim();
+
+            if (string.IsNullOrEmpty(email) || !Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            {
+                ModernMessageBox.Show("Please enter a valid email address.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(subject))
+            {
+                ModernMessageBox.Show("Please enter a subject.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Create temp directory and files for attachments
+            string tempDir = Path.Combine(Path.GetTempPath(), "Agilico_Diagnostics_Logs");
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+                Directory.CreateDirectory(tempDir);
+            }
+            catch { /* Ignore clear errors, write to new unique folder if needed */ }
+
+            string logPath = Path.Combine(tempDir, "diagnostic_report.txt");
+            string pcapPath = "";
+            string pingLogPath = "";
+            string lanReportPath = "";
+
+            try
+            {
+                File.WriteAllText(logPath, _logContent);
+                
+                if (_pcapBytes != null && _pcapBytes.Length > 0)
+                {
+                    pcapPath = Path.Combine(tempDir, "network_capture.pcap");
+                    File.WriteAllBytes(pcapPath, _pcapBytes);
+                }
+
+                if (!string.IsNullOrEmpty(_pingTrackerTarget) && _pingLogExporter != null)
+                {
+                    pingLogPath = Path.Combine(tempDir, "ping_history.csv");
+                    _pingLogExporter(pingLogPath);
+                }
+
+                if (_lanDevices != null && _lanDevices.Count > 0)
+                {
+                    lanReportPath = Path.Combine(tempDir, "network_scan_report.csv");
+                    var sb = new StringBuilder();
+                    sb.AppendLine("IP Address,MAC Address,Hostname,Manufacturer,Status");
+                    foreach (var d in _lanDevices)
+                    {
+                        sb.AppendLine($"{CsvEscape(d.IpAddress)},{CsvEscape(d.MacAddress)},{CsvEscape(d.Hostname)},{CsvEscape(d.Manufacturer)},{CsvEscape(d.Status)}");
+                    }
+                    File.WriteAllText(lanReportPath, sb.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to prepare attachment files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // Construct email body combining user description and basic context
+            string emailBody = $"From: {email}\r\n\r\n" +
+                               $"User Description:\r\n{description}\r\n\r\n" +
+                               $"--------------------------------------------------\r\n" +
+                               $"Diagnostic Summary and details are attached to this email.\r\n" +
+                               $"Hostname: {Environment.MachineName}\r\n" +
+                               $"OS Version: {Environment.OSVersion}\r\n" +
+                               $"Local Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n";
+
+            // Try to use Outlook COM Interop
+            Type? outlookType = Type.GetTypeFromProgID("Outlook.Application");
+            if (outlookType != null)
+            {
+                try
+                {
+                    object? outlookApp = Activator.CreateInstance(outlookType);
+                    if (outlookApp != null)
+                    {
+                        dynamic app = outlookApp;
+                        dynamic mailItem = app.CreateItem(0); // 0 = olMailItem
+                        if (mailItem != null)
+                        {
+                            mailItem.To = "support@tech.agilico.co.uk";
+                            mailItem.Subject = subject;
+                            mailItem.Body = emailBody;
+
+                            // Add attachments
+                            if (File.Exists(logPath)) mailItem.Attachments.Add(logPath);
+                            if (!string.IsNullOrEmpty(pcapPath) && File.Exists(pcapPath)) mailItem.Attachments.Add(pcapPath);
+                            if (!string.IsNullOrEmpty(pingLogPath) && File.Exists(pingLogPath)) mailItem.Attachments.Add(pingLogPath);
+                            if (!string.IsNullOrEmpty(lanReportPath) && File.Exists(lanReportPath)) mailItem.Attachments.Add(lanReportPath);
+
+                            mailItem.Display(false); // Display non-modal
+                            DialogResult = true;
+                            Close();
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Failed to connect to Outlook client: {ex.Message}. Falling back to default mail link.", "Outlook Connector Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+
+            // Fallback to mailto link
+            try
+            {
+                string mailtoUrl = $"mailto:support@tech.agilico.co.uk?subject={Uri.EscapeDataString(subject)}&body={Uri.EscapeDataString(emailBody)}";
+                
+                ModernMessageBox.Show($"Outlook client was not detected or failed to start. We will open your default email client.\r\n\r\nIMPORTANT: Please manually attach the diagnostic logs from:\r\n{tempDir}", "Outlook Not Detected", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                Process.Start(new ProcessStartInfo(mailtoUrl) { UseShellExecute = true });
+                
+                // Open the temp folder in File Explorer to make it easy for the user to attach the files
+                Process.Start(new ProcessStartInfo(tempDir) { UseShellExecute = true });
+                
+                DialogResult = true;
+                Close();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to open email client: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static string CsvEscape(string field)
+        {
+            if (string.IsNullOrEmpty(field)) return "";
+            if (field.Contains(',') || field.Contains('"') || field.Contains('\n') || field.Contains('\r'))
+            {
+                return "\"" + field.Replace("\"", "\"\"") + "\"";
+            }
+            return field;
+        }
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+
+namespace agilicomsptoolkit
+{
+    public class UserGroupInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Sid { get; set; } = string.Empty;
+    }
+
+    public class UserPrivilegeInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public partial class UserDomainInfoDialog : Window
+    {
+        public ObservableCollection<UserGroupInfo> UserGroups { get; set; } = new ObservableCollection<UserGroupInfo>();
+        public ObservableCollection<UserPrivilegeInfo> UserPrivileges { get; set; } = new ObservableCollection<UserPrivilegeInfo>();
+
+        public UserDomainInfoDialog()
+        {
+            InitializeComponent();
+            DataContext = this;
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadUserDomainInfoAsync();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private async Task LoadUserDomainInfoAsync()
+        {
+            try
+            {
+                // 1. Gather User Name & SID
+                string userCsv = await RunCommandAsync("whoami /user /fo csv");
+                var userLines = userCsv.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                if (userLines.Length >= 2)
+                {
+                    var userParts = ParseCsvLine(userLines[1]);
+                    if (userParts.Length >= 2)
+                    {
+                        string fullUser = userParts[0];
+                        TxtUserName.Text = fullUser;
+                        TxtUserSid.Text = userParts[1];
+
+                        if (fullUser.Contains("\\"))
+                        {
+                            TxtDomain.Text = fullUser.Split('\\')[0];
+                        }
+                    }
+                }
+
+                // Logon Server info
+                string logonServer = Environment.GetEnvironmentVariable("LOGONSERVER") ?? "Local Machine";
+                TxtLogonServer.Text = logonServer;
+
+                if (!string.IsNullOrEmpty(logonServer) && logonServer != "Local Machine")
+                {
+                    try
+                    {
+                        var cleanServerName = logonServer.TrimStart('\\');
+                        var ips = await Dns.GetHostAddressesAsync(cleanServerName);
+                        if (ips.Length > 0)
+                        {
+                            TxtLogonServerIp.Text = ips[0].ToString();
+                        }
+                    }
+                    catch
+                    {
+                        TxtLogonServerIp.Text = "Could not resolve IP";
+                    }
+                }
+                else
+                {
+                    TxtLogonServerIp.Text = "N/A";
+                }
+
+                // 2. Gather Group Membership
+                string groupsCsv = await RunCommandAsync("whoami /groups /fo csv");
+                var groupLines = groupsCsv.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                UserGroups.Clear();
+                foreach (var line in groupLines.Skip(1)) // Skip header
+                {
+                    var parts = ParseCsvLine(line);
+                    if (parts.Length >= 3)
+                    {
+                        UserGroups.Add(new UserGroupInfo
+                        {
+                            Name = parts[0],
+                            Type = parts[1],
+                            Sid = parts[2]
+                        });
+                    }
+                }
+                GridGroups.ItemsSource = UserGroups;
+
+                // 3. Gather Privileges
+                string privsCsv = await RunCommandAsync("whoami /priv /fo csv");
+                var privLines = privsCsv.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                UserPrivileges.Clear();
+                foreach (var line in privLines.Skip(1)) // Skip header
+                {
+                    var parts = ParseCsvLine(line);
+                    if (parts.Length >= 3)
+                    {
+                        UserPrivileges.Add(new UserPrivilegeInfo
+                        {
+                            Name = parts[0],
+                            Description = parts[1],
+                            Status = parts[2]
+                        });
+                    }
+                }
+                GridPrivileges.ItemsSource = UserPrivileges;
+
+                TxtStatus.Text = $"Audit complete. {UserGroups.Count} groups & {UserPrivileges.Count} privileges analyzed.";
+            }
+            catch (Exception ex)
+            {
+                TxtStatus.Text = "Audit failed.";
+                ModernMessageBox.Show($"Failed to audit user and domain information: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task<string> RunCommandAsync(string command)
+        {
+            var parts = command.Split(new[] { ' ' }, 2);
+            var exe = parts[0];
+            var args = parts.Length > 1 ? parts[1] : "";
+
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = exe,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            string output = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            return output;
+        }
+
+        private static string[] ParseCsvLine(string line)
+        {
+            var result = new List<string>();
+            bool inQuotes = false;
+            var currentToken = new System.Text.StringBuilder();
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    result.Add(currentToken.ToString().Trim(' ', '"'));
+                    currentToken.Clear();
+                }
+                else
+                {
+                    currentToken.Append(c);
+                }
+            }
+            result.Add(currentToken.ToString().Trim(' ', '"'));
+            return result.ToArray();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+}
+using System;
+using System.Windows;
+using System.Threading.Tasks;
+
+namespace agilicomsptoolkit
+{
+    public partial class MainWindow : Window
+    {
+        private async void BtnIpConfig_Click(object sender, RoutedEventArgs e)
+        {
+            var result = ModernMessageBox.Show("This will flush your DNS cache, release your current IP, and renew it. Your connection may drop temporarily.\n\nContinue?", "Network Config Manager", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    this.IsEnabled = false;
+                    await Task.Run(() =>
+                    {
+                        using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
+                        p1?.WaitForExit(5000);
+                        using var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
+                        p2?.WaitForExit(5000);
+                        using var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
+                        p3?.WaitForExit(10000);
+                    });
+                    
+                    ModernMessageBox.Show("Network configuration successfully reset and renewed.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    ModernMessageBox.Show($"Failed to execute network commands: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    this.IsEnabled = true;
+                }
+            }
+        }
+
+        private void BtnResourceMonitor_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ResourceMonitorDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnActiveDirectory_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new UserDomainInfoDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnSoftwareAudit_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new SoftwareAuditDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnServicesManager_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ServiceManagerDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnDiskCleanup_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DiskManagementDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnEventLog_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new EventLogDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private async void BtnGroupPolicy_Click(object sender, RoutedEventArgs e)
+        {
+            // Keeping plain text dump for unstructured tools
+            await RunITToolAsync("Group Policy Utility", "gpresult /R");
+        }
+
+        private void BtnFirewall_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new FirewallStatusDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private async void BtnPowerManager_Click(object sender, RoutedEventArgs e)
+        {
+            // Keeping plain text dump for unstructured tools
+            await RunITToolAsync("System Uptime & Power", "powercfg /requests");
+        }
+
+        private void BtnStartupApps_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new StartupManagerDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnLocalUsers_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new LocalUsersDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void BtnNicOptimizer_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new NicOptimizerDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private async Task RunGenericAuditAsync(string title, string description, string jsonCommand)
+        {
+            try
+            {
+                string exe = "powershell.exe";
+                string args = $"-NoProfile -Command \"{jsonCommand}\"";
+                
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exe,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(startInfo);
+                if (process == null) return;
+                
+                var outTask = process.StandardOutput.ReadToEndAsync();
+                var errTask = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                string output = await outTask;
+                string err = await errTask;
+                
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    if (!string.IsNullOrWhiteSpace(err))
+                    {
+                        ModernMessageBox.Show($"Command failed with error:\n{err}", "Audit Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        ModernMessageBox.Show("Command returned no tabular data.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    return;
+                }
+
+                var dialog = new GenericDataGridDialog(title, description, output) { Owner = this };
+                dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to generate audit report:\n{ex.Message}", "Tool Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task RunITToolAsync(string title, string command)
+        {
+            try
+            {
+                // Run via PowerShell to support rich formatting and modern cmdlets
+                string exe = "powershell.exe";
+                string args = $"-NoProfile -Command \"{command}\"";
+                
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exe,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(startInfo);
+                if (process == null) return;
+                
+                var outTask = process.StandardOutput.ReadToEndAsync();
+                var errTask = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                string output = await outTask;
+                string err = await errTask;
+                
+                if (string.IsNullOrWhiteSpace(output) && !string.IsNullOrWhiteSpace(err))
+                    output = $"Error Output:\n{err}";
+                else if (string.IsNullOrWhiteSpace(output))
+                    output = "Command completed successfully (no output).";
+
+                var dialog = new ResultDialog(title, output) { Owner = this };
+                dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ModernMessageBox.Show($"Failed to execute tool:\n{ex.Message}", "Tool Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnM365Manager_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new M365ManagerDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+}

@@ -38,9 +38,9 @@ namespace agilicomsptoolkit
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(jsonPayload))
+                if (string.IsNullOrWhiteSpace(jsonPayload) || !(jsonPayload.TrimStart().StartsWith("[") || jsonPayload.TrimStart().StartsWith("{")))
                 {
-                    ModernMessageBox.Show("No data was returned.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ModernMessageBox.Show("No valid tabular data was returned or output format is unsupported.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 

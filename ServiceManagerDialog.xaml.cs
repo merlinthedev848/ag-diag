@@ -76,11 +76,14 @@ namespace agilicomsptoolkit
                 DragMove();
         }
 
-        private void LoadServices()
+        private async void LoadServices()
         {
             try
             {
-                var systemServices = ServiceController.GetServices().OrderBy(s => s.DisplayName).ToList();
+                var systemServices = await System.Threading.Tasks.Task.Run(() => 
+                    ServiceController.GetServices().OrderBy(s => s.DisplayName).ToList()
+                );
+                
                 Services.Clear();
                 foreach (var s in systemServices)
                 {
@@ -100,27 +103,37 @@ namespace agilicomsptoolkit
             LoadServices();
         }
 
-        private void BtnAction_Click(object sender, RoutedEventArgs e)
+        private async void BtnAction_Click(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is ServiceItem item)
             {
+                btn.IsEnabled = false;
+                
                 if (item.Status == "Running")
                 {
                     // STOP SERVICE
                     var result = ModernMessageBox.Show($"Are you sure you want to stop '{item.DisplayName}'?\n\nStopping critical services may cause system instability.", "Confirm Stop", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                    if (result != MessageBoxResult.Yes) return;
+                    if (result != MessageBoxResult.Yes) 
+                    {
+                        btn.IsEnabled = true;
+                        return;
+                    }
 
                     try
                     {
                         if (!item.Controller.CanStop)
                         {
                             ModernMessageBox.Show("This service cannot be stopped.", "Not Supported", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            btn.IsEnabled = true;
                             return;
                         }
 
-                        item.Controller.Stop();
-                        item.Controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
-                        item.Controller.Refresh();
+                        await System.Threading.Tasks.Task.Run(() => 
+                        {
+                            item.Controller.Stop();
+                            item.Controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                            item.Controller.Refresh();
+                        });
                         item.RefreshProperties();
                         
                         if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction($"Stopped Windows Service: {item.DisplayName}");
@@ -134,13 +147,20 @@ namespace agilicomsptoolkit
                 {
                     // START SERVICE
                     var result = ModernMessageBox.Show($"Are you sure you want to start '{item.DisplayName}'?", "Confirm Start", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                    if (result != MessageBoxResult.Yes) return;
+                    if (result != MessageBoxResult.Yes) 
+                    {
+                        btn.IsEnabled = true;
+                        return;
+                    }
 
                     try
                     {
-                        item.Controller.Start();
-                        item.Controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
-                        item.Controller.Refresh();
+                        await System.Threading.Tasks.Task.Run(() => 
+                        {
+                            item.Controller.Start();
+                            item.Controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                            item.Controller.Refresh();
+                        });
                         item.RefreshProperties();
                         
                         if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction($"Started Windows Service: {item.DisplayName}");
@@ -150,6 +170,7 @@ namespace agilicomsptoolkit
                         ModernMessageBox.Show($"Failed to start service. Ensure you are running as Administrator.\n\nDetails: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
+                btn.IsEnabled = true;
             }
         }
 

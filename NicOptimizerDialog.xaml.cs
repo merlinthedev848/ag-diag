@@ -61,7 +61,7 @@ namespace agilicomsptoolkit
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (!string.IsNullOrWhiteSpace(output))
+                if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
                 {
                     using var doc = JsonDocument.Parse(output);
                     
@@ -113,41 +113,49 @@ namespace agilicomsptoolkit
                 
                 try
                 {
-                    await Task.Run(() =>
+                    string[] commands = new[]
                     {
-                        string[] commands = new[]
-                        {
-                            "Enable-NetAdapterRss -Name '*' -ErrorAction SilentlyContinue",
-                            "Disable-NetAdapterLso -Name '*' -ErrorAction SilentlyContinue",
-                            "netsh int tcp set global autotuninglevel=normal",
-                            "netsh int tcp set heuristics disabled",
-                            "netsh int tcp set global ecncapability=enabled"
-                        };
-
-                        string script = string.Join(" ; ", commands);
+                        // Hardware Offloads & Scaling
+                        "Enable-NetAdapterRss -Name '*' -ErrorAction SilentlyContinue",
+                        "Disable-NetAdapterLso -Name '*' -ErrorAction SilentlyContinue",
+                        "Disable-NetAdapterRsc -Name '*' -ErrorAction SilentlyContinue", // RSC can cause latency for VoIP
                         
-                        var process = new Process
-                        {
-                            StartInfo = new ProcessStartInfo
-                            {
-                                FileName = "powershell.exe",
-                                Arguments = $"-NoProfile -Command \"{script}\"",
-                                RedirectStandardOutput = true,
-                                RedirectStandardError = true,
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    });
+                        // TCP/IP Stack Tuning
+                        "netsh int tcp set global autotuninglevel=normal",
+                        "netsh int tcp set heuristics disabled",
+                        "netsh int tcp set global ecncapability=disabled", // ECN can sometimes cause packet drops on unsupportive routers
+                        "netsh int tcp set global rss=enabled",
+                        "netsh int tcp set global timestamps=disabled",
+                        "netsh int tcp set global nonsackrttresiliency=disabled",
+                        
+                        // Windows Multimedia Network Throttling (Optimizes for VoIP and gaming/speed)
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name 'NetworkThrottlingIndex' -Value 0xFFFFFFFF -ErrorAction SilentlyContinue",
+                        "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name 'SystemResponsiveness' -Value 0 -ErrorAction SilentlyContinue"
+                    };
 
-                    ModernMessageBox.Show("All physical network adapters have been optimized for maximum VoIP performance.\nLSO Disabled, RSS Enabled, and TCP Heuristics Tuned.", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                    TxtStatus.Text = "Optimization applied.";
+                    string script = string.Join(" ; ", commands);
+                    
+                    var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-NoProfile -Command \"{script}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    ModernMessageBox.Show("Network adapters have been optimized for maximum Speed, Stability, and VoIP Performance.\n\nChanges applied:\n- RSS Enabled, LSO/RSC Disabled\n- TCP Auto-Tuning and Heuristics Optimized\n- Windows Network Throttling Disabled", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TxtStatus.Text = "Maximum connectivity optimizations applied.";
                     
                     if (Owner is MainWindow mainWindow) 
                     {
-                        mainWindow.LogAuditAction("Executed NIC Optimizer routine on physical network adapters.");
+                        mainWindow.LogAuditAction("Executed advanced NIC Optimizer routine on physical network adapters.");
                     }
                 }
                 catch (Exception ex)

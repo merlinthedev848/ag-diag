@@ -325,32 +325,31 @@ namespace agilicomsptoolkit
 
         private async Task<string> RunPowerShellSilentAsync(string command)
         {
-            return await Task.Run(() =>
+            try
             {
-                try
+                var startInfo = new ProcessStartInfo
                 {
-                    var startInfo = new ProcessStartInfo
-                    {
-                        FileName = "powershell.exe",
-                        Arguments = $"-NoProfile -Command \"{command}\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -Command \"{command}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-                    using var proc = Process.Start(startInfo);
-                    if (proc == null) return string.Empty;
+                using var proc = Process.Start(startInfo);
+                if (proc == null) return string.Empty;
 
-                    string stdout = proc.StandardOutput.ReadToEnd();
-                    proc.WaitForExit(5000);
-                    return stdout;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            });
+                string stdout = await proc.StandardOutput.ReadToEndAsync();
+                using var cts = new System.Threading.CancellationTokenSource(5000);
+                try { await proc.WaitForExitAsync(cts.Token); } catch { }
+                
+                return stdout;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private void RunPowerShellInteractive(string scriptContent, Action? onExit = null)

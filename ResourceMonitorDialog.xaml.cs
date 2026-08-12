@@ -32,30 +32,33 @@ namespace agilicomsptoolkit
                 DragMove();
         }
 
-        private void LoadProcesses()
+        private async void LoadProcesses()
         {
             try
             {
-                _processes.Clear();
-                var procs = Process.GetProcesses()
-                    .Select(p => {
-                        double mem = 0;
-                        try { mem = Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1); } catch { }
-                        string title = "";
-                        try { title = p.MainWindowTitle; } catch { }
-                        return new ProcessInfo
-                        {
-                            Name = p.ProcessName,
-                            Id = p.Id,
-                            MemoryMB = mem,
-                            Title = title
-                        };
-                    })
-                    .Where(p => p.MemoryMB > 10) // Filter out tiny background tasks for cleaner view
-                    .OrderByDescending(p => p.MemoryMB)
-                    .Take(50) // Show top 50
-                    .ToList();
+                var procs = await Task.Run(() =>
+                {
+                    return Process.GetProcesses()
+                        .Select(p => {
+                            double mem = 0;
+                            try { mem = Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1); } catch { }
+                            string title = "";
+                            try { title = p.MainWindowTitle; } catch { }
+                            return new ProcessInfo
+                            {
+                                Name = p.ProcessName,
+                                Id = p.Id,
+                                MemoryMB = mem,
+                                Title = title
+                            };
+                        })
+                        .Where(p => p.MemoryMB > 10) // Filter out tiny background tasks for cleaner view
+                        .OrderByDescending(p => p.MemoryMB)
+                        .Take(50) // Show top 50
+                        .ToList();
+                });
 
+                _processes.Clear();
                 foreach (var p in procs)
                 {
                     _processes.Add(p);

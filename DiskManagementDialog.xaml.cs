@@ -41,49 +41,62 @@ namespace agilicomsptoolkit
                 DragMove();
         }
 
-        private void LoadDisks()
+        private async void LoadDisks()
         {
             Disks.Clear();
             try
             {
-                DriveInfo[] drives = DriveInfo.GetDrives();
-                foreach (DriveInfo d in drives)
+                var diskInfos = await Task.Run(() =>
                 {
-                    if (d.IsReady && d.DriveType == DriveType.Fixed)
+                    var list = new System.Collections.Generic.List<LogicalDiskInfo>();
+                    DriveInfo[] drives = DriveInfo.GetDrives();
+                    foreach (DriveInfo d in drives)
                     {
-                        double totalGb = Math.Round(d.TotalSize / 1024.0 / 1024.0 / 1024.0, 2);
-                        double freeGb = Math.Round(d.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0, 2);
-                        double usedGb = totalGb - freeGb;
-                        
-                        double usedPercent = totalGb > 0 ? (usedGb / totalGb) * 100.0 : 0;
-                        double freePercent = 100.0 - usedPercent;
-
-                        Brush fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3b82f6")); // Blue
-                        Brush textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#94a3b8")); // Slate 400
-
-                        if (usedPercent >= 90)
+                        if (d.IsReady && d.DriveType == DriveType.Fixed)
                         {
-                            fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444")); // Red
-                            textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444"));
+                            double totalGb = Math.Round(d.TotalSize / 1024.0 / 1024.0 / 1024.0, 2);
+                            double freeGb = Math.Round(d.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0, 2);
+                            double usedGb = totalGb - freeGb;
+                            
+                            double usedPercent = totalGb > 0 ? (usedGb / totalGb) * 100.0 : 0;
+                            double freePercent = 100.0 - usedPercent;
+
+                            Brush fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3b82f6")); // Blue
+                            Brush textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#94a3b8")); // Slate 400
+
+                            if (usedPercent >= 90)
+                            {
+                                fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444")); // Red
+                                textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ef4444"));
+                            }
+                            else if (usedPercent >= 80)
+                            {
+                                fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b")); // Orange
+                                textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b"));
+                            }
+                            
+                            fillBrush.Freeze();
+                            textBrush.Freeze();
+
+                            list.Add(new LogicalDiskInfo
+                            {
+                                DeviceID = d.Name.TrimEnd('\\'),
+                                VolumeName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local Disk" : d.VolumeLabel,
+                                SizeText = $"{usedGb:F1} GB used of {totalGb:F1} GB",
+                                PercentageText = $"{Math.Round(usedPercent)}% Used ({freeGb:F1} GB Free)",
+                                FillWidthStar = new GridLength(usedPercent, GridUnitType.Star),
+                                EmptyWidthStar = new GridLength(freePercent, GridUnitType.Star),
+                                FillBrush = fillBrush,
+                                TextBrush = textBrush
+                            });
                         }
-                        else if (usedPercent >= 80)
-                        {
-                            fillBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b")); // Orange
-                            textBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f59e0b"));
-                        }
-
-                        Disks.Add(new LogicalDiskInfo
-                        {
-                            DeviceID = d.Name.TrimEnd('\\'),
-                            VolumeName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local Disk" : d.VolumeLabel,
-                            SizeText = $"{usedGb:F1} GB used of {totalGb:F1} GB",
-                            PercentageText = $"{Math.Round(usedPercent)}% Used ({freeGb:F1} GB Free)",
-                            FillWidthStar = new GridLength(usedPercent, GridUnitType.Star),
-                            EmptyWidthStar = new GridLength(freePercent, GridUnitType.Star),
-                            FillBrush = fillBrush,
-                            TextBrush = textBrush
-                        });
                     }
+                    return list;
+                });
+                
+                foreach (var di in diskInfos)
+                {
+                    Disks.Add(di);
                 }
                 ItemsDisks.ItemsSource = Disks;
             }

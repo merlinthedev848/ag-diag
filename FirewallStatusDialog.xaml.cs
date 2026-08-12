@@ -82,7 +82,7 @@ namespace agilicomsptoolkit
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (!string.IsNullOrWhiteSpace(output))
+                if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
                 {
                     using var doc = JsonDocument.Parse(output);
                     int activeCount = 0;
