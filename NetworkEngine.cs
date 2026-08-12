@@ -416,7 +416,7 @@ namespace agilicomsptoolkit
         {
             try
             {
-                var proc = new System.Diagnostics.Process();
+                using var proc = new System.Diagnostics.Process();
                 proc.StartInfo.FileName = "netsh";
                 proc.StartInfo.Arguments = "wlan show interfaces";
                 proc.StartInfo.UseShellExecute = false;
@@ -424,15 +424,14 @@ namespace agilicomsptoolkit
                 proc.StartInfo.CreateNoWindow = true;
                 proc.Start();
 
-                // Use synchronous read with a timeout — safe inside Task.Run context.
-                // Avoids .Result deadlock risk on SynchronizationContext-bearing threads.
+                var readTask = proc.StandardOutput.ReadToEndAsync();
                 bool exited = proc.WaitForExit(3000);
                 if (!exited)
                 {
                     try { proc.Kill(); } catch { }
                     proc.WaitForExit(500);
                 }
-                string output = exited ? proc.StandardOutput.ReadToEnd() : "";
+                string output = exited ? readTask.Result : "";
 
                 string ssid = "Unknown";
                 string signal = "";
@@ -1429,23 +1428,19 @@ namespace agilicomsptoolkit
                 return true;
             }
 
-            // Bind local port 5060 or ephemeral equivalent to determine availability
+            UdpClient? testClient = null;
             try
             {
-                using (var testClient = new UdpClient(localPort))
-                {
-                    Log($"Local UDP port {localPort} is available.");
-                }
+                testClient = new UdpClient(localPort);
+                Log($"Local UDP port {localPort} is bound for testing.");
             }
             catch (SocketException)
             {
                 Log($"Local UDP port {localPort} is in use. Auto-selecting an ephemeral port for testing...");
                 try
                 {
-                    using (var testClient = new UdpClient(0))
-                    {
-                        localPort = ((IPEndPoint)testClient.Client.LocalEndPoint!).Port;
-                    }
+                    testClient = new UdpClient(0);
+                    localPort = ((IPEndPoint)testClient.Client.LocalEndPoint!).Port;
                     Log($"Selected local UDP port {localPort} for testing.");
                 }
                 catch (Exception ex)
@@ -1456,18 +1451,25 @@ namespace agilicomsptoolkit
                 }
             }
 
-            // Contact STUN servers to check mapped port using the determined localPort
-            var servers = new[] { "stun-gb-a.hp2k.co.uk", "stun-gb-b.hp2k.co.uk", "stun.l.google.com" };
-            foreach (var server in servers)
+            try
             {
-                if (token.IsCancellationRequested) return false;
-                var (ok, ip, mPort) = await QueryStunServerAsync(server, 3478, token, localPort);
-                if (ok)
+                // Contact STUN servers to check mapped port using the determined localPort and active testClient
+                var servers = new[] { "stun-gb-a.hp2k.co.uk", "stun-gb-b.hp2k.co.uk", "stun.l.google.com" };
+                foreach (var server in servers)
                 {
-                    mappedPort = mPort;
-                    success = true;
-                    break;
+                    if (token.IsCancellationRequested) return false;
+                    var (ok, ip, mPort) = await QueryStunServerAsync(server, 3478, token, localPort, testClient);
+                    if (ok)
+                    {
+                        mappedPort = mPort;
+                        success = true;
+                        break;
+                    }
                 }
+            }
+            finally
+            {
+                testClient?.Close();
             }
 
             if (!success)
@@ -1595,6 +1597,7 @@ namespace agilicomsptoolkit
                     }
                     else
                     {
+                        _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                         Log($"Request to {server} timed out.");
                     }
                 }
@@ -2027,6 +2030,7 @@ namespace agilicomsptoolkit
                 }
                 else
                 {
+                    _ = connectTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                     return (false, "Connection timed out after 5 seconds");
                 }
             }
@@ -2075,9 +2079,9 @@ namespace agilicomsptoolkit
             bool allPassed = signallingResult.ok && presenceResult.ok && roomsResult.ok;
 
             Log("SignalR/WebSocket Connection Summary:");
-            Log($"  Signalling Hub ({SignallingUrl}): {(signallingResult.ok ? "PASS" : "FAIL - " + signallingResult.msg)}");
-            Log($"  Presence Hub ({PresenceUrl}): {(presenceResult.ok ? "PASS" : "FAIL - " + presenceResult.msg)}");
-            Log($"  Rooms Hub ({RoomsUrl}): {(roomsResult.ok ? "PASS" : "FAIL - " + roomsResult.msg)}");
+            Log($"  Signalling Hub ({SignallingUrl}): {(signallingResult.ok ? "PASSED" : "FAILED - " + signallingResult.msg)}");
+            Log($"  Presence Hub ({PresenceUrl}): {(presenceResult.ok ? "PASSED" : "FAILED - " + presenceResult.msg)}");
+            Log($"  Rooms Hub ({RoomsUrl}): {(roomsResult.ok ? "PASSED" : "FAILED - " + roomsResult.msg)}");
 
             if (allPassed)
             {

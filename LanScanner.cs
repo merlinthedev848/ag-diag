@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace agilicomsptoolkit
 {
@@ -27,12 +28,12 @@ namespace agilicomsptoolkit
         [DllImport("iphlpapi.dll", ExactSpelling = true, SetLastError = true)]
         private static extern int SendARP(int DestIP, int SrcIP, byte[] pMacAddr, ref int PhyAddrLen);
 
-        private readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        private readonly Dictionary<string, string> _ouiCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        private static readonly ConcurrentDictionary<string, string> _ouiCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly SemaphoreSlim _macApiSemaphore = new SemaphoreSlim(1, 1);
 
         // A curated list of common OUI prefixes for instant resolution without internet
-        private readonly Dictionary<string, string> _commonOuis = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<string, string> _commonOuis = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "00:15:65", "Yealink" }, { "00:15:B9", "Yealink" }, { "80:5E:C0", "Yealink" }, { "E4:34:93", "Yealink" }, { "00:04:13", "Snom" },
             { "00:04:F2", "Polycom" }, { "00:E0:75", "Polycom" }, { "64:16:7F", "Polycom" }, { "00:0B:82", "Grandstream" }, { "C0:74:AD", "Grandstream" },
@@ -100,7 +101,12 @@ namespace agilicomsptoolkit
 
             uint networkAddr = (uint)(networkBytes[0] << 24 | networkBytes[1] << 16 | networkBytes[2] << 8 | networkBytes[3]);
             uint broadcastAddr = (uint)(broadcastBytes[0] << 24 | broadcastBytes[1] << 16 | broadcastBytes[2] << 8 | broadcastBytes[3]);
-            uint hostCount = broadcastAddr - networkAddr - 1; // exclude network and broadcast
+            
+            uint hostCount = 0;
+            if (broadcastAddr > networkAddr + 1)
+            {
+                hostCount = broadcastAddr - networkAddr - 1; // exclude network and broadcast
+            }
 
             // Cap at 1024 hosts to prevent accidental huge scans
             const uint maxHosts = 1024;
@@ -109,17 +115,6 @@ namespace agilicomsptoolkit
                 hostCount = maxHosts;
             }
             if (hostCount == 0) return activeDevices;
-
-            // Calculate CIDR for display
-            int cidr = 0;
-            foreach (byte b in maskBytes)
-            {
-                for (int bit = 7; bit >= 0; bit--)
-                {
-                    if ((b & (1 << bit)) != 0) cidr++;
-                    else break;
-                }
-            }
 
             int totalIPs = (int)hostCount;
             int completed = 0;
@@ -137,76 +132,92 @@ namespace agilicomsptoolkit
                 uint targetAddr = networkAddr + (uint)offset;
                 string targetIp = $"{(targetAddr >> 24) & 0xFF}.{(targetAddr >> 16) & 0xFF}.{(targetAddr >> 8) & 0xFF}.{targetAddr & 0xFF}";
                 
-                bool isAlive = false;
                 try
                 {
-                    using var pinger = new Ping();
-                    var reply = await pinger.SendPingAsync(targetIp, 1000);
-                    isAlive = (reply.Status == IPStatus.Success);
-                }
-                catch { }
-
-                if (isAlive || targetIp == localIp)
-                {
-                    if (ct.IsCancellationRequested) return;
-
-                    // SendARP blocks synchronously, but MaxDegreeOfParallelism will handle it efficiently
-                    string mac = "";
-                    await Task.Run(() => { mac = GetMacAddress(targetIp); }, ct);
-                    
-                    var device = new LanDevice
-                    {
-                        IpAddress = targetIp,
-                        MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
-                    };
-                    
-                    if (ct.IsCancellationRequested) return;
-
-                    // Get Hostname
+                    bool isAlive = false;
                     try
                     {
-                        if (device.IpAddress == localIp)
+                        using var pinger = new Ping();
+                        var reply = await pinger.SendPingAsync(targetIp, 1000);
+                        isAlive = (reply.Status == IPStatus.Success);
+                    }
+                    catch { }
+
+                    if (ct.IsCancellationRequested) return;
+
+                    if (isAlive || targetIp == localIp)
+                    {
+                        if (ct.IsCancellationRequested) return;
+
+                        // SendARP blocks synchronously, but MaxDegreeOfParallelism will handle it efficiently
+                        string mac = "";
+                        await Task.Run(() => { mac = GetMacAddress(targetIp); }, ct);
+                        
+                        var device = new LanDevice
                         {
-                            device.Hostname = Dns.GetHostName();
-                        }
-                        else
+                            IpAddress = targetIp,
+                            MacAddress = string.IsNullOrEmpty(mac) ? (targetIp == localIp ? "Local Interface" : "Unknown") : mac,
+                        };
+                        
+                        if (ct.IsCancellationRequested) return;
+
+                        // Get Hostname
+                        try
                         {
-                            var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
-                            var timeoutTask = Task.Delay(1000, ct);
-                            var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
-                            if (completedTask == dnsTask)
+                            if (device.IpAddress == localIp)
                             {
-                                var hostEntry = await dnsTask;
-                                device.Hostname = hostEntry.HostName;
+                                device.Hostname = Dns.GetHostName();
                             }
                             else
                             {
-                                device.Hostname = "-";
+                                var dnsTask = Dns.GetHostEntryAsync(device.IpAddress);
+                                using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                                var timeoutTask = Task.Delay(1000, delayCts.Token);
+                                var completedTask = await Task.WhenAny(dnsTask, timeoutTask);
+                                if (completedTask == dnsTask)
+                                {
+                                    delayCts.Cancel();
+                                    var hostEntry = await dnsTask;
+                                    device.Hostname = hostEntry.HostName;
+                                }
+                                else
+                                {
+                                    device.Hostname = "-";
+                                }
                             }
                         }
+                        catch { device.Hostname = "-"; }
+
+                        if (ct.IsCancellationRequested) return;
+
+                        device.Manufacturer = await GetManufacturerAsync(device.MacAddress, ct);
+
+                        if (ct.IsCancellationRequested) return;
+
+                        lock (syncLock)
+                        {
+                            activeDevices.Add(device);
+                        }
+                        
+                        if (System.Windows.Application.Current != null && System.Windows.Application.Current.Dispatcher != null)
+                        {
+                            _ = System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => deviceFoundCallback?.Invoke(device)));
+                        }
+                        else
+                        {
+                            deviceFoundCallback?.Invoke(device);
+                        }
                     }
-                    catch { device.Hostname = "-"; }
-
-                    if (ct.IsCancellationRequested) return;
-
-                    device.Manufacturer = await GetManufacturerAsync(device.MacAddress, ct);
-
-                    if (ct.IsCancellationRequested) return;
-
+                }
+                finally
+                {
                     lock (syncLock)
                     {
-                        activeDevices.Add(device);
-                    }
-                    
-                    deviceFoundCallback?.Invoke(device);
-                }
-
-                lock (syncLock)
-                {
-                    completed++;
-                    if (completed % 10 == 0 || completed == totalIPs)
-                    {
-                        progressCallback?.Invoke(completed, totalIPs);
+                        completed++;
+                        if (completed % 10 == 0 || completed == totalIPs)
+                        {
+                            progressCallback?.Invoke(completed, totalIPs);
+                        }
                     }
                 }
             });
@@ -289,7 +300,11 @@ namespace agilicomsptoolkit
             finally
             {
                 // Delay releasing the semaphore for 600ms to stay within the 2 req/sec rate limit of api.macvendors.com
-                _ = Task.Delay(600).ContinueWith(_ => _macApiSemaphore.Release());
+                _ = Task.Run(async () =>
+                {
+                    try { await Task.Delay(600, token); } catch { }
+                    try { _macApiSemaphore.Release(); } catch { }
+                }, token);
             }
 
             _ouiCache[prefix] = "Unknown";
@@ -313,7 +328,7 @@ namespace agilicomsptoolkit
 
         public void Dispose()
         {
-            _httpClient?.Dispose();
+            // HttpClient is a static field now, no instance disposal needed.
         }
     }
 }

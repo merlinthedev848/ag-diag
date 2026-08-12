@@ -65,7 +65,7 @@ namespace agilicomsptoolkit
             {
                 string jsonCommand = "Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction | ConvertTo-Json -Compress";
                 
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -148,6 +148,7 @@ namespace agilicomsptoolkit
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Dialog: Firewall Status closed.");
             Close();
         }
     }

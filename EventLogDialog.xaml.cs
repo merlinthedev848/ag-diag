@@ -87,9 +87,9 @@ namespace agilicomsptoolkit
 
             try
             {
-                string jsonCommand = "Get-EventLog -LogName System -Newest 50 | Select-Object TimeGenerated, EntryType, Source, Message | ConvertTo-Json -Compress";
+                string jsonCommand = "Get-WinEvent -LogName System -MaxEvents 50 | Select-Object @{Name='TimeGenerated';Expression={$_.TimeCreated}}, @{Name='EntryType';Expression={$_.LevelDisplayName}}, @{Name='Source';Expression={$_.ProviderName}}, Message | ConvertTo-Json -Compress";
                 
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -146,6 +146,7 @@ namespace agilicomsptoolkit
             {
                 try
                 {
+                    Logger.Log($"Action: Event Log - searched for solution for event from '{log.Source}'");
                     // Escape query string - get first line of message for better search
                     string cleanMessage = log.Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
                     string query = Uri.EscapeDataString($"Windows Event Log {log.Source} {cleanMessage}");
@@ -159,6 +160,7 @@ namespace agilicomsptoolkit
                 }
                 catch (Exception ex)
                 {
+                    Logger.Log($"Error: Event Log search failed - {ex.Message}");
                     ModernMessageBox.Show($"Failed to open search: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -220,6 +222,7 @@ namespace agilicomsptoolkit
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Dialog: Event Log closed.");
             Close();
         }
     }

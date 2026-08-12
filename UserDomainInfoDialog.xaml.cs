@@ -147,7 +147,7 @@ namespace agilicomsptoolkit
             var exe = parts[0];
             var args = parts.Length > 1 ? parts[1] : "";
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -195,6 +195,7 @@ namespace agilicomsptoolkit
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Dialog: User & Domain Info closed.");
             Close();
         }
     }

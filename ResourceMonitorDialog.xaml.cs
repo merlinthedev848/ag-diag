@@ -72,6 +72,7 @@ namespace agilicomsptoolkit
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Action: Resource Monitor - refreshed process list.");
             LoadProcesses();
         }
 
@@ -86,11 +87,13 @@ namespace agilicomsptoolkit
                     {
                         var p = Process.GetProcessById(selected.Id);
                         p.Kill();
+                        Logger.Log($"Action: Resource Monitor - terminated process '{selected.Name}' (PID {selected.Id}).");
                         ModernMessageBox.Show($"Successfully terminated {selected.Name}.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                         LoadProcesses();
                     }
                     catch (Exception ex)
                     {
+                        Logger.Log($"Error: Resource Monitor - failed to terminate '{selected.Name}' - {ex.Message}");
                         ModernMessageBox.Show($"Could not terminate process: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
@@ -103,6 +106,7 @@ namespace agilicomsptoolkit
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Dialog: Resource Monitor closed.");
             Close();
         }
     }

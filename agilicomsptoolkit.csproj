@@ -22,9 +22,9 @@
     <Product>Agilico MSP Toolkit</Product>
     <Copyright>Copyright (c) 2026 Agilico. All rights reserved.</Copyright>
     <Description>Network diagnostic and IT engineering toolkit for Agilico Connect Windows App.</Description>
-    <Version>4.1.0</Version>
-    <AssemblyVersion>4.1.0</AssemblyVersion>
-    <FileVersion>4.1.0</FileVersion>
+    <Version>4.0.0</Version>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+    <FileVersion>4.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

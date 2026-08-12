@@ -44,7 +44,7 @@ namespace agilicomsptoolkit
                 // Only get physical adapters (Virtual=False) that are up or disconnected
                 string jsonCommand = "Get-NetAdapter -Physical | Select-Object Name, InterfaceDescription, Status | ConvertTo-Json -Compress";
                 
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -135,7 +135,7 @@ namespace agilicomsptoolkit
 
                     string script = string.Join(" ; ", commands);
                     
-                    var process = new Process
+                    using var process = new Process
                     {
                         StartInfo = new ProcessStartInfo
                         {

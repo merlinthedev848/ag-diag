@@ -9,6 +9,7 @@ namespace agilicomsptoolkit
 {
     public partial class MainWindow : Window
     {
+#if FULL_VERSION
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         private static extern bool ChangeWindowMessageFilter(uint message, uint flag);
 
@@ -217,6 +218,8 @@ namespace agilicomsptoolkit
         {
             try
             {
+                LogAuditAction($"Started audio conversion of file: {inputPath}");
+                
                 // UI Reset
                 TxtConvertingFileName.Text = System.IO.Path.GetFileName(inputPath);
                 PrgConversion.Value = 0;
@@ -240,6 +243,7 @@ namespace agilicomsptoolkit
                 {
                     TxtStep1Status.Text = $"Failed: Unsupported format '{ext}'";
                     TxtConversionResult.Text = "Conversion aborted due to unsupported file format.";
+                    LogAuditAction($"Audio conversion aborted: Unsupported format '{ext}' for file: {inputPath}");
                     return;
                 }
 
@@ -270,17 +274,29 @@ namespace agilicomsptoolkit
                     TxtStep3Status.Text = "Completed";
                     PrgConversion.Value = 100;
                     TxtConversionResult.Text = $"Success! Saved to:\n{result.outputPath}";
+                    LogAuditAction($"Audio conversion completed successfully for file: {inputPath}. Output saved to: {result.outputPath}");
                 }
                 else
                 {
                     TxtStep3Status.Text = "Failed";
                     TxtConversionResult.Text = $"Conversion Error: {result.message}";
+                    LogAuditAction($"Audio conversion failed for file: {inputPath}. Error: {result.message}");
                 }
             }
             catch (Exception ex)
             {
                 TxtConversionResult.Text = $"Unexpected Error: {ex.Message}";
+                LogAuditAction($"Unexpected error during audio conversion of file: {inputPath}. Error: {ex.Message}");
             }
         }
+#else
+        private void BtnConverter_Click(object sender, RoutedEventArgs e) { }
+        private void DropZoneBorder_DragEnter(object sender, DragEventArgs e) { }
+        private void DropZoneBorder_DragOver(object sender, DragEventArgs e) { }
+        private void DropZoneBorder_DragLeave(object sender, DragEventArgs e) { }
+        private void DropZoneBorder_Drop(object sender, DragEventArgs e) { }
+        private void DropZoneBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { }
+        private void BtnBrowseMedia_Click(object sender, RoutedEventArgs e) { }
+#endif
     }
 }

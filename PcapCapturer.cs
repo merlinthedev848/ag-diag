@@ -97,11 +97,7 @@ namespace agilicomsptoolkit
             if (oldCts != null)
             {
                 try { oldCts.Cancel(); } catch { }
-                // Dispose after a delay to ensure any asynchronous capture loop handles cancellation cleanly
-                Task.Delay(500).ContinueWith(_ =>
-                {
-                    try { oldCts.Dispose(); } catch { }
-                });
+                try { oldCts.Dispose(); } catch { }
             }
 
             if (socketToClose != null)
@@ -289,8 +285,11 @@ namespace agilicomsptoolkit
             if (!BitConverter.IsLittleEndian) Array.Reverse(bytes);
             _outputStream.Write(bytes, 0, 2);
         }
+
         private void StartRawSocketSniffer(string? adapterIp = null)
         {
+            Socket? socket = null;
+            CancellationTokenSource? cts = null;
             try
             {
                 string localIp = !string.IsNullOrEmpty(adapterIp) ? adapterIp : GetLocalIpAddress();
@@ -299,24 +298,43 @@ namespace agilicomsptoolkit
                     throw new InvalidOperationException("No active local IP address found to bind packet sniffer.");
                 }
 
-                _rawSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.IP);
-                _rawSocket.Bind(new IPEndPoint(IPAddress.Parse(localIp), 0));
+                socket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.IP);
+                socket.Bind(new IPEndPoint(IPAddress.Parse(localIp), 0));
                 
                 byte[] inVal = new byte[] { 1, 0, 0, 0 };
                 byte[] outVal = new byte[] { 0, 0, 0, 0 };
-                _rawSocket.IOControl(IOControlCode.ReceiveAll, inVal, outVal);
+                socket.IOControl(IOControlCode.ReceiveAll, inVal, outVal);
 
-                _captureCts = new CancellationTokenSource();
-                var token = _captureCts.Token;
+                cts = new CancellationTokenSource();
+                var token = cts.Token;
 
-                _captureTask = Task.Run(() => CaptureLoopAsync(token), token);
+                lock (_lock)
+                {
+                    if (!_isWriting)
+                    {
+                        socket.Close();
+                        cts.Dispose();
+                        return;
+                    }
+                    _rawSocket = socket;
+                    _captureCts = cts;
+                    _captureTask = Task.Run(() => CaptureLoopAsync(token), token);
+                }
             }
             catch (SocketException ex)
             {
+                socket?.Close();
+                cts?.Dispose();
                 if (ex.SocketErrorCode == SocketError.AccessDenied || ex.ErrorCode == 10013)
                 {
                     throw new UnauthorizedAccessException("Administrative privileges are required to perform raw packet capture on Windows. Please run the application as Administrator.", ex);
                 }
+                throw;
+            }
+            catch
+            {
+                socket?.Close();
+                cts?.Dispose();
                 throw;
             }
         }

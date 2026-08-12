@@ -50,6 +50,7 @@ namespace agilicomsptoolkit
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Action: Ticket creation cancelled.");
             DialogResult = false;
             Close();
         }
@@ -57,6 +58,7 @@ namespace agilicomsptoolkit
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private void BtnCreateDraft_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log($"Action: Ticket draft creation initiated.");
             var email = TxtEmail.Text.Trim();
             var subject = TxtSubject.Text.Trim();
             var description = TxtDescription.Text.Trim();

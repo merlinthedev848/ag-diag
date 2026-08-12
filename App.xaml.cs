@@ -16,6 +16,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        LogStartupMessage("OnStartup triggered.");
 
         // Global Exception Handling
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
@@ -23,6 +24,7 @@ public partial class App : Application
             var ex = args.ExceptionObject as Exception;
             string errorMsg = ex?.Message ?? "Unknown fatal error";
             System.Diagnostics.Debug.WriteLine($"AppDomain Unhandled Exception: {errorMsg}\n{ex?.StackTrace}");
+            LogStartupError("AppDomain.UnhandledException", ex);
             
             // ModernMessageBox is a WPF window and requires STA thread.
             // Check if we can safely dispatch to the UI thread, otherwise fallback to standard MessageBox.Show.
@@ -45,6 +47,7 @@ public partial class App : Application
         DispatcherUnhandledException += (s, args) =>
         {
             System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
+            LogStartupError("DispatcherUnhandledException", args.Exception);
             ModernMessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true; // Prevent app from closing if possible
         };
@@ -52,6 +55,7 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (s, args) =>
         {
             System.Diagnostics.Debug.WriteLine($"Unobserved Task Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
+            LogStartupError("TaskScheduler.UnobservedTaskException", args.Exception);
             // Don't show message box for unobserved background task exceptions, just log them
             args.SetObserved();
         };
@@ -65,6 +69,8 @@ public partial class App : Application
             }
         }
 
+        LogStartupMessage($"Silent mode: {silentMode}");
+
         if (silentMode)
         {
             RunSilentModeAsync(e);
@@ -75,16 +81,23 @@ public partial class App : Application
             this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
             // Launch GUI
+            LogStartupMessage("Instantiating TermsDialog.");
             var terms = new TermsDialog();
-            if (terms.ShowDialog() == true)
+            LogStartupMessage("Showing TermsDialog.");
+            bool? result = terms.ShowDialog();
+            LogStartupMessage($"TermsDialog result: {result}");
+            if (result == true)
             {
+                LogStartupMessage("Instantiating MainWindow.");
                 var mainWindow = new MainWindow();
                 this.MainWindow = mainWindow;
                 this.ShutdownMode = ShutdownMode.OnLastWindowClose;
+                LogStartupMessage("Showing MainWindow.");
                 mainWindow.Show();
             }
             else
             {
+                LogStartupMessage("User declined terms or closed dialog. Shutting down.");
                 Shutdown();
             }
         }
@@ -158,6 +171,32 @@ public partial class App : Application
                 Environment.Exit(1);
             }
         });
+    }
+
+    private static void LogStartupError(string context, Exception? ex)
+    {
+        try
+        {
+            string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit");
+            Directory.CreateDirectory(appDataDir);
+            string logFile = Path.Combine(appDataDir, "startup_log.txt");
+            string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR ({context}): {ex?.Message}{Environment.NewLine}{ex?.StackTrace}{Environment.NewLine}{Environment.NewLine}";
+            File.AppendAllText(logFile, msg);
+        }
+        catch { }
+    }
+
+    private static void LogStartupMessage(string message)
+    {
+        try
+        {
+            string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit");
+            Directory.CreateDirectory(appDataDir);
+            string logFile = Path.Combine(appDataDir, "startup_log.txt");
+            string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] INFO: {message}{Environment.NewLine}";
+            File.AppendAllText(logFile, msg);
+        }
+        catch { }
     }
 }
 

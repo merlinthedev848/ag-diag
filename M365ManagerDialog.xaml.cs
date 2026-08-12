@@ -137,9 +137,8 @@ namespace agilicomsptoolkit
         private void BtnGeneratePass_Click(object sender, RoutedEventArgs e)
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
-            var random = new Random();
-            var password = new string(Enumerable.Repeat(chars, 12)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            var password = new string(Enumerable.Range(0, 12)
+                .Select(_ => chars[System.Security.Cryptography.RandomNumberGenerator.GetInt32(chars.Length)]).ToArray());
             
             TxtResetPassword.Text = password;
         }
@@ -152,6 +151,15 @@ namespace agilicomsptoolkit
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             GeneratePreviewScript();
+        }
+
+        private static string EscapePowerShellString(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            return input
+                .Replace("`", "``")
+                .Replace("\"", "`\"")
+                .Replace("$", "`$");
         }
 
         private void GeneratePreviewScript()
@@ -173,8 +181,8 @@ namespace agilicomsptoolkit
             }
             else if (selectedTab.Header.ToString() == "Delegations")
             {
-                string mailbox = string.IsNullOrWhiteSpace(TxtMailboxUPN.Text) ? "<user@domain.com>" : TxtMailboxUPN.Text.Trim();
-                string delegateUser = string.IsNullOrWhiteSpace(TxtDelegateUPN.Text) ? "<delegate@domain.com>" : TxtDelegateUPN.Text.Trim();
+                string mailbox = string.IsNullOrWhiteSpace(TxtMailboxUPN.Text) ? "<user@domain.com>" : EscapePowerShellString(TxtMailboxUPN.Text.Trim());
+                string delegateUser = string.IsNullOrWhiteSpace(TxtDelegateUPN.Text) ? "<delegate@domain.com>" : EscapePowerShellString(TxtDelegateUPN.Text.Trim());
 
                 sb.AppendLine("# Microsoft 365 Mailbox & Calendar Delegation");
                 sb.AppendLine("Import-Module ExchangeOnlineManagement");
@@ -215,8 +223,8 @@ namespace agilicomsptoolkit
             }
             else if (selectedTab.Header.ToString() == "User Security")
             {
-                string user = string.IsNullOrWhiteSpace(TxtSecurityUserUPN.Text) ? "<user@domain.com>" : TxtSecurityUserUPN.Text.Trim();
-                string pass = TxtResetPassword.Text;
+                string user = string.IsNullOrWhiteSpace(TxtSecurityUserUPN.Text) ? "<user@domain.com>" : EscapePowerShellString(TxtSecurityUserUPN.Text.Trim());
+                string pass = EscapePowerShellString(TxtResetPassword.Text);
 
                 sb.AppendLine("# Microsoft 365 Account Security & Password Management");
                 sb.AppendLine("Import-Module Microsoft.Graph");
@@ -254,8 +262,8 @@ namespace agilicomsptoolkit
             }
             else if (selectedTab.Header.ToString() == "Teams & Groups")
             {
-                string group = string.IsNullOrWhiteSpace(TxtGroupUPN.Text) ? "<Group-UPN-or-GUID>" : TxtGroupUPN.Text.Trim();
-                string member = string.IsNullOrWhiteSpace(TxtGroupMemberUPN.Text) ? "<user@domain.com>" : TxtGroupMemberUPN.Text.Trim();
+                string group = string.IsNullOrWhiteSpace(TxtGroupUPN.Text) ? "<Group-UPN-or-GUID>" : EscapePowerShellString(TxtGroupUPN.Text.Trim());
+                string member = string.IsNullOrWhiteSpace(TxtGroupMemberUPN.Text) ? "<user@domain.com>" : EscapePowerShellString(TxtGroupMemberUPN.Text.Trim());
                 string operation = (ComboGroupOp.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Add to Group / Team";
                 bool isOwner = RadioOwner.IsChecked ?? false;
 

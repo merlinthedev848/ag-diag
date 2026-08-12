@@ -85,7 +85,7 @@ namespace agilicomsptoolkit
 
         #region DNS SRV Resolver
 
-        public static async Task<List<SrvRecord>> ResolveSrvAsync(string service, string domain, string dnsServer = "8.8.8.8")
+        public static async Task<List<SrvRecord>> ResolveSrvAsync(string service, string domain, string dnsServer = "8.8.8.8", CancellationToken token = default)
         {
             var records = new List<SrvRecord>();
             try
@@ -102,8 +102,8 @@ namespace agilicomsptoolkit
 
                 await client.SendAsync(query, query.Length, endpoint);
 
-                var receiveTask = client.ReceiveAsync();
-                var delayTask = Task.Delay(3000);
+                var receiveTask = client.ReceiveAsync(token).AsTask();
+                var delayTask = Task.Delay(3000, token);
 
                 var completed = await Task.WhenAny(receiveTask, delayTask);
                 if (completed == receiveTask)
@@ -117,6 +117,10 @@ namespace agilicomsptoolkit
                             records = ParseSrvResponse(result.Buffer);
                         }
                     }
+                }
+                else
+                {
+                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
             catch { }
@@ -321,7 +325,7 @@ namespace agilicomsptoolkit
             try
             {
                 using var client = new TcpClient();
-                var connectTask = client.ConnectAsync(target, port);
+                var connectTask = client.ConnectAsync(target, port, token).AsTask();
                 var delayTask = Task.Delay(1500, token); // 1.5 second timeout
 
                 var completed = await Task.WhenAny(connectTask, delayTask);
@@ -334,6 +338,7 @@ namespace agilicomsptoolkit
                 }
                 else
                 {
+                    _ = connectTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                     result.Status = "Blocked"; // Timeout
                 }
             }
@@ -437,6 +442,7 @@ namespace agilicomsptoolkit
                 }
                 else
                 {
+                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                     // UDP timeout is common if remote is not listening or ignores payload.
                     // If no ICMP error was returned, we mark as Unresponsive (likely permitted outbound).
                     result.Status = treatTimeoutAsOpen ? "Open" : "Unresponsive";

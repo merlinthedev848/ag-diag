@@ -41,6 +41,7 @@ namespace agilicomsptoolkit
         public MainWindow()
         {
             InitializeComponent();
+            Logger.Log("MainWindow loaded.");
             _engine = new NetworkEngine();
             _lanScanner = new LanScanner();
             _lanDevices = new ObservableCollection<LanDevice>();
@@ -78,12 +79,14 @@ namespace agilicomsptoolkit
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Application started successfully. MainWindow loaded.");
             try
             {
 #if FULL_VERSION
                 _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnConverter, BtnHelp, BtnLogs, BtnSettings };
 #else
                 _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
+                TabConverter.Visibility = Visibility.Collapsed;
 #endif
                 GridLanDevices.ItemsSource = _lanDevices;
                 GridPingTargets.ItemsSource = _pingTargets;
@@ -185,12 +188,13 @@ namespace agilicomsptoolkit
             }
         }
 
-        private void BtnDashboard_Click(object sender, RoutedEventArgs e) => SelectTab(0, BtnDashboard);
-        private void BtnItTools_Click(object sender, RoutedEventArgs e) => SelectTab(1, BtnItTools);
-        private void BtnNetTools_Click(object sender, RoutedEventArgs e) => SelectTab(2, BtnNetTools);
+        private void BtnDashboard_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: Dashboard"); SelectTab(0, BtnDashboard); }
+        private void BtnItTools_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: IT Tools"); SelectTab(1, BtnItTools); }
+        private void BtnNetTools_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: Network Tools"); SelectTab(2, BtnNetTools); }
 
         private async void BtnHardwareScan_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Log("Action: Hardware Scan initiated.");
             try
             {
                 var items = await HardwareChecker.RunDiagnosticsAsync();
@@ -200,30 +204,35 @@ namespace agilicomsptoolkit
             }
             catch (Exception ex)
             {
+                Logger.Log($"Error: Hardware Scan failed - {ex.Message}");
                 ModernMessageBox.Show($"Failed to run hardware check.\n\nError: {ex.Message}", "Hardware Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         
         private void BtnSubNetScan_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Nav: Network Tools > Subnet Scan");
             NetToolsTabControl.SelectedIndex = 0;
             UpdateSubNavButtons((System.Windows.Controls.Button)sender);
         }
 
         private void BtnSubPingTrack_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Nav: Network Tools > Ping Tracker");
             NetToolsTabControl.SelectedIndex = 1;
             UpdateSubNavButtons((System.Windows.Controls.Button)sender);
         }
 
         private void BtnSubProbe_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Nav: Network Tools > Probe");
             NetToolsTabControl.SelectedIndex = 2;
             UpdateSubNavButtons((System.Windows.Controls.Button)sender);
         }
 
         private void BtnSubPcap_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Nav: Network Tools > Packet Capture");
             NetToolsTabControl.SelectedIndex = 3;
             UpdateSubNavButtons((System.Windows.Controls.Button)sender);
             
@@ -245,9 +254,9 @@ namespace agilicomsptoolkit
                 }
             }
         }
-        private void BtnHelp_Click(object sender, RoutedEventArgs e) => SelectTab(4, BtnHelp);
-        private void BtnLogs_Click(object sender, RoutedEventArgs e) => SelectTab(5, BtnLogs);
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SelectTab(6, BtnSettings);
+        private void BtnHelp_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: Help"); SelectTab(4, BtnHelp); }
+        private void BtnLogs_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: Logs"); SelectTab(5, BtnLogs); }
+        private void BtnSettings_Click(object sender, RoutedEventArgs e) { Logger.Log("Nav: Settings"); SelectTab(6, BtnSettings); }
 
         private void SelectProbeTab(int index, Button activeButton)
         {
@@ -292,6 +301,7 @@ namespace agilicomsptoolkit
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            Logger.Log("Application closing.");
             try
             {
                 _engine.Cancel();
@@ -385,6 +395,7 @@ namespace agilicomsptoolkit
         {
             try
             {
+                LogAuditAction("Started Network Readiness Diagnostics.");
                 // Sync settings from UI text fields
                 if (!ValidateAndApplySettings()) return;
 
@@ -431,6 +442,7 @@ namespace agilicomsptoolkit
 
         private async void BtnStartLanScan_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Started local network (LAN) scan.");
             BtnStartLanScan.IsEnabled = false;
             PanelLanScanProgress.Visibility = Visibility.Visible;
             _lanDevices.Clear();
@@ -474,8 +486,12 @@ namespace agilicomsptoolkit
                         _lanDevices.Add(d);
                     }
                 }));
+                LogAuditAction($"LAN scan completed. Found {_lanDevices.Count} devices.");
             }
-            catch (OperationCanceledException) { /* scan was cancelled */ }
+            catch (OperationCanceledException)
+            {
+                LogAuditAction("Cancelled local network (LAN) scan.");
+            }
 
             PanelLanScanProgress.Visibility = Visibility.Collapsed;
             BtnStartLanScan.IsEnabled = true;
@@ -483,6 +499,7 @@ namespace agilicomsptoolkit
 
         private void BtnStop_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Cancelled Network Readiness Diagnostics.");
             _engine.Cancel();
             RestoreControlButtons();
         }
@@ -539,6 +556,7 @@ namespace agilicomsptoolkit
             // Simulation mode
             _engine.IsSimulationMode = ChkSimulation.IsChecked == true;
 
+            LogAuditAction($"Applied Network Settings - STUN: {_engine.StunServer}:{_engine.StunPort}, Local SIP Port: {_engine.LocalSipPort}, SIP ALG Server: {_engine.SipAlgServer}:{_engine.SipAlgPort}, Simulation: {_engine.IsSimulationMode}");
             return true;
         }
 
@@ -585,6 +603,7 @@ namespace agilicomsptoolkit
 
         private void Engine_OnComplete(bool success, int score)
         {
+            LogAuditAction($"Network Readiness Diagnostics completed. Score: {score}/100, Success: {success}");
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 RestoreControlButtons();
@@ -724,6 +743,19 @@ namespace agilicomsptoolkit
                 TxtLogs.AppendText(logMsg + Environment.NewLine);
                 TxtLogs.ScrollToEnd();
             }));
+
+            try
+            {
+                string appDataDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit");
+                Directory.CreateDirectory(appDataDir);
+                string logFile = System.IO.Path.Combine(appDataDir, "audit_log.txt");
+                string fileMsg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] AUDIT: {actionText}{Environment.NewLine}";
+                File.AppendAllText(logFile, fileMsg);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to write to audit log file: {ex.Message}");
+            }
         }
 
         #endregion
@@ -732,11 +764,13 @@ namespace agilicomsptoolkit
 
         private void BtnClearLog_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Action: Cleared in-app log.");
             TxtLogs.Clear();
         }
 
         private void BtnSaveLog_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Action: Save log initiated.");
             if (string.IsNullOrWhiteSpace(TxtLogs.Text))
             {
                 ModernMessageBox.Show("Log is empty. Run a diagnostic test first to generate logs.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -754,10 +788,12 @@ namespace agilicomsptoolkit
                 try
                 {
                     File.WriteAllText(dialog.FileName, TxtLogs.Text);
+                    LogAuditAction($"Action: Log saved to {dialog.FileName}");
                     ModernMessageBox.Show("Log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
+                    LogAuditAction($"Error: Failed to save log - {ex.Message}");
                     ModernMessageBox.Show($"Failed to save log: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -806,6 +842,7 @@ namespace agilicomsptoolkit
         {
             try
             {
+                LogAuditAction("Executed Reset Agilico Connect application routine (terminated softphone process, deleted local AppData cache, and cleared registry subkeys).");
                 // 1. Force-close any running Agilico Connect process
                 ForceCloseAgilicoConnect();
 
@@ -916,6 +953,7 @@ namespace agilicomsptoolkit
             var newItem = new PingTargetItem(target, intervalMs);
             newItem.OnPingResultReceived += TargetItem_OnPingResultReceived;
             _pingTargets.Add(newItem);
+            LogAuditAction($"Added ping target: {target}");
             
             // Start pinging immediately — don't wait for the user to press "Start All"
             newItem.Start();
@@ -968,9 +1006,15 @@ namespace agilicomsptoolkit
             if (sender is Button btn && btn.Tag is PingTargetItem item)
             {
                 if (item.Tracker.IsRunning)
+                {
+                    LogAuditAction($"Stopped continuous ping to target: {item.Target}");
                     item.Stop();
+                }
                 else
+                {
+                    LogAuditAction($"Started continuous ping to target: {item.Target}");
                     item.Start();
+                }
                 UpdatePingKpis();
             }
         }
@@ -979,6 +1023,7 @@ namespace agilicomsptoolkit
         {
             if (sender is Button btn && btn.Tag is PingTargetItem item)
             {
+                LogAuditAction($"Removed ping target: {item.Target}");
                 item.Stop();
                 item.OnPingResultReceived -= TargetItem_OnPingResultReceived;
                 _pingTargets.Remove(item);
@@ -995,12 +1040,14 @@ namespace agilicomsptoolkit
         
         private void BtnPingStartAll_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Started continuous pinging on all targets.");
             foreach (var item in _pingTargets) item.Start();
             UpdatePingKpis();
         }
 
         private void BtnPingStopAll_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Stopped continuous pinging on all targets.");
             foreach (var item in _pingTargets) item.Stop();
             UpdatePingKpis();
         }
@@ -1250,6 +1297,7 @@ namespace agilicomsptoolkit
                 {
                     var bytes = _engine.Pcap.GetPcapBytes();
                     System.IO.File.WriteAllBytes(sfd.FileName, bytes);
+                    LogAuditAction($"Exported captured network packets (PCAP) to: {sfd.FileName}");
                     ModernMessageBox.Show("PCAP log saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
@@ -1510,6 +1558,7 @@ namespace agilicomsptoolkit
 
             try
             {
+                LogAuditAction($"Started network path trace to: {target}");
                 await Task.Run(async () =>
                 {
                     int maxHops = 30;
@@ -1607,8 +1656,12 @@ namespace agilicomsptoolkit
                         }
                     }
                 }, token);
+                LogAuditAction($"Network path trace to {target} completed.");
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                LogAuditAction("Cancelled network path trace.");
+            }
             finally
             {
                 localCts.Dispose();
@@ -1651,6 +1704,9 @@ namespace agilicomsptoolkit
                 BtnItTools.Visibility = Visibility.Collapsed;
                 BtnNetTools.Visibility = Visibility.Collapsed;
                 BtnSettings.Visibility = Visibility.Collapsed;
+#if FULL_VERSION
+                BtnConverter.Visibility = Visibility.Collapsed;
+#endif
                 
                 if (PageTabControl.SelectedIndex == 1 || PageTabControl.SelectedIndex == 2 || 
                     PageTabControl.SelectedIndex == 3 || PageTabControl.SelectedIndex == 6)
@@ -1681,6 +1737,9 @@ namespace agilicomsptoolkit
                     BtnNetTools.Visibility = Visibility.Visible;
                     BtnLogs.Visibility = Visibility.Visible;
                     BtnSettings.Visibility = Visibility.Visible;
+#if FULL_VERSION
+                    BtnConverter.Visibility = Visibility.Visible;
+#endif
                     ModernMessageBox.Show("Engineer Mode activated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
@@ -1698,6 +1757,7 @@ namespace agilicomsptoolkit
             {
                 // Stop Capture
                 _engine.Pcap.Stop();
+                LogAuditAction("Stopped manual packet capture (PCAP) sniffer.");
                 _isManualCapturing = false;
                 TxtTogglePcap.Text = "START CAPTURE";
                 BtnTogglePcap.Background = (Brush)FindResource("AccentGreenBrush");
@@ -1740,6 +1800,7 @@ namespace agilicomsptoolkit
                 try
                 {
                     _engine.Pcap.Start(true, string.IsNullOrEmpty(filterIp) ? null : filterIp, string.IsNullOrEmpty(selectedIp) ? null : selectedIp);
+                    LogAuditAction("Started manual packet capture (PCAP) sniffer.");
                     _isManualCapturing = true;
                     TxtTogglePcap.Text = "STOP CAPTURE";
                     BtnTogglePcap.Background = (Brush)FindResource("AccentRedBrush");
@@ -1893,6 +1954,8 @@ namespace agilicomsptoolkit
                 _lastDownloadMbps = downloadMbps;
                 _lastUploadMbps = uploadMbps;
 
+                LogAuditAction($"Bandwidth speed test completed. Download: {downloadMbps:F1} Mbps, Upload: {uploadMbps:F1} Mbps");
+
                 TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
                 TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
                 TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
@@ -1927,6 +1990,7 @@ namespace agilicomsptoolkit
 
         private void BtnRaiseTicket_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Raise Support Ticket dialog.");
             string subject = $"Agilico Connect Check Failure - {Environment.MachineName}";
             
             string body = "Please detail your issue here:\n\n\n\n" +
@@ -1966,6 +2030,7 @@ namespace agilicomsptoolkit
             BtnResolveSrv.IsEnabled = false;
             BtnResolveSrv.Content = "RESOLVING...";
             _srvRecords.Clear();
+            LogAuditAction($"Executed DNS SRV resolution for Service: {service}, Domain: {domain}");
 
             try
             {
@@ -2038,6 +2103,7 @@ namespace agilicomsptoolkit
 
             var profileItem = CbPortProfile.SelectedItem as ComboBoxItem;
             var profileName = profileItem?.Content?.ToString() ?? "Agilico Connect Profile";
+            LogAuditAction($"Started port connectivity probe using profile: {profileName}");
 
             try
             {
@@ -2163,10 +2229,14 @@ namespace agilicomsptoolkit
                     _ = Dispatcher.BeginInvoke(new Action(() => _portProbeResults.Add(res)));
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                LogAuditAction("Cancelled port connectivity probe.");
+            }
             catch (Exception ex)
             {
                 ModernMessageBox.Show($"Error running port probes: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                LogAuditAction("Completed port connectivity probe.");
             }
             finally
             {
@@ -2504,6 +2574,7 @@ namespace agilicomsptoolkit
             BtnRefreshSockets.Content = "REFRESHING...";
             try
             {
+                LogAuditAction("Refreshed active network sockets list.");
                 await RefreshSocketsListAsync();
             }
             catch (Exception ex)

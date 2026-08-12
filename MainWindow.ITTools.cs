@@ -14,6 +14,7 @@ namespace agilicomsptoolkit
                 try
                 {
                     this.IsEnabled = false;
+                    LogAuditAction("Executed Network Configuration Reset (ipconfig flushdns/release/renew).");
                     
                     using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
                     if (p1 != null) await p1.WaitForExitAsync();
@@ -39,72 +40,84 @@ namespace agilicomsptoolkit
 
         private void BtnResourceMonitor_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Resource Monitor dialog.");
             var dialog = new ResourceMonitorDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnActiveDirectory_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Active Directory & Domain Information dialog.");
             var dialog = new UserDomainInfoDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnSoftwareAudit_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Software Audit dialog.");
             var dialog = new SoftwareAuditDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnServicesManager_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Windows Services Manager dialog.");
             var dialog = new ServiceManagerDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnDiskCleanup_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Disk Management & Cleanup dialog.");
             var dialog = new DiskManagementDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnEventLog_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Windows Event Log dialog.");
             var dialog = new EventLogDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private async void BtnGroupPolicy_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Executed Group Policy analysis report.");
             // Keeping plain text dump for unstructured tools
             await RunITToolAsync("Group Policy Utility", "gpresult /R");
         }
 
         private void BtnFirewall_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Firewall Status dialog.");
             var dialog = new FirewallStatusDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private async void BtnPowerManager_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Executed System Power & Uptime analysis report.");
             // Keeping plain text dump for unstructured tools
             await RunITToolAsync("System Uptime & Power", "powercfg /requests");
         }
 
         private void BtnStartupApps_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Windows Startup Manager dialog.");
             var dialog = new StartupManagerDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnLocalUsers_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Local Users & Groups Manager dialog.");
             var dialog = new LocalUsersDialog { Owner = this };
             dialog.ShowDialog();
         }
 
         private void BtnNicOptimizer_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Network Adapter (NIC) Optimizer dialog.");
             var dialog = new NicOptimizerDialog { Owner = this };
             dialog.ShowDialog();
         }
@@ -202,6 +215,7 @@ namespace agilicomsptoolkit
 
         private void BtnM365Manager_Click(object sender, RoutedEventArgs e)
         {
+            LogAuditAction("Launched Microsoft 365 / Teams Management dialog.");
             var dialog = new M365ManagerDialog { Owner = this };
             dialog.ShowDialog();
         }

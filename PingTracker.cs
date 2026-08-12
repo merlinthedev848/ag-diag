@@ -135,107 +135,100 @@ namespace agilicomsptoolkit
 
         private async Task RunPingLoopAsync(string target, int intervalMs, CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                var startTime = DateTime.Now;
-                PingResult result;
-
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    using var ping = new Ping();
-                    // Ping target with timeout capped to the interval or 2000ms max
-                    var timeout = Math.Min(intervalMs, 2000);
-                    var reply = await ping.SendPingAsync(target, timeout);
-                    result = new PingResult
-                    {
-                        Timestamp = DateTime.Now,
-                        Target = target,
-                        LatencyMs = reply.Status == IPStatus.Success ? reply.RoundtripTime : null,
-                        Status = reply.Status
-                    };
-                }
-                catch (Exception)
-                {
-                    result = new PingResult
-                    {
-                        Timestamp = DateTime.Now,
-                        Target = target,
-                        LatencyMs = null,
-                        Status = IPStatus.Unknown
-                    };
-                }
+                    var startTime = DateTime.Now;
+                    PingResult result;
 
-                PingStats stats;
-                lock (_lock)
-                {
-                    _allResults.Add(result);
-                    if (_allResults.Count > 10000)
-                    {
-                        _allResults.RemoveAt(0);
-                    }
-                    _recentResults.Add(result);
-                    if (_recentResults.Count > MaxRecentCount)
-                    {
-                        _recentResults.RemoveAt(0);
-                    }
-
-                    // Update running statistics
-                    _totalPings++;
-                    if (result.LatencyMs.HasValue)
-                    {
-                        long val = result.LatencyMs.Value;
-                        _successfulPingsCount++;
-                        _sumLatencies += val;
-
-                        if (val < _minLatency) _minLatency = val;
-                        if (val > _maxLatency) _maxLatency = val;
-
-                        if (_lastSuccessfulLatency.HasValue)
-                        {
-                            _sumJitterDiff += Math.Abs(val - _lastSuccessfulLatency.Value);
-                        }
-                        _lastSuccessfulLatency = val;
-                    }
-                    else
-                    {
-                        _failedPings++;
-                    }
-
-                    stats = CalculateStats();
-                }
-
-                if (!token.IsCancellationRequested)
-                {
-                    OnPingResult?.Invoke(result, stats);
-                }
-
-                // Calculate delay to maintain interval precisely
-                var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-                var delay = intervalMs - elapsed;
-                if (delay > 0)
-                {
                     try
+                    {
+                        using var ping = new Ping();
+                        // Ping target with timeout capped to the interval or 2000ms max
+                        var timeout = Math.Min(intervalMs, 2000);
+                        var reply = await ping.SendPingAsync(target, timeout);
+                        result = new PingResult
+                        {
+                            Timestamp = DateTime.Now,
+                            Target = target,
+                            LatencyMs = reply.Status == IPStatus.Success ? reply.RoundtripTime : null,
+                            Status = reply.Status
+                        };
+                    }
+                    catch (Exception)
+                    {
+                        result = new PingResult
+                        {
+                            Timestamp = DateTime.Now,
+                            Target = target,
+                            LatencyMs = null,
+                            Status = IPStatus.Unknown
+                        };
+                    }
+
+                    if (token.IsCancellationRequested) break;
+
+                    PingStats stats;
+                    lock (_lock)
+                    {
+                        _allResults.Add(result);
+                        if (_allResults.Count > 10000)
+                        {
+                            _allResults.RemoveAt(0);
+                        }
+                        _recentResults.Add(result);
+                        if (_recentResults.Count > MaxRecentCount)
+                        {
+                            _recentResults.RemoveAt(0);
+                        }
+
+                        // Update running statistics
+                        _totalPings++;
+                        if (result.LatencyMs.HasValue)
+                        {
+                            long val = result.LatencyMs.Value;
+                            _successfulPingsCount++;
+                            _sumLatencies += val;
+
+                            if (val < _minLatency) _minLatency = val;
+                            if (val > _maxLatency) _maxLatency = val;
+
+                            if (_lastSuccessfulLatency.HasValue)
+                            {
+                                _sumJitterDiff += Math.Abs(val - _lastSuccessfulLatency.Value);
+                            }
+                            _lastSuccessfulLatency = val;
+                        }
+                        else
+                        {
+                            _failedPings++;
+                        }
+
+                        stats = CalculateStats();
+                    }
+
+                    if (!token.IsCancellationRequested)
+                    {
+                        OnPingResult?.Invoke(result, stats);
+                    }
+
+                    // Calculate delay to maintain interval precisely
+                    var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
+                    var delay = intervalMs - elapsed;
+                    if (delay > 0)
                     {
                         await Task.Delay((int)delay, token);
                     }
-                    catch (TaskCanceledException)
+                    else
                     {
-                        break;
-                    }
-                }
-                else
-                {
-                    // If ping took longer than interval, pause briefly to prevent CPU hogging
-                    try
-                    {
+                        // If ping took longer than interval, pause briefly to prevent CPU hogging
                         await Task.Delay(50, token);
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        break;
                     }
                 }
             }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
         }
 
         private PingStats CalculateStats()

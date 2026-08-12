@@ -1840,7 +1840,7 @@
                 
 
                 <!-- TAB 3: CONVERTER -->
-                <TabItem>
+                <TabItem x:Name="TabConverter">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <Grid Margin="20" VerticalAlignment="Top">
                             <Grid.RowDefinitions>

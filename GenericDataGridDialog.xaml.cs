@@ -20,12 +20,17 @@ namespace agilicomsptoolkit
             {
                 DiskActionsPanel.Visibility = Visibility.Visible;
             }
-            else if (title.Contains("Software Audit", StringComparison.OrdinalIgnoreCase))
+
+            LoadData(jsonPayload);
+            Loaded += Window_Loaded;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (TxtTitle.Text.Contains("Software Audit", StringComparison.OrdinalIgnoreCase))
             {
                 CheckForUpdatesAsync();
             }
-
-            LoadData(jsonPayload);
         }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
