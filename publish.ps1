@@ -19,7 +19,7 @@ Write-Host ""
 Write-Host "Publishing Standalone Release (self-contained, single-file)..."
 dotnet publish -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true `
-    -p:PublishReadyToRun=true `
+    -p:PublishReadyToRun=false `
     -p:EnableCompressionInSingleFile=false `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:IsFullVersion=true `
@@ -31,7 +31,7 @@ Write-Host ""
 Write-Host "Publishing Lite Release (framework-dependent, single-file)..."
 dotnet publish -c Release -r win-x64 --self-contained false `
     -p:PublishSingleFile=true `
-    -p:PublishReadyToRun=true `
+    -p:PublishReadyToRun=false `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:IsFullVersion=false `
     -p:AssemblyName="Agilico MSP Toolkit Lite" `
