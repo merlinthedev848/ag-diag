@@ -9,12 +9,6 @@ namespace agilicomsptoolkit
         public HardwareReportDialog(List<HardwareItem> items)
         {
             InitializeComponent();
-            
-            if (Application.Current != null && Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded && Application.Current.MainWindow != this)
-            {
-                this.Owner = Application.Current.MainWindow;
-            }
-
             HardwareList.ItemsSource = items;
         }
 

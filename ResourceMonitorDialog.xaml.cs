@@ -38,23 +38,31 @@ namespace agilicomsptoolkit
             {
                 var procs = await Task.Run(() =>
                 {
-                    return Process.GetProcesses()
-                        .Select(p => {
-                            double mem = 0;
-                            try { mem = Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1); } catch { }
-                            string title = "";
-                            try { title = p.MainWindowTitle; } catch { }
-                            return new ProcessInfo
+                    var rawProcesses = Process.GetProcesses();
+                    var mapped = new System.Collections.Generic.List<ProcessInfo>();
+                    foreach (var p in rawProcesses)
+                    {
+                        using (p)
+                        {
+                            try
                             {
-                                Name = p.ProcessName,
-                                Id = p.Id,
-                                MemoryMB = mem,
-                                Title = title
-                            };
-                        })
-                        .Where(p => p.MemoryMB > 10) // Filter out tiny background tasks for cleaner view
+                                double mem = Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1);
+                                string title = p.MainWindowTitle;
+                                mapped.Add(new ProcessInfo
+                                {
+                                    Name = p.ProcessName,
+                                    Id = p.Id,
+                                    MemoryMB = mem,
+                                    Title = title
+                                });
+                            }
+                            catch { }
+                        }
+                    }
+                    return mapped
+                        .Where(p => p.MemoryMB > 10)
                         .OrderByDescending(p => p.MemoryMB)
-                        .Take(50) // Show top 50
+                        .Take(50)
                         .ToList();
                 });
 

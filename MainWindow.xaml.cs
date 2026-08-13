@@ -198,9 +198,12 @@ namespace agilicomsptoolkit
             try
             {
                 var items = await HardwareChecker.RunDiagnosticsAsync();
-                var hwDialog = new HardwareReportDialog(items);
-                hwDialog.Owner = this;
-                hwDialog.ShowDialog();
+                Dispatcher.Invoke(() =>
+                {
+                    var hwDialog = new HardwareReportDialog(items);
+                    hwDialog.Owner = this;
+                    hwDialog.ShowDialog();
+                });
             }
             catch (Exception ex)
             {

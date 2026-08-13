@@ -162,8 +162,11 @@ namespace agilicomsptoolkit
                     return;
                 }
 
-                var dialog = new GenericDataGridDialog(title, description, output) { Owner = this };
-                dialog.ShowDialog();
+                Dispatcher.Invoke(() =>
+                {
+                    var dialog = new GenericDataGridDialog(title, description, output) { Owner = this };
+                    dialog.ShowDialog();
+                });
             }
             catch (Exception ex)
             {
@@ -204,8 +207,11 @@ namespace agilicomsptoolkit
                 else if (string.IsNullOrWhiteSpace(output))
                     output = "Command completed successfully (no output).";
 
-                var dialog = new ResultDialog(title, output) { Owner = this };
-                dialog.ShowDialog();
+                Dispatcher.Invoke(() =>
+                {
+                    var dialog = new ResultDialog(title, output) { Owner = this };
+                    dialog.ShowDialog();
+                });
             }
             catch (Exception ex)
             {
