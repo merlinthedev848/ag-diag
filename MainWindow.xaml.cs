@@ -84,6 +84,7 @@ namespace agilicomsptoolkit
             {
 #if FULL_VERSION
                 _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnConverter, BtnHelp, BtnLogs, BtnSettings };
+                EnableDragAndDropAdminBypass();
 #else
                 _navButtons = new[] { BtnDashboard, BtnItTools, BtnNetTools, BtnHelp, BtnLogs, BtnSettings };
                 TabConverter.Visibility = Visibility.Collapsed;
