@@ -15,6 +15,16 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Enable Multicore JIT (ProfileOptimization) to accelerate startup
+        try
+        {
+            string profileDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit", "JitProfiles");
+            Directory.CreateDirectory(profileDir);
+            System.Runtime.ProfileOptimization.SetProfileRoot(profileDir);
+            System.Runtime.ProfileOptimization.StartProfile("Startup.profile");
+        }
+        catch { /* Ignore profile optimization failures */ }
+
         base.OnStartup(e);
         LogStartupMessage("OnStartup triggered.");
 
