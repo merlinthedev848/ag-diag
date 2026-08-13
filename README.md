@@ -1,4 +1,4 @@
-# Agilico MSP Toolkit (v4.0.0)
+# Agilico MSP Toolkit (v4.1.0)
 
 An advanced, premium-themed desktop diagnostic application built for Windows, designed to verify local and outbound network readiness for the **Agilico Connect** application. It conducts deep packet analysis, network path tracing, port connectivity probing, and VoIP simulation, providing IT engineers and end-users with instant, actionable diagnostics.
 

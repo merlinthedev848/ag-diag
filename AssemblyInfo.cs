@@ -11,6 +11,6 @@ using System.Windows;
 
 [assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 
-[assembly: System.Reflection.AssemblyVersion("4.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("4.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersion("4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("4.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("4.1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("4.1.0")]

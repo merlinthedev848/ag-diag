@@ -126,7 +126,7 @@ namespace agilicomsptoolkit
                     string procName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
                     bool isLite = procName.Contains("Lite", StringComparison.OrdinalIgnoreCase);
                     string mode = isLite ? "Lite" : "Standard";
-                    TxtVersion.Text = $"v4.0.0 ({mode})";
+                    TxtVersion.Text = $"v4.1.0 ({mode})";
                     TxtTitleBar.Text = "Agilico MSP Toolkit";
                 }
                 catch { }
