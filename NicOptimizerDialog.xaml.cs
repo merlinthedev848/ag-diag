@@ -58,8 +58,10 @@ namespace agilicomsptoolkit
                 };
                 
                 process.Start();
+                var errorTask = process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
+                _ = await errorTask;
 
                 if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
                 {
@@ -148,7 +150,11 @@ namespace agilicomsptoolkit
                         }
                     };
                     process.Start();
+                    var errorTask = process.StandardError.ReadToEndAsync();
+                    var outputTask = process.StandardOutput.ReadToEndAsync();
                     await process.WaitForExitAsync();
+                    _ = await errorTask;
+                    _ = await outputTask;
 
                     ModernMessageBox.Show("Network adapters have been optimized for maximum Speed, Stability, and VoIP Performance.\n\nChanges applied:\n- RSS Enabled, LSO/RSC Disabled\n- TCP Auto-Tuning and Heuristics Optimized\n- Windows Network Throttling Disabled", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                     TxtStatus.Text = "Maximum connectivity optimizations applied.";

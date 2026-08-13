@@ -114,7 +114,7 @@ namespace agilicomsptoolkit
             try
             {
                 if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Cleanup utility.");
-                Process.Start(new ProcessStartInfo
+                using var proc = Process.Start(new ProcessStartInfo
                 {
                     FileName = "cleanmgr.exe",
                     UseShellExecute = true
@@ -134,7 +134,7 @@ namespace agilicomsptoolkit
             try
             {
                 if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Launched Disk Defragmenter utility.");
-                Process.Start(new ProcessStartInfo
+                using var proc = Process.Start(new ProcessStartInfo
                 {
                     FileName = "dfrgui.exe",
                     UseShellExecute = true

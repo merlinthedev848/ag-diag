@@ -79,8 +79,10 @@ namespace agilicomsptoolkit
                 };
                 
                 process.Start();
+                var errorTask = process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
+                _ = await errorTask;
 
                 if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
                 {
@@ -127,11 +129,40 @@ namespace agilicomsptoolkit
         private void ParseProfileElement(JsonElement element, System.Collections.Generic.List<FirewallProfileInfo> list, ref int activeCount)
         {
             string name = element.GetProperty("Name").GetString() ?? "Unknown";
-            int enabledVal = element.GetProperty("Enabled").GetInt32();
-            bool isEnabled = enabledVal == 1;
             
-            string inbound = element.GetProperty("DefaultInboundAction").GetInt32() == 1 ? "Allow" : "Block";
-            string outbound = element.GetProperty("DefaultOutboundAction").GetInt32() == 1 ? "Allow" : "Block";
+            bool isEnabled = false;
+            if (element.TryGetProperty("Enabled", out var enabledProp))
+            {
+                if (enabledProp.ValueKind == JsonValueKind.True) isEnabled = true;
+                else if (enabledProp.ValueKind == JsonValueKind.False) isEnabled = false;
+                else if (enabledProp.ValueKind == JsonValueKind.Number) isEnabled = enabledProp.GetInt32() == 1;
+                else if (enabledProp.ValueKind == JsonValueKind.String)
+                {
+                    string? s = enabledProp.GetString();
+                    isEnabled = s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            
+            string GetActionString(JsonElement prop)
+            {
+                if (prop.ValueKind == JsonValueKind.Number)
+                {
+                    return prop.GetInt32() == 1 ? "Allow" : "Block";
+                }
+                if (prop.ValueKind == JsonValueKind.String)
+                {
+                    return prop.GetString() ?? "Block";
+                }
+                return "Block";
+            }
+
+            string inbound = "Block";
+            if (element.TryGetProperty("DefaultInboundAction", out var inboundProp))
+                inbound = GetActionString(inboundProp);
+
+            string outbound = "Block";
+            if (element.TryGetProperty("DefaultOutboundAction", out var outboundProp))
+                outbound = GetActionString(outboundProp);
 
             if (isEnabled) activeCount++;
 

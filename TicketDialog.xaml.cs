@@ -174,14 +174,24 @@ namespace agilicomsptoolkit
             // Fallback to mailto link
             try
             {
-                string mailtoUrl = $"mailto:support@tech.agilico.co.uk?subject={Uri.EscapeDataString(subject)}&body={Uri.EscapeDataString(emailBody)}";
+                string safeDescription = description.Length > 1000 ? description.Substring(0, 1000) + "... [truncated]" : description;
+                string mailtoBody = $"From: {email}\r\n\r\n" +
+                                    $"User Description:\r\n{safeDescription}\r\n\r\n" +
+                                    $"--------------------------------------------------\r\n" +
+                                    $"Diagnostic Summary and details are in the logs directory.\r\n" +
+                                    $"Hostname: {Environment.MachineName}\r\n" +
+                                    $"OS Version: {Environment.OSVersion}\r\n" +
+                                    $"Local Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n\r\n" +
+                                    $"[Please manually attach the files from the opened folder to this email]";
+
+                string mailtoUrl = $"mailto:support@tech.agilico.co.uk?subject={Uri.EscapeDataString(subject)}&body={Uri.EscapeDataString(mailtoBody)}";
                 
                 ModernMessageBox.Show($"Outlook client was not detected or failed to start. We will open your default email client.\r\n\r\nIMPORTANT: Please manually attach the diagnostic logs from:\r\n{tempDir}", "Outlook Not Detected", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                Process.Start(new ProcessStartInfo(mailtoUrl) { UseShellExecute = true });
+                using var mailProc = Process.Start(new ProcessStartInfo(mailtoUrl) { UseShellExecute = true });
                 
                 // Open the temp folder in File Explorer to make it easy for the user to attach the files
-                Process.Start(new ProcessStartInfo(tempDir) { UseShellExecute = true });
+                using var explorerProc = Process.Start(new ProcessStartInfo(tempDir) { UseShellExecute = true });
                 
                 DialogResult = true;
                 Close();

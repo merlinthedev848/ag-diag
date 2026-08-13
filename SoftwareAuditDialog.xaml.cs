@@ -157,8 +157,10 @@ namespace agilicomsptoolkit
                 };
 
                 process.Start();
+                var errorTask = process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
+                _ = await errorTask;
 
                 int updateCount = 0;
                 string[] lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);

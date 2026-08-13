@@ -65,6 +65,15 @@ namespace agilicomsptoolkit
             DataContext = this;
         }
 
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            foreach (var item in Services)
+            {
+                item.Controller?.Dispose();
+            }
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             LoadServices();
@@ -84,6 +93,10 @@ namespace agilicomsptoolkit
                     ServiceController.GetServices().OrderBy(s => s.DisplayName).ToList()
                 );
                 
+                foreach (var item in Services)
+                {
+                    item.Controller?.Dispose();
+                }
                 Services.Clear();
                 foreach (var s in systemServices)
                 {

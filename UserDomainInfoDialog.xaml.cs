@@ -161,8 +161,10 @@ namespace agilicomsptoolkit
             };
 
             process.Start();
+            var errorTask = process.StandardError.ReadToEndAsync();
             string output = await process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
+            _ = await errorTask;
             return output;
         }
 
@@ -177,7 +179,15 @@ namespace agilicomsptoolkit
                 char c = line[i];
                 if (c == '"')
                 {
-                    inQuotes = !inQuotes;
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        currentToken.Append('"');
+                        i++; // Skip the second quote
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
                 }
                 else if (c == ',' && !inQuotes)
                 {

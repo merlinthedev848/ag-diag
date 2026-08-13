@@ -13,9 +13,73 @@ namespace agilicomsptoolkit
 {
     public partial class M365ManagerDialog : Window
     {
+        private readonly System.Collections.Generic.List<string> _tempFiles = new();
+
         public M365ManagerDialog()
         {
             InitializeComponent();
+            DataContext = this;
+            _ = CheckPowerShellModulesAsync();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            foreach (var file in _tempFiles)
+            {
+                try { if (File.Exists(file)) File.Delete(file); } catch { }
+            }
+        }
+
+        private async Task<string> RunPowerShellSilentAsync(string script)
+        {
+            string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".ps1");
+            _tempFiles.Add(tempPath);
+            File.WriteAllText(tempPath, script);
+
+            using var process = new Process();
+            process.StartInfo.FileName = "powershell.exe";
+            process.StartInfo.Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{tempPath}\"";
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+
+            var sbOut = new StringBuilder();
+            var sbErr = new StringBuilder();
+
+            process.Start();
+
+            var readOut = process.StandardOutput.ReadToEndAsync();
+            var readErr = process.StandardError.ReadToEndAsync();
+
+            await Task.WhenAll(readOut, readErr);
+            await Task.Run(() => process.WaitForExit());
+
+            return readOut.Result + readErr.Result;
+        }
+
+        private void RunPowerShellInteractive(string script, Action? callback = null)
+        {
+            string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".ps1");
+            _tempFiles.Add(tempPath);
+            File.WriteAllText(tempPath, script);
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoExit -ExecutionPolicy Bypass -File \"{tempPath}\"",
+                UseShellExecute = true
+            };
+
+            var proc = Process.Start(psi);
+            if (callback != null)
+            {
+                Task.Run(() => {
+                    proc?.WaitForExit();
+                    Dispatcher.Invoke(callback);
+                });
+            }
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -329,67 +393,6 @@ namespace agilicomsptoolkit
             }
 
             RunPowerShellInteractive(TxtScriptPreview.Text);
-        }
-
-        private async Task<string> RunPowerShellSilentAsync(string command)
-        {
-            try
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -Command \"{command}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var proc = Process.Start(startInfo);
-                if (proc == null) return string.Empty;
-
-                string stdout = await proc.StandardOutput.ReadToEndAsync();
-                using var cts = new System.Threading.CancellationTokenSource(5000);
-                try { await proc.WaitForExitAsync(cts.Token); } catch { }
-                
-                return stdout;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private void RunPowerShellInteractive(string scriptContent, Action? onExit = null)
-        {
-            try
-            {
-                // Create a temporary script file to run or execute as command block
-                string tempFile = Path.Combine(Path.GetTempPath(), "m365_automation.ps1");
-                File.WriteAllText(tempFile, scriptContent, Encoding.UTF8);
-
-                string arguments = $"-NoProfile -NoExit -ExecutionPolicy Bypass -File \"{tempFile}\"";
-
-                var proc = Process.Start(new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = arguments,
-                    UseShellExecute = true
-                });
-
-                if (proc != null && onExit != null)
-                {
-                    proc.EnableRaisingEvents = true;
-                    proc.Exited += (s, ev) =>
-                    {
-                        Dispatcher.Invoke(onExit);
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                ModernMessageBox.Show($"Failed to launch PowerShell: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
     }
 }

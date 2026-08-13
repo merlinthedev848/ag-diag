@@ -103,8 +103,10 @@ namespace agilicomsptoolkit
                 };
                 
                 process.Start();
+                var errorTask = process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
+                _ = await errorTask;
 
                 if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
                 {
