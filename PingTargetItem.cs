@@ -42,6 +42,7 @@ namespace agilicomsptoolkit
         {
             System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
             {
+                if (!Tracker.IsRunning) return;
                 bool success = result.Status == System.Net.NetworkInformation.IPStatus.Success;
                 
                 // Calculate status from stats/result

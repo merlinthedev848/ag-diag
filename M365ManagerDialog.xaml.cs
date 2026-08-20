@@ -19,7 +19,6 @@ namespace agilicomsptoolkit
         {
             InitializeComponent();
             DataContext = this;
-            _ = CheckPowerShellModulesAsync();
         }
 
         protected override void OnClosed(EventArgs e)
@@ -54,7 +53,7 @@ namespace agilicomsptoolkit
             var readErr = process.StandardError.ReadToEndAsync();
 
             await Task.WhenAll(readOut, readErr);
-            await Task.Run(() => process.WaitForExit());
+            await process.WaitForExitAsync();
 
             return readOut.Result + readErr.Result;
         }
@@ -223,6 +222,7 @@ namespace agilicomsptoolkit
             return input
                 .Replace("`", "``")
                 .Replace("\"", "`\"")
+                .Replace("'", "`'")
                 .Replace("$", "`$");
         }
 

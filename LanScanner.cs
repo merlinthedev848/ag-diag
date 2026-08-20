@@ -302,9 +302,9 @@ namespace agilicomsptoolkit
                 // Delay releasing the semaphore for 600ms to stay within the 2 req/sec rate limit of api.macvendors.com
                 _ = Task.Run(async () =>
                 {
-                    try { await Task.Delay(600, token); } catch { }
+                    try { await Task.Delay(600, CancellationToken.None); } catch { }
                     try { _macApiSemaphore.Release(); } catch { }
-                }, token);
+                });
             }
 
             _ouiCache[prefix] = "Unknown";

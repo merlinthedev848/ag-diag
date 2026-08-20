@@ -183,6 +183,8 @@ public partial class App : Application
         });
     }
 
+    private static readonly object _startupLogLock = new();
+
     private static void LogStartupError(string context, Exception? ex)
     {
         try
@@ -191,7 +193,10 @@ public partial class App : Application
             Directory.CreateDirectory(appDataDir);
             string logFile = Path.Combine(appDataDir, "startup_log.txt");
             string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR ({context}): {ex?.Message}{Environment.NewLine}{ex?.StackTrace}{Environment.NewLine}{Environment.NewLine}";
-            File.AppendAllText(logFile, msg);
+            lock (_startupLogLock)
+            {
+                File.AppendAllText(logFile, msg);
+            }
         }
         catch { }
     }
@@ -204,7 +209,10 @@ public partial class App : Application
             Directory.CreateDirectory(appDataDir);
             string logFile = Path.Combine(appDataDir, "startup_log.txt");
             string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] INFO: {message}{Environment.NewLine}";
-            File.AppendAllText(logFile, msg);
+            lock (_startupLogLock)
+            {
+                File.AppendAllText(logFile, msg);
+            }
         }
         catch { }
     }

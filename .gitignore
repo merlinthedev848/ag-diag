@@ -28,3 +28,5 @@ publish_output/
 *.exe
 *.pdb
 *.zip
+*.tmp
+*.log

@@ -35,6 +35,7 @@ namespace agilicomsptoolkit
         private readonly ObservableCollection<ActiveSocket> _allSockets = new();
         private readonly ObservableCollection<ActiveSocket> _displayedSockets = new();
 
+        private static readonly System.Net.Http.HttpClient _geoIpHttpClient = new() { Timeout = TimeSpan.FromSeconds(3) };
         private double _lastDownloadMbps = 0.0;
         private double _lastUploadMbps = 0.0;
 
@@ -842,13 +843,13 @@ namespace agilicomsptoolkit
             return exePath;
         }
 
-        private void BtnResetConnect_Click(object sender, RoutedEventArgs e)
+        private async void BtnResetConnect_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 LogAuditAction("Executed Reset Agilico Connect application routine (terminated softphone process, deleted local AppData cache, and cleared registry subkeys).");
-                // 1. Force-close any running Agilico Connect process
-                ForceCloseAgilicoConnect();
+                // 1. Force-close any running Agilico Connect process on background thread
+                await Task.Run(() => ForceCloseAgilicoConnect());
 
                 // 2. Clear AppData Local cache directory
                 string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -2321,12 +2322,8 @@ namespace agilicomsptoolkit
 
             try
             {
-                using var client = new System.Net.Http.HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(3);
-                client.DefaultRequestHeaders.Add("User-Agent", "AgilicoMSPToolkit/4.0.0");
-
                 string url = $"https://ip-api.com/json/{ipAddress}?fields=status,message,country,city,as";
-                string json = await client.GetStringAsync(url);
+                string json = await _geoIpHttpClient.GetStringAsync(url);
 
                 using var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
                 var root = jsonDoc.RootElement;

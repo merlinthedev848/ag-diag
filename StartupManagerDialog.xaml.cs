@@ -71,7 +71,6 @@ namespace agilicomsptoolkit
         {
             InitializeComponent();
             DataContext = this;
-            Loaded += Window_Loaded;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)

@@ -118,174 +118,177 @@ namespace agilicomsptoolkit
 
         private async Task RunEnvironmentScanAsync(CancellationToken token)
         {
-            Log("=================================================================");
-            Log("ENVIRONMENT & NETWORK ADAPTER SCAN");
-            Log("=================================================================");
+            await Task.Run(() =>
+            {
+                Log("=================================================================");
+                Log("ENVIRONMENT & NETWORK ADAPTER SCAN");
+                Log("=================================================================");
 
-            if (!string.IsNullOrEmpty(ServerUsername))
-            {
-                bool hasToken = !string.IsNullOrEmpty(ClientToken);
-                Log($"Registry credentials: Username={ServerUsername}, UserID={ClientUserId}, AuthTokenPresent={hasToken}");
-            }
-            else
-            {
-                Log("Registry credentials: None found. Softphone may not be registered.");
-            }
-
-            try
-            {
-                bool procFound = false;
-                foreach (var proc in System.Diagnostics.Process.GetProcesses())
+                if (!string.IsNullOrEmpty(ServerUsername))
                 {
-                    string name = proc.ProcessName.ToLower();
-                    if (name.Contains("agilico") || name.Contains("softphone") || name.Contains("dmc"))
-                    {
-                        Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
-                        procFound = true;
-                    }
-                }
-                if (!procFound) Log("Active Softphone Process: No running softphone processes detected.");
-            }
-            catch (Exception ex)
-            {
-                Log($"Error scanning processes: {ex.Message}");
-            }
-
-            try
-            {
-                Log("Scanning network adapters for DHCP, IP and gateway configuration...");
-                var interfaces = NetworkInterface.GetAllNetworkInterfaces();
-                int upAdapters = 0;
-                int validConfiguredAdapters = 0;
-                var issueReasons = new List<string>();
-
-                foreach (var ni in interfaces)
-                {
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                        continue;
-
-                    string adapterName = ni.Name;
-                    string adapterDesc = ni.Description;
-                    Log($"Adapter: '{adapterName}' ({adapterDesc})");
-                    Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {(ni.Speed / 1000000.0):0} Mbps");
-
-                    if (ni.OperationalStatus != OperationalStatus.Up)
-                    {
-                        Log($"  [INFO] Adapter is offline/disconnected.");
-                        continue;
-                    }
-
-                    upAdapters++;
-                    var props = ni.GetIPProperties();
-                    
-                    bool isDhcpEnabled = false;
-                    try
-                    {
-                        var ipv4Props = props.GetIPv4Properties();
-                        if (ipv4Props != null) isDhcpEnabled = ipv4Props.IsDhcpEnabled;
-                    }
-                    catch { }
-
-                    Log($"  DHCP Configuration: {(isDhcpEnabled ? "Enabled (Dynamic IP)" : "Disabled (Static IP)")}");
-
-                    var dhcpServers = new List<string>();
-                    foreach (var dhcp in props.DhcpServerAddresses) dhcpServers.Add(dhcp.ToString());
-                    if (isDhcpEnabled && dhcpServers.Count > 0) Log($"  DHCP Server: {string.Join(", ", dhcpServers)}");
-
-                    var gateways = new List<string>();
-                    foreach (var gw in props.GatewayAddresses) gateways.Add(gw.Address.ToString());
-                    Log($"  Default Gateway: {(gateways.Count > 0 ? string.Join(", ", gateways) : "NONE (No connection to router)")}");
-
-                    var ipv4Addresses = new List<string>();
-                    bool hasApipa = false;
-                    bool hasZeroIp = false;
-
-                    foreach (var addr in props.UnicastAddresses)
-                    {
-                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
-                        {
-                            string ipStr = addr.Address.ToString();
-                            ipv4Addresses.Add(ipStr);
-                            if (ipStr.StartsWith("169.254")) hasApipa = true;
-                            if (ipStr == "0.0.0.0") hasZeroIp = true;
-                        }
-                    }
-
-                    Log($"  IP Addresses: {(ipv4Addresses.Count > 0 ? string.Join(", ", ipv4Addresses) : "None assigned")}");
-
-                    var dnsServers = new List<string>();
-                    foreach (var dns in props.DnsAddresses) dnsServers.Add(dns.ToString());
-                    Log($"  DNS Servers: {(dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "NONE configured")}");
-
-                    string descLower = adapterDesc.ToLower();
-                    string nameLower = adapterName.ToLower();
-                    bool isVpn = ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel || ni.NetworkInterfaceType == NetworkInterfaceType.Ppp || 
-                        nameLower.Contains("vpn") || nameLower.Contains("tap") || nameLower.Contains("tun") || nameLower.Contains("globalprotect") || 
-                        nameLower.Contains("cisco") || nameLower.Contains("anyconnect") || nameLower.Contains("fortinet") || nameLower.Contains("forticlient") || 
-                        nameLower.Contains("wireguard") || nameLower.Contains("tailscale") || nameLower.Contains("zerotier") || nameLower.Contains("checkpoint") || 
-                        nameLower.Contains("sonicwall") || nameLower.Contains("pulse") || descLower.Contains("vpn") || descLower.Contains("tap") || 
-                        descLower.Contains("tun") || descLower.Contains("virtual adapter") || descLower.Contains("fortinet") || descLower.Contains("globalprotect");
-
-                    if (isVpn)
-                    {
-                        Log($"  [WARNING] Active VPN/Virtual adapter detected. Active VPNs can introduce routing overhead, packet loss, and MTU issues.", true);
-                    }
-
-                    if (hasApipa)
-                    {
-                        string msg = $"Adapter '{adapterName}' has a self-assigned APIPA IP address ({string.Join(", ", ipv4Addresses)}). DHCP server failed to assign an IP address. Check local router connection.";
-                        Log($"  [CRITICAL] {msg}", true);
-                        issueReasons.Add(msg);
-                    }
-                    else if (hasZeroIp || ipv4Addresses.Count == 0)
-                    {
-                        string msg = $"Adapter '{adapterName}' has no valid IP address assigned (0.0.0.0 or empty). Check physical cable or Wi-Fi router connection.";
-                        Log($"  [CRITICAL] {msg}", true);
-                        issueReasons.Add(msg);
-                    }
-                    else if (gateways.Count == 0 && !isVpn)
-                    {
-                        string msg = $"Adapter '{adapterName}' is active but has no Default Gateway configured. It cannot route traffic to the internet or Agilico portal.";
-                        Log($"  [CRITICAL] {msg}", true);
-                        issueReasons.Add(msg);
-                    }
-                    else if (dnsServers.Count == 0 && !isVpn)
-                    {
-                        string msg = $"Adapter '{adapterName}' has no DNS servers configured. Domain resolution will fail.";
-                        Log($"  [CRITICAL] {msg}", true);
-                        issueReasons.Add(msg);
-                    }
-                    else
-                    {
-                        if (!isVpn) validConfiguredAdapters++;
-                    }
-                }
-
-                if (upAdapters == 0)
-                {
-                    HasLocalConnectivityIssue = true;
-                    LocalConnectivityIssueReason = "All network adapters are offline/disconnected. Check your network cables or Wi-Fi status.";
-                    Log($"[CRITICAL] {LocalConnectivityIssueReason}", true);
-                }
-                else if (validConfiguredAdapters == 0)
-                {
-                    HasLocalConnectivityIssue = true;
-                    LocalConnectivityIssueReason = issueReasons.Count > 0 ? string.Join(" | ", issueReasons) : "No network adapter has a valid IP address, Gateway, and DNS server configuration to connect to the router/internet.";
-                    Log($"[CRITICAL] Local connectivity issue: {LocalConnectivityIssueReason}", true);
+                    bool hasToken = !string.IsNullOrEmpty(ClientToken);
+                    Log($"Registry credentials: Username={ServerUsername}, UserID={ClientUserId}, AuthTokenPresent={hasToken}");
                 }
                 else
                 {
-                    HasLocalConnectivityIssue = false;
-                    LocalConnectivityIssueReason = "";
-                    Log($"Network scan completed. Found {validConfiguredAdapters} active, correctly configured physical network adapter(s).");
+                    Log("Registry credentials: None found. Softphone may not be registered.");
                 }
-            }
-            catch (Exception ex)
-            {
-                Log($"Error scanning adapters: {ex.Message}");
-            }
-            Log("=================================================================");
-            Log("");
+
+                try
+                {
+                    bool procFound = false;
+                    foreach (var proc in System.Diagnostics.Process.GetProcesses())
+                    {
+                        string name = proc.ProcessName.ToLower();
+                        if (name.Contains("agilico") || name.Contains("softphone") || name.Contains("dmc"))
+                        {
+                            Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
+                            procFound = true;
+                        }
+                    }
+                    if (!procFound) Log("Active Softphone Process: No running softphone processes detected.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error scanning processes: {ex.Message}");
+                }
+
+                try
+                {
+                    Log("Scanning network adapters for DHCP, IP and gateway configuration...");
+                    var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                    int upAdapters = 0;
+                    int validConfiguredAdapters = 0;
+                    var issueReasons = new List<string>();
+
+                    foreach (var ni in interfaces)
+                    {
+                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                            continue;
+
+                        string adapterName = ni.Name;
+                        string adapterDesc = ni.Description;
+                        Log($"Adapter: '{adapterName}' ({adapterDesc})");
+                        Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {(ni.Speed / 1000000.0):0} Mbps");
+
+                        if (ni.OperationalStatus != OperationalStatus.Up)
+                        {
+                            Log($"  [INFO] Adapter is offline/disconnected.");
+                            continue;
+                        }
+
+                        upAdapters++;
+                        var props = ni.GetIPProperties();
+                        
+                        bool isDhcpEnabled = false;
+                        try
+                        {
+                            var ipv4Props = props.GetIPv4Properties();
+                            if (ipv4Props != null) isDhcpEnabled = ipv4Props.IsDhcpEnabled;
+                        }
+                        catch { }
+
+                        Log($"  DHCP Configuration: {(isDhcpEnabled ? "Enabled (Dynamic IP)" : "Disabled (Static IP)")}");
+
+                        var dhcpServers = new List<string>();
+                        foreach (var dhcp in props.DhcpServerAddresses) dhcpServers.Add(dhcp.ToString());
+                        if (isDhcpEnabled && dhcpServers.Count > 0) Log($"  DHCP Server: {string.Join(", ", dhcpServers)}");
+
+                        var gateways = new List<string>();
+                        foreach (var gw in props.GatewayAddresses) gateways.Add(gw.Address.ToString());
+                        Log($"  Default Gateway: {(gateways.Count > 0 ? string.Join(", ", gateways) : "NONE (No connection to router)")}");
+
+                        var ipv4Addresses = new List<string>();
+                        bool hasApipa = false;
+                        bool hasZeroIp = false;
+
+                        foreach (var addr in props.UnicastAddresses)
+                        {
+                            if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                            {
+                                string ipStr = addr.Address.ToString();
+                                ipv4Addresses.Add(ipStr);
+                                if (ipStr.StartsWith("169.254")) hasApipa = true;
+                                if (ipStr == "0.0.0.0") hasZeroIp = true;
+                            }
+                        }
+
+                        Log($"  IP Addresses: {(ipv4Addresses.Count > 0 ? string.Join(", ", ipv4Addresses) : "None assigned")}");
+
+                        var dnsServers = new List<string>();
+                        foreach (var dns in props.DnsAddresses) dnsServers.Add(dns.ToString());
+                        Log($"  DNS Servers: {(dnsServers.Count > 0 ? string.Join(", ", dnsServers) : "NONE configured")}");
+
+                        string descLower = adapterDesc.ToLower();
+                        string nameLower = adapterName.ToLower();
+                        bool isVpn = ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel || ni.NetworkInterfaceType == NetworkInterfaceType.Ppp || 
+                            nameLower.Contains("vpn") || nameLower.Contains("tap") || nameLower.Contains("tun") || nameLower.Contains("globalprotect") || 
+                            nameLower.Contains("cisco") || nameLower.Contains("anyconnect") || nameLower.Contains("fortinet") || nameLower.Contains("forticlient") || 
+                            nameLower.Contains("wireguard") || nameLower.Contains("tailscale") || nameLower.Contains("zerotier") || nameLower.Contains("checkpoint") || 
+                            nameLower.Contains("sonicwall") || nameLower.Contains("pulse") || descLower.Contains("vpn") || descLower.Contains("tap") || 
+                            descLower.Contains("tun") || descLower.Contains("virtual adapter") || descLower.Contains("fortinet") || descLower.Contains("globalprotect");
+
+                        if (isVpn)
+                        {
+                            Log($"  [WARNING] Active VPN/Virtual adapter detected. Active VPNs can introduce routing overhead, packet loss, and MTU issues.", true);
+                        }
+
+                        if (hasApipa)
+                        {
+                            string msg = $"Adapter '{adapterName}' has a self-assigned APIPA IP address ({string.Join(", ", ipv4Addresses)}). DHCP server failed to assign an IP address. Check local router connection.";
+                            Log($"  [CRITICAL] {msg}", true);
+                            issueReasons.Add(msg);
+                        }
+                        else if (hasZeroIp || ipv4Addresses.Count == 0)
+                        {
+                            string msg = $"Adapter '{adapterName}' has no valid IP address assigned (0.0.0.0 or empty). Check physical cable or Wi-Fi router connection.";
+                            Log($"  [CRITICAL] {msg}", true);
+                            issueReasons.Add(msg);
+                        }
+                        else if (gateways.Count == 0 && !isVpn)
+                        {
+                            string msg = $"Adapter '{adapterName}' is active but has no Default Gateway configured. It cannot route traffic to the internet or Agilico portal.";
+                            Log($"  [CRITICAL] {msg}", true);
+                            issueReasons.Add(msg);
+                        }
+                        else if (dnsServers.Count == 0 && !isVpn)
+                        {
+                            string msg = $"Adapter '{adapterName}' has no DNS servers configured. Domain resolution will fail.";
+                            Log($"  [CRITICAL] {msg}", true);
+                            issueReasons.Add(msg);
+                        }
+                        else
+                        {
+                            if (!isVpn) validConfiguredAdapters++;
+                        }
+                    }
+
+                    if (upAdapters == 0)
+                    {
+                        HasLocalConnectivityIssue = true;
+                        LocalConnectivityIssueReason = "All network adapters are offline/disconnected. Check your network cables or Wi-Fi status.";
+                        Log($"[CRITICAL] {LocalConnectivityIssueReason}", true);
+                    }
+                    else if (validConfiguredAdapters == 0)
+                    {
+                        HasLocalConnectivityIssue = true;
+                        LocalConnectivityIssueReason = issueReasons.Count > 0 ? string.Join(" | ", issueReasons) : "No network adapter has a valid IP address, Gateway, and DNS server configuration to connect to the router/internet.";
+                        Log($"[CRITICAL] Local connectivity issue: {LocalConnectivityIssueReason}", true);
+                    }
+                    else
+                    {
+                        HasLocalConnectivityIssue = false;
+                        LocalConnectivityIssueReason = "";
+                        Log($"Network scan completed. Found {validConfiguredAdapters} active, correctly configured physical network adapter(s).");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error scanning adapters: {ex.Message}");
+                }
+                Log("=================================================================");
+                Log("");
+            }, token);
         }
 
         public class LocalNetworkInfo
@@ -795,6 +798,7 @@ namespace agilicomsptoolkit
             catch (OperationCanceledException)
             {
                 Log("Diagnostics cancelled by user.");
+                OnComplete?.Invoke(false, 0);
                 return false;
             }
             catch (Exception ex)

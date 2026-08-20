@@ -226,7 +226,8 @@ namespace agilicomsptoolkit
                     }
 
                     // Build PCAP Packet Header (16 bytes)
-                    long microsec = DateTime.UtcNow.Ticks / 10;
+                    long unixEpochTicks = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+                    long microsec = (DateTime.UtcNow.Ticks - unixEpochTicks) / 10;
                     long seconds = microsec / 1000000;
                     long useconds = microsec % 1000000;
 
@@ -408,7 +409,8 @@ namespace agilicomsptoolkit
 
                     int capLength = ethHeader.Length + ipPacket.Length;
 
-                    long microsec = DateTime.UtcNow.Ticks / 10;
+                    long unixEpochTicks = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+                    long microsec = (DateTime.UtcNow.Ticks - unixEpochTicks) / 10;
                     long seconds = microsec / 1000000;
                     long useconds = microsec % 1000000;
 

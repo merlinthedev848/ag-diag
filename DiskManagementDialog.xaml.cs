@@ -78,10 +78,13 @@ namespace agilicomsptoolkit
                             fillBrush.Freeze();
                             textBrush.Freeze();
 
+                            string volName = "Local Disk";
+                            try { volName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local Disk" : d.VolumeLabel; } catch { }
+
                             list.Add(new LogicalDiskInfo
                             {
                                 DeviceID = d.Name.TrimEnd('\\'),
-                                VolumeName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local Disk" : d.VolumeLabel,
+                                VolumeName = volName,
                                 SizeText = $"{usedGb:F1} GB used of {totalGb:F1} GB",
                                 PercentageText = $"{Math.Round(usedPercent)}% Used ({freeGb:F1} GB Free)",
                                 FillWidthStar = new GridLength(usedPercent, GridUnitType.Star),

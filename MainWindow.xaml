@@ -69,7 +69,7 @@
                         <TextBlock Text="Converter" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                     <Button x:Name="BtnHelp" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconHelp}" Click="BtnHelp_Click">
-                        <TextBlock Text="Results" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock Text="Help" FontSize="11" FontWeight="SemiBold"/>
                     </Button>
                     <Button x:Name="BtnLogs" Style="{StaticResource SidebarButtonStyle}" Tag="{StaticResource IconLogs}" Click="BtnLogs_Click">
                         <TextBlock Text="Logs" FontSize="11" FontWeight="SemiBold"/>

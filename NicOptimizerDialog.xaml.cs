@@ -117,10 +117,10 @@ namespace agilicomsptoolkit
                 {
                     string[] commands = new[]
                     {
-                        // Hardware Offloads & Scaling
-                        "Enable-NetAdapterRss -Name '*' -ErrorAction SilentlyContinue",
-                        "Disable-NetAdapterLso -Name '*' -ErrorAction SilentlyContinue",
-                        "Disable-NetAdapterRsc -Name '*' -ErrorAction SilentlyContinue", // RSC can cause latency for VoIP
+                        // Hardware Offloads & Scaling (targeting physical adapters only)
+                        "Get-NetAdapter -Physical | Enable-NetAdapterRss -ErrorAction SilentlyContinue",
+                        "Get-NetAdapter -Physical | Disable-NetAdapterLso -ErrorAction SilentlyContinue",
+                        "Get-NetAdapter -Physical | Disable-NetAdapterRsc -ErrorAction SilentlyContinue", // RSC can cause latency for VoIP
                         
                         // TCP/IP Stack Tuning
                         "netsh int tcp set global autotuninglevel=normal",
@@ -153,10 +153,16 @@ namespace agilicomsptoolkit
                     var errorTask = process.StandardError.ReadToEndAsync();
                     var outputTask = process.StandardOutput.ReadToEndAsync();
                     await process.WaitForExitAsync();
-                    _ = await errorTask;
+                    string errOutput = await errorTask;
                     _ = await outputTask;
 
-                    ModernMessageBox.Show("Network adapters have been optimized for maximum Speed, Stability, and VoIP Performance.\n\nChanges applied:\n- RSS Enabled, LSO/RSC Disabled\n- TCP Auto-Tuning and Heuristics Optimized\n- Windows Network Throttling Disabled", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    if (!string.IsNullOrWhiteSpace(errOutput) && errOutput.Contains("Access is denied", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ModernMessageBox.Show("Administrator privileges are required to apply network optimizations.", "Access Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    ModernMessageBox.Show("Network adapters have been optimized for maximum Speed, Stability, and VoIP Performance.\n\nChanges applied:\n- RSS Enabled, LSO/RSC Disabled (Physical NICs)\n- TCP Auto-Tuning and Heuristics Optimized\n- Windows Network Throttling Disabled", "Optimization Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                     TxtStatus.Text = "Maximum connectivity optimizations applied.";
                     
                     if (Owner is MainWindow mainWindow) 

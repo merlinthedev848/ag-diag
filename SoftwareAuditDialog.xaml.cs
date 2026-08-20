@@ -224,7 +224,7 @@ namespace agilicomsptoolkit
             }
         }
 
-        private void BtnUpdateSoftware_Click(object sender, RoutedEventArgs e)
+        private async void BtnUpdateSoftware_Click(object sender, RoutedEventArgs e)
         {
             var result = ModernMessageBox.Show("Are you sure you want to update all available software?\n\nThis may close running applications and take several minutes.", "Confirm Update", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes) return;
@@ -233,19 +233,29 @@ namespace agilicomsptoolkit
             {
                 if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Initiated global software update via winget.");
 
-                Process.Start(new ProcessStartInfo
+                BtnUpdateSoftware.IsEnabled = false;
+                BtnUpdateSoftware.Content = "Updating...";
+
+                var proc = Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
                     Arguments = "/c winget upgrade --all & pause",
                     UseShellExecute = true
                 });
-                
-                BtnUpdateSoftware.IsEnabled = false;
-                BtnUpdateSoftware.Content = "Updating...";
+
+                if (proc != null)
+                {
+                    await proc.WaitForExitAsync();
+                }
             }
             catch (Exception ex)
             {
                 ModernMessageBox.Show($"Failed to launch winget: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnUpdateSoftware.IsEnabled = true;
+                BtnUpdateSoftware.Content = "Update All Software";
             }
         }
 

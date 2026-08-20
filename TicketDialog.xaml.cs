@@ -75,14 +75,10 @@ namespace agilicomsptoolkit
                 return;
             }
 
-            // Create temp directory and files for attachments
-            string tempDir = Path.Combine(Path.GetTempPath(), "Agilico_Diagnostics_Logs");
+            // Create unique temp directory and files for attachments
+            string tempDir = Path.Combine(Path.GetTempPath(), $"Agilico_Diagnostics_Logs_{Guid.NewGuid():N}");
             try
             {
-                if (Directory.Exists(tempDir))
-                {
-                    Directory.Delete(tempDir, true);
-                }
                 Directory.CreateDirectory(tempDir);
             }
             catch { /* Ignore clear errors, write to new unique folder if needed */ }

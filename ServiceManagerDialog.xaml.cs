@@ -93,6 +93,12 @@ namespace agilicomsptoolkit
                     ServiceController.GetServices().OrderBy(s => s.DisplayName).ToList()
                 );
                 
+                if (!this.IsLoaded || !this.IsVisible)
+                {
+                    foreach (var s in systemServices) s.Dispose();
+                    return;
+                }
+
                 foreach (var item in Services)
                 {
                     item.Controller?.Dispose();
