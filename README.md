@@ -4,6 +4,15 @@ An advanced, premium-themed desktop diagnostic application built for Windows, de
 
 ---
 
+## 📥 Downloads (Latest v4.1.0)
+
+| Flavour | Executable File | Size | Description |
+| :--- | :--- | :--- | :--- |
+| **Standard (Full)** | [⬇️ `Agilico.MSP.Toolkit.exe`](https://github.com/merlinthedev848/ag-diag/releases/download/v4.1.0/Agilico.MSP.Toolkit.exe) | ~228 MB | **Self-contained** (no .NET runtime required), includes Audio Converter & Admin drag-and-drop. |
+| **Lite** | [⬇️ `Agilico.MSP.Toolkit.Lite.exe`](https://github.com/merlinthedev848/ag-diag/releases/download/v4.1.0/Agilico.MSP.Toolkit.Lite.exe) | ~2.2 MB | **Lightweight** (requires .NET 8.0 Desktop Runtime). |
+
+---
+
 ## Key Features
 
 ### 1. Core Outbound Probing Engine (10 Critical Tests)
