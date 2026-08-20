@@ -137,10 +137,13 @@ namespace agilicomsptoolkit
                 try
                 {
                     bool procFound = false;
+                    int currentPid = Environment.ProcessId;
                     foreach (var proc in System.Diagnostics.Process.GetProcesses())
                     {
+                        if (proc.Id == currentPid) continue;
                         string name = proc.ProcessName.ToLower();
-                        if (name.Contains("agilico") || name.Contains("softphone") || name.Contains("dmc"))
+                        if (name.Contains("toolkit")) continue;
+                        if (name.Contains("agilicoconnect") || name.Contains("softphone") || name.Contains("dmc") || (name.Contains("agilico") && !name.Contains("toolkit")))
                         {
                             Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
                             procFound = true;
@@ -169,7 +172,8 @@ namespace agilicomsptoolkit
                         string adapterName = ni.Name;
                         string adapterDesc = ni.Description;
                         Log($"Adapter: '{adapterName}' ({adapterDesc})");
-                        Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {(ni.Speed / 1000000.0):0} Mbps");
+                        string speedStr = (ni.Speed > 0) ? $"{(ni.Speed / 1000000.0):0} Mbps" : "Unknown";
+                        Log($"  Status: {ni.OperationalStatus}, Type: {ni.NetworkInterfaceType}, Speed: {speedStr}");
 
                         if (ni.OperationalStatus != OperationalStatus.Up)
                         {
@@ -1376,7 +1380,7 @@ namespace agilicomsptoolkit
 
         private async Task<int> CountPrivateHopsAsync(string targetIp, int maxHops)
         {
-            int privateHops = 0;
+            var seenPrivateIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using var ping = new Ping();
             var options = new PingOptions(1, true);
 
@@ -1393,7 +1397,7 @@ namespace agilicomsptoolkit
                         {
                             if (IsPrivateIp(addr))
                             {
-                                privateHops++;
+                                seenPrivateIps.Add(addr.ToString());
                             }
                             else
                             {
@@ -1408,7 +1412,7 @@ namespace agilicomsptoolkit
                     // Ignore and try next hop
                 }
             }
-            return privateHops;
+            return seenPrivateIps.Count;
         }
 
         private async Task<bool> RunNatPortRandomnessTestAsync(CancellationToken token)
@@ -1416,7 +1420,7 @@ namespace agilicomsptoolkit
             if (CheckLocalConnectivityBeforeTest("NAT Port Translation (Random Port)")) return false;
             UpdateProgress("NAT Port Translation (Random Port)", "Running", "Checking port preservation...");
             Log("Test 7: Evaluating NAT port translation...");
-            Log("Guideline: 'The public interface NAT port should be random and not be the same as the local NAT port.'");
+            Log("Guideline: 'The public interface NAT port should be preserved (consistent NAT) for reliable bidirectional VoIP media.'");
 
             int localPort = LocalSipPort;
             int mappedPort = 0;
@@ -1726,6 +1730,12 @@ namespace agilicomsptoolkit
                     catch (OperationCanceledException) { /* Timeout — packet lost */ }
                     catch { /* Other error — packet lost */ }
 
+                    // Fast-fail if destination is completely unresponsive after 5 attempts
+                    if (i >= 4 && packetsReceived == 0)
+                    {
+                        break;
+                    }
+
                     await Task.Delay(packetDelayMs, token);
                 }
 
@@ -1751,7 +1761,7 @@ namespace agilicomsptoolkit
                     }
                 }
 
-                Log($"  [{pathName}] Sent: {numPackets}, Recv: {packetsReceived}, Loss: {lossPercent:0.0}%, Jitter: {jitter:0.1}ms, RTT: {avgRtt:0.1}ms");
+                Log($"  [{pathName}] Sent: {numPackets}, Recv: {packetsReceived}, Loss: {lossPercent:0.0}%, Jitter: {jitter:0.0}ms, RTT: {avgRtt:0.0}ms");
                 
                 bool pass = (lossPercent <= 5.0) && (jitter <= 30.0) && (packetsReceived > 0);
                 return (numPackets, packetsReceived, lossPercent, jitter, avgRtt, pass);
@@ -1808,9 +1818,9 @@ namespace agilicomsptoolkit
             else if (mosScore < 4.0) mosRating = "Good";
 
             Log("RTP Quality Summary:");
-            Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.1}ms, RTT={pathA.avgRtt:0.1}ms - {(pathA.pass ? "PASS" : "FAIL")}");
-            Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.1}ms, RTT={pathB.avgRtt:0.1}ms - {(pathB.pass ? "PASS" : "FAIL")} (Informational only)");
-            Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.1}ms, RTT={pathC.avgRtt:0.1}ms - {(pathC.pass ? "PASS" : "FAIL")}");
+            Log($"  Path A (SIP 5060): Loss={pathA.loss:0.0}%, Jitter={pathA.jitter:0.0}ms, RTT={pathA.avgRtt:0.0}ms - {(pathA.pass ? "PASS" : "FAIL")}");
+            Log($"  Path B (Agilico STUN): Loss={pathB.loss:0.0}%, Jitter={pathB.jitter:0.0}ms, RTT={pathB.avgRtt:0.0}ms - {(pathB.pass ? "PASS" : "FAIL")} (Informational only)");
+            Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.0}ms, RTT={pathC.avgRtt:0.0}ms - {(pathC.pass ? "PASS" : "FAIL")}");
             Log($"  Estimated Call Quality: MOS {mosScore:F2} ({mosRating})");
 
             if (allPassed)
@@ -1867,13 +1877,12 @@ namespace agilicomsptoolkit
 
                 await client.SendAsync(stunRequest, stunRequest.Length, endPoint);
 
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(1500, token);
+                using var queryCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                queryCts.CancelAfter(1500);
 
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
+                try
                 {
-                    var result = await receiveTask;
+                    var result = await client.ReceiveAsync(queryCts.Token);
                     // Record received packet
                     Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), port, localIp, localPort, true);
                     if (ValidateStunResponse(result.Buffer, transactionId))
@@ -1885,10 +1894,10 @@ namespace agilicomsptoolkit
                         }
                     }
                 }
-                else
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
-                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                    token.ThrowIfCancellationRequested();
+                    // Timeout on this STUN endpoint
+                    return (false, null, 0);
                 }
                 return (false, null, 0);
             }
