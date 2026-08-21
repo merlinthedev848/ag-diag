@@ -1492,6 +1492,7 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
@@ -1499,7 +1500,7 @@
                                         <TextBlock Grid.Row="0" Text="Outbound Firewall Port Prober" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,10"/>
 
                                         <!-- Controls -->
-                                        <Grid Grid.Row="1" Margin="0,0,0,5">
+                                        <Grid Grid.Row="1" Margin="0,0,0,6">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
@@ -1512,15 +1513,16 @@
                                                 <ComboBoxItem Content="Microsoft Teams"/>
                                                 <ComboBoxItem Content="Custom Port Range"/>
                                             </ComboBox>
-                                            <Button x:Name="BtnStartPortProbe" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="PROBE PORTS" Click="BtnStartPortProbe_Click" Margin="10,0,0,0" Padding="15,0"/>
+                                            <Button x:Name="BtnStartPortProbe" Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Content="PROBE PORTS" Click="BtnStartPortProbe_Click" Margin="10,0,0,0" Padding="15,0" Height="32"/>
                                         </Grid>
+
                                         <!-- Profile description -->
-                                        <TextBlock x:Name="TxtPortProfileDesc" Grid.Row="1" Margin="0,0,0,10"
-                                                   Text="Tests HTTP/HTTPS, STUN (UDP 3478), SIP (UDP 5060/5061), and NTP (UDP 123) for Agilico Connect endpoints."
+                                        <TextBlock x:Name="TxtPortProfileDesc" Grid.Row="2" Margin="0,0,0,10"
+                                                   Text="Tests HTTP (TCP 80), HTTPS (TCP 443), STUN (UDP 3478), SIP signalling (UDP 5060/5061), and NTP (UDP 123) against Agilico Connect endpoints."
                                                    FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
 
                                         <!-- Results Grid -->
-                                        <DataGrid Grid.Row="2" x:Name="GridPortProber" AutoGenerateColumns="False" IsReadOnly="True" 
+                                        <DataGrid Grid.Row="3" x:Name="GridPortProber" AutoGenerateColumns="False" IsReadOnly="True" 
                                                   GridLinesVisibility="Horizontal" HeadersVisibility="Column" Background="Transparent" RowBackground="Transparent" AlternatingRowBackground="#f8fafc" BorderThickness="0" RowHeight="32">
                                             <DataGrid.Resources>
                                                 <Style TargetType="DataGridColumnHeader">
