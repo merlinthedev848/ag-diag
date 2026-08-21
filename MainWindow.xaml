@@ -845,6 +845,20 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Button>
+
+                                        <Button x:Name="BtnDriverUpdater" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,10" Width="280" Height="50" Click="BtnDriverUpdater_Click" HorizontalAlignment="Left">
+                                            <Grid HorizontalAlignment="Left" Width="260">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="30"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path Data="{StaticResource IconHardware}" Fill="{StaticResource TextDarkBrush}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                    <TextBlock Text="Driver Management &amp; Updates" FontWeight="Bold" FontSize="12"/>
+                                                    <TextBlock Text="Audit devices and upgrade drivers" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
                                     </WrapPanel>
 
                                     <!-- Category 2: Network Config & Tuning -->

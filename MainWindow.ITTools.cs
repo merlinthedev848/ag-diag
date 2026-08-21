@@ -59,6 +59,13 @@ namespace agilicomsptoolkit
             dialog.ShowDialog();
         }
 
+        private void BtnDriverUpdater_Click(object sender, RoutedEventArgs e)
+        {
+            LogAuditAction("Launched Driver Management & Updates dialog.");
+            var dialog = new DriverUpdaterDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
         private void BtnServicesManager_Click(object sender, RoutedEventArgs e)
         {
             LogAuditAction("Launched Windows Services Manager dialog.");
