@@ -4,9 +4,11 @@ $outDir = Join-Path $PSScriptRoot "publish_output"
 
 # Always wipe intermediate and output folders for a clean build
 Write-Host "Cleaning previous build artefacts..."
+Get-Process -Name "Agilico MSP Toolkit*", "Agilico.MSP.Toolkit*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
 Remove-Item (Join-Path $srcDir "bin\Publish") -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item $outDir -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Path $outDir | Out-Null
+New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 
 Set-Location $srcDir
 

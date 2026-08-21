@@ -59,7 +59,11 @@ public partial class App : Application
             System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
             LogStartupError("DispatcherUnhandledException", args.Exception);
             ModernMessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            args.Handled = true; // Prevent app from closing if possible
+            args.Handled = true;
+            if (this.MainWindow == null || !this.MainWindow.IsVisible)
+            {
+                Shutdown(1);
+            }
         };
 
         TaskScheduler.UnobservedTaskException += (s, args) =>
@@ -87,7 +91,7 @@ public partial class App : Application
         }
         else
         {
-            // Prevent WPF from initiating shutdown when TermsDialog closes
+            // Prevent WPF from initiating shutdown while TermsDialog is showing
             this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
             // Launch GUI
@@ -98,17 +102,26 @@ public partial class App : Application
             LogStartupMessage($"TermsDialog result: {result}");
             if (result == true)
             {
-                LogStartupMessage("Instantiating MainWindow.");
-                var mainWindow = new MainWindow();
-                this.MainWindow = mainWindow;
-                this.ShutdownMode = ShutdownMode.OnLastWindowClose;
-                LogStartupMessage("Showing MainWindow.");
-                mainWindow.Show();
+                try
+                {
+                    LogStartupMessage("Instantiating MainWindow.");
+                    var mainWindow = new MainWindow();
+                    this.MainWindow = mainWindow;
+                    this.ShutdownMode = ShutdownMode.OnMainWindowClose;
+                    LogStartupMessage("Showing MainWindow.");
+                    mainWindow.Show();
+                }
+                catch (Exception ex)
+                {
+                    LogStartupError("MainWindowInstantiation", ex);
+                    ModernMessageBox.Show($"Failed to initialize main window.\n\nError: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Shutdown(1);
+                }
             }
             else
             {
                 LogStartupMessage("User declined terms or closed dialog. Shutting down.");
-                Shutdown();
+                Shutdown(0);
             }
         }
     }
