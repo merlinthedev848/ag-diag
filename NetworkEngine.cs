@@ -775,7 +775,7 @@ namespace agilicomsptoolkit
                 int totalPossible = 0;
                 int totalEarned = 0;
                 // Note: Agilico STUN (weights[3]) is informational only, so it contributes 0 to the score.
-                int[] weights = new int[] { 15, 15, 5, 0, 5, 5, 5, 15, 15, 10 };
+                int[] weights = new int[] { 15, 15, 5, 0, 10, 10, 10, 15, 15, 5 };
                 bool[] results = new bool[] { dnsPass, httpPass, ntpPass, agilicoStunPass, googleStunPass, natHopsPass, natPortPass, sipAlgPass, rtpQualityPass, signalRPass };
 
                 for (int i = 0; i < 10; i++)
