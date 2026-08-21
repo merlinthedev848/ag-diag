@@ -71,8 +71,8 @@
         <Geometry x:Key="IconNetwork">M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z</Geometry>
         <Geometry x:Key="IconShield">M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z</Geometry>
         <Geometry x:Key="IconPulse">M23,12L20.56,9.57L16.29,13.84L11.71,9.26L7.44,13.53L5,11.09V12A7,7 0 0,0 12,19A7,7 0 0,0 19,12H23M12,2A10,10 0 0,1 22,12H20A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12H22A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2Z</Geometry>
-        <Geometry x:Key="IconPlus">M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z</Geometry>
         <Geometry x:Key="IconWrench">M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.5 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z</Geometry>
+        <Geometry x:Key="IconHardware">M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v8H8V8zm1-4V2h2v2h2V2h2v2h1a2 2 0 0 1 2 2v1h2v2h-2v2h2v2h-2v2h2v2h-2v1a2 2 0 0 1-2 2h-1v2h-2v-2h-2v2H9v-2H8v2H6v-2H5a2 2 0 0 1-2-2v-1H1v-2h2v-2H1v-2h2v-2H1V7h2V6a2 2 0 0 1 2-2h1V2h2v2h1z</Geometry>
 
         <!-- Base Styles -->
         <!-- Custom Sidebar Button -->
