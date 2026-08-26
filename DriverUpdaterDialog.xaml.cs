@@ -120,6 +120,8 @@ namespace agilicomsptoolkit
 
         private void ApplyFilter()
         {
+            if (TxtSummary == null || _allDrivers == null || _filteredDrivers == null || _availableUpdates == null) return;
+
             string search = TxtDriverSearch?.Text?.Trim().ToLowerInvariant() ?? "";
             string selectedClass = (CmbDriverClass?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All Classes";
 
@@ -212,21 +214,21 @@ namespace agilicomsptoolkit
             try
             {
                 string script = @"
- = New-Object -ComObject Microsoft.Update.Session
- = .CreateUpdateSearcher()
-.ServerSelection = 2
+$Session = New-Object -ComObject Microsoft.Update.Session
+$Searcher = $Session.CreateUpdateSearcher()
+$Searcher.ServerSelection = 2
 try {
-     = .Search(""IsInstalled=0 and Type='Driver'"")
-     = @()
-    foreach ( in .Updates) {
-         += [PSCustomObject]@{
-            Title = .Title
-            DriverClass = if (.DriverClass) { .DriverClass } else { 'Driver' }
-            DriverModel = if (.DriverModel) { .DriverModel } else { '-' }
-            DriverDate = if (.DriverVerDate) { .DriverVerDate.ToString('dd/MM/yyyy') } else { '-' }
+    $Results = $Searcher.Search(""IsInstalled=0 and Type='Driver'"")
+    $List = @()
+    foreach ($Update in $Results.Updates) {
+        $List += [PSCustomObject]@{
+            Title = $Update.Title
+            DriverClass = if ($Update.DriverClass) { $Update.DriverClass } else { 'Driver' }
+            DriverModel = if ($Update.DriverModel) { $Update.DriverModel } else { '-' }
+            DriverDate = if ($Update.DriverVerDate) { $Update.DriverVerDate.ToString('dd/MM/yyyy') } else { '-' }
         }
     }
-     | ConvertTo-Json -Compress
+    $List | ConvertTo-Json -Compress
 } catch {
     Write-Output '[]'
 }
@@ -319,34 +321,34 @@ try {
             TxtUpdateProgress.Text = "Starting Windows Update Agent driver installer...";
 
             string installScript = @"
- = New-Object -ComObject Microsoft.Update.Session
- = .CreateUpdateSearcher()
-.ServerSelection = 2
- = .Search(""IsInstalled=0 and Type='Driver'"")
+$Session = New-Object -ComObject Microsoft.Update.Session
+$Searcher = $Session.CreateUpdateSearcher()
+$Searcher.ServerSelection = 2
+$Results = $Searcher.Search(""IsInstalled=0 and Type='Driver'"")
 
-if (.Updates.Count -eq 0) {
+if ($Results.Updates.Count -eq 0) {
     Write-Output 'NO_UPDATES'
     exit
 }
 
- = .CreateUpdateDownloader()
-.Updates = .Updates
+$Downloader = $Session.CreateUpdateDownloader()
+$Downloader.Updates = $Results.Updates
 Write-Output 'DOWNLOADING'
-.Download()
+$Downloader.Download()
 
- = New-Object -ComObject Microsoft.Update.UpdateColl
-foreach ( in .Updates) {
-    if (.IsDownloaded) {
-        .Add() | Out-Null
+$UpdatesToInstall = New-Object -ComObject Microsoft.Update.UpdateColl
+foreach ($Update in $Results.Updates) {
+    if ($Update.IsDownloaded) {
+        $UpdatesToInstall.Add($Update) | Out-Null
     }
 }
 
-if (.Count -gt 0) {
-     = .CreateUpdateInstaller()
-    .Updates = 
+if ($UpdatesToInstall.Count -gt 0) {
+    $Installer = $Session.CreateUpdateInstaller()
+    $Installer.Updates = $UpdatesToInstall
     Write-Output 'INSTALLING'
-     = .Install()
-    Write-Output ""RESULT::""
+    $Result = $Installer.Install()
+    Write-Output ""RESULT::$($Result.ResultCode)""
 } else {
     Write-Output 'DOWNLOAD_FAILED'
 }
