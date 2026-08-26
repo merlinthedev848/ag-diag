@@ -321,7 +321,7 @@ namespace agilicomsptoolkit
             }
             catch { }
 
-            Environment.Exit(0);
+            Application.Current?.Shutdown();
         }
 
         #endregion

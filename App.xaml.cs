@@ -58,7 +58,19 @@ public partial class App : Application
         {
             System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
             LogStartupError("DispatcherUnhandledException", args.Exception);
-            ModernMessageBox.Show($"An unexpected error occurred.\n\nError: {args.Exception.Message}", "Application Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            string errorMsg = args.Exception.Message;
+            Exception inner = args.Exception.InnerException;
+            while (inner != null)
+            {
+                errorMsg += "\nInner: " + inner.Message;
+                if (inner is System.Windows.Markup.XamlParseException xamlEx)
+                {
+                    errorMsg += $"\nLine: {xamlEx.LineNumber}, Pos: {xamlEx.LinePosition}";
+                }
+                inner = inner.InnerException;
+            }
+
+            MessageBox.Show("Error: " + errorMsg, "Agilico MSP Toolkit", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
             if (this.MainWindow == null || !this.MainWindow.IsVisible)
             {
@@ -75,15 +87,42 @@ public partial class App : Application
         };
 
         bool silentMode = false;
+        bool testXaml = false;
         foreach (var arg in e.Args)
         {
             if (arg.Equals("--silent", StringComparison.OrdinalIgnoreCase))
             {
                 silentMode = true;
             }
+            if (arg.Equals("--test-xaml", StringComparison.OrdinalIgnoreCase))
+            {
+                testXaml = true;
+            }
         }
 
-        LogStartupMessage($"Silent mode: {silentMode}");
+        LogStartupMessage($"Silent mode: {silentMode}, Test XAML mode: {testXaml}");
+
+        if (testXaml)
+        {
+            try
+            {
+                AttachConsole(ATTACH_PARENT_PROCESS);
+                Console.WriteLine("\n[TEST-XAML] Instantiating MainWindow...");
+                var mainWindow = new MainWindow();
+                Console.WriteLine("[TEST-XAML] MainWindow instantiated successfully!");
+                Shutdown(0);
+                return;
+            }
+            catch (Exception ex)
+            {
+                AttachConsole(ATTACH_PARENT_PROCESS);
+                Console.WriteLine("\n[TEST-XAML] FAILED to instantiate MainWindow!");
+                Console.WriteLine(ex.ToString());
+                LogStartupError("TestXamlException", ex);
+                Shutdown(1);
+                return;
+            }
+        }
 
         if (silentMode)
         {
@@ -205,7 +244,7 @@ public partial class App : Application
             string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit");
             Directory.CreateDirectory(appDataDir);
             string logFile = Path.Combine(appDataDir, "startup_log.txt");
-            string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR ({context}): {ex?.Message}{Environment.NewLine}{ex?.StackTrace}{Environment.NewLine}{Environment.NewLine}";
+            string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR ({context}): {ex?.ToString()}{Environment.NewLine}{Environment.NewLine}";
             lock (_startupLogLock)
             {
                 File.AppendAllText(logFile, msg);

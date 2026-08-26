@@ -1,0 +1,59 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Agilico MSP Toolkit" 
+           Manufacturer="Agilico" 
+           Version="4.1.0" 
+           UpgradeCode="a630aad3-9be4-4417-99af-754932d7093c"
+           Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Agilico MSP Toolkit is already installed." />
+    
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="AgilicoDir" Name="Agilico">
+        <Directory Id="INSTALLFOLDER" Name="Agilico MSP Toolkit" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Agilico" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="b630aad3-9be4-4417-99af-754932d7093d">
+        <File Id="AgilicoExe" Source="publish_output\Agilico MSP Toolkit.exe" KeyPath="yes" />
+        
+        <!-- Start Menu Shortcut -->
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Agilico MSP Toolkit"
+                  Description="Agilico Network Diagnostics and MSP Toolkit"
+                  WorkingDirectory="INSTALLFOLDER"
+                  IconIndex="0"
+                  Advertise="yes" />
+
+        <!-- Desktop Shortcut -->
+        <Shortcut Id="ApplicationDesktopShortcut"
+                  Directory="DesktopFolder"
+                  Name="Agilico MSP Toolkit"
+                  Description="Agilico Network Diagnostics and MSP Toolkit"
+                  WorkingDirectory="INSTALLFOLDER"
+                  IconIndex="0"
+                  Advertise="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ProgramMenuComponents" Directory="ApplicationProgramsFolder">
+      <Component Id="CleanupShortcut" Guid="c630aad3-9be4-4417-99af-754932d7093e">
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKMU" Key="Software\Agilico\AgilicoMSPToolkit" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="MainFeature" Title="Agilico MSP Toolkit" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="ProgramMenuComponents" />
+    </Feature>
+  </Package>
+</Wix>

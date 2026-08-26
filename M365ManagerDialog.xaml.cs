@@ -32,7 +32,9 @@ namespace agilicomsptoolkit
 
         private async Task<string> RunPowerShellSilentAsync(string script)
         {
-            string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".ps1");
+            string tempDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit", "Temp");
+            Directory.CreateDirectory(tempDir);
+            string tempPath = Path.Combine(tempDir, Guid.NewGuid().ToString() + ".ps1");
             _tempFiles.Add(tempPath);
             File.WriteAllText(tempPath, script);
 
@@ -44,9 +46,6 @@ namespace agilicomsptoolkit
             process.StartInfo.RedirectStandardError = true;
             process.StartInfo.CreateNoWindow = true;
 
-            var sbOut = new StringBuilder();
-            var sbErr = new StringBuilder();
-
             process.Start();
 
             var readOut = process.StandardOutput.ReadToEndAsync();
@@ -55,12 +54,16 @@ namespace agilicomsptoolkit
             await Task.WhenAll(readOut, readErr);
             await process.WaitForExitAsync();
 
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+
             return readOut.Result + readErr.Result;
         }
 
         private void RunPowerShellInteractive(string script, Action? callback = null)
         {
-            string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".ps1");
+            string tempDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit", "Temp");
+            Directory.CreateDirectory(tempDir);
+            string tempPath = Path.Combine(tempDir, Guid.NewGuid().ToString() + ".ps1");
             _tempFiles.Add(tempPath);
             File.WriteAllText(tempPath, script);
 
@@ -72,13 +75,14 @@ namespace agilicomsptoolkit
             };
 
             var proc = Process.Start(psi);
-            if (callback != null)
-            {
-                Task.Run(() => {
-                    proc?.WaitForExit();
+            Task.Run(() => {
+                proc?.WaitForExit();
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                if (callback != null)
+                {
                     Dispatcher.Invoke(callback);
-                });
-            }
+                }
+            });
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)

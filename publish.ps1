@@ -33,7 +33,7 @@ Write-Host ""
 Write-Host "Publishing Lite Release (framework-dependent, single-file)..."
 dotnet publish -c Release -r win-x64 --self-contained false `
     -p:PublishSingleFile=true `
-    -p:PublishReadyToRun=false `
+    -p:PublishReadyToRun=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:IsFullVersion=false `
     -p:AssemblyName="Agilico MSP Toolkit Lite" `
@@ -87,6 +87,22 @@ $dbgLite       = "$outDir\Debug - Lite"
 Copy-Item "bin\Publish\StandaloneDebug" -Destination $dbgStandalone -Recurse -Force
 Copy-Item "bin\Publish\LiteDebug"       -Destination $dbgLite       -Recurse -Force
 
+# -----------------------------------------------------------------------
+# MSI INSTALLERS — WiX v4/v5/v7
+# -----------------------------------------------------------------------
+
+Write-Host ""
+Write-Host "Building MSI Installers via WiX Toolset..."
+if (Get-Command wix -ErrorAction SilentlyContinue) {
+    & wix build "$srcDir\Product.wxs" -arch x64 -o "$outDir\Agilico_MSP_Toolkit.msi"
+    & wix build "$srcDir\ProductLite.wxs" -arch x64 -o "$outDir\Agilico_MSP_Toolkit_Lite.msi"
+    Write-Host "MSI Installers generated successfully:"
+    Write-Host "   $outDir\Agilico_MSP_Toolkit.msi"
+    Write-Host "   $outDir\Agilico_MSP_Toolkit_Lite.msi"
+} else {
+    Write-Host "WiX Toolset (wix) command not found - skipping MSI generation." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "=========================================="
 Write-Host " Build complete."
@@ -95,6 +111,10 @@ Write-Host ""
 Write-Host " RELEASE (single-file, run directly):"
 Write-Host "   $outDir\Agilico MSP Toolkit.exe"
 Write-Host "   $outDir\Agilico MSP Toolkit Lite.exe"
+Write-Host ""
+Write-Host " MSI INSTALLERS:"
+Write-Host "   $outDir\Agilico_MSP_Toolkit.msi"
+Write-Host "   $outDir\Agilico_MSP_Toolkit_Lite.msi"
 Write-Host ""
 Write-Host " DEBUG (folder, run the .exe INSIDE the folder):"
 Write-Host "   $dbgStandalone\Agilico MSP Toolkit.exe"

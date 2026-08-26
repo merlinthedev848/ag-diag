@@ -185,19 +185,20 @@ namespace agilicomsptoolkit
                             string availableVersion = match.Groups[4].Value.Trim();
 
                             // Find in our list
-                            var item = SoftwareList.FirstOrDefault(s => s.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase) || name.StartsWith(s.Name, StringComparison.OrdinalIgnoreCase));
-                            if (item != null)
+                            SoftwareInfo? item = null;
+                            Application.Current.Dispatcher.Invoke(() =>
                             {
-                                var orangeBrush = SoftwareInfo.CreateFrozenBrush("#f59e0b");
-                                Application.Current.Dispatcher.Invoke(() =>
+                                item = SoftwareList.FirstOrDefault(s => s.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase) || name.StartsWith(s.Name, StringComparison.OrdinalIgnoreCase));
+                                if (item != null)
                                 {
+                                    var orangeBrush = SoftwareInfo.CreateFrozenBrush("#f59e0b");
                                     item.AvailableVersion = availableVersion;
                                     item.UpdateBgBrush = orangeBrush;
                                     item.UpdateFgBrush = Brushes.White;
-                                });
-                                updateCount++;
-                                _updatesAvailable = true;
-                            }
+                                    updateCount++;
+                                    _updatesAvailable = true;
+                                }
+                            });
                         }
                     }
                 }
