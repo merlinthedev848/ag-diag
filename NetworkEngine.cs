@@ -556,7 +556,7 @@ namespace agilicomsptoolkit
             OnProgress?.Invoke(testName, status, details);
         }
 
-        public async Task<bool> RunDiagnosticsAsync()
+        public async Task<bool> RunDiagnosticsAsync(Func<CancellationToken, Task<(double download, double upload)>> speedTestCallback = null)
         {
             var localCts = new CancellationTokenSource();
             var oldCts = Interlocked.Exchange(ref _cts, localCts);
@@ -650,6 +650,31 @@ namespace agilicomsptoolkit
                 {
                     Log("Test 1: Skipped by user selection.");
                     UpdateProgress("DNS Domain & Resolution Check", "Skipped", "Skipped by user");
+                }
+                if (token.IsCancellationRequested) return false;
+
+                // Test: Bandwidth Speed Test
+                if (speedTestCallback != null)
+                {
+                    UpdateProgress("Bandwidth Speed Test", "Running", "Measuring download and upload speeds...");
+                    Log("Running Bandwidth Speed Test...");
+                    try
+                    {
+                        var speeds = await speedTestCallback(token);
+                        LastDownloadMbps = speeds.download;
+                        LastUploadMbps = speeds.upload;
+                        UpdateProgress("Bandwidth Speed Test", "Passed", $"Pass - Down: {speeds.download:F1} Mbps | Up: {speeds.upload:F1} Mbps");
+                        Log($"Bandwidth Speed Test Completed: Down: {speeds.download:F1} Mbps | Up: {speeds.upload:F1} Mbps");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Bandwidth Speed Test Error: {ex.Message}", true);
+                        UpdateProgress("Bandwidth Speed Test", "Failed", "Fail - Speed test encountered an error");
+                    }
+                }
+                else
+                {
+                    UpdateProgress("Bandwidth Speed Test", "Skipped", "Skipped by configuration");
                 }
                 if (token.IsCancellationRequested) return false;
 

@@ -236,37 +236,7 @@
 
                                         <!-- Download Speed -->
                                         <TextBlock Grid.Row="8" Grid.Column="0" Text="Download Speed:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,6"/>
-                                        <StackPanel Grid.Row="8" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
-                                            <TextBlock x:Name="TxtLocalDownloadSpeed" Text="Not Tested" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
-                                            <ProgressBar x:Name="SpeedTestProgress" IsIndeterminate="True" Width="40" Height="4" Margin="10,0,0,0" Visibility="Collapsed" VerticalAlignment="Center"/>
-                                            <Button x:Name="BtnRecheckSpeed" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip="Re-run Connection Speed Test" Click="BtnRecheckSpeed_Click">
-                                                <Button.Style>
-                                                    <Style TargetType="Button">
-                                                        <Setter Property="Background" Value="Transparent"/>
-                                                        <Setter Property="BorderThickness" Value="0"/>
-                                                        <Setter Property="Cursor" Value="Hand"/>
-                                                        <Setter Property="Template">
-                                                            <Setter.Value>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4" Padding="4">
-                                                                        <Path x:Name="icon" Data="{StaticResource IconRefresh}" Fill="{StaticResource TextMutedBrush}" Width="12" Height="12" Stretch="Uniform"/>
-                                                                    </Border>
-                                                                    <ControlTemplate.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter TargetName="border" Property="Background" Value="{StaticResource BorderLightBrush}"/>
-                                                                            <Setter TargetName="icon" Property="Fill" Value="{StaticResource TextDarkBrush}"/>
-                                                                        </Trigger>
-                                                                        <Trigger Property="IsEnabled" Value="False">
-                                                                            <Setter Property="Opacity" Value="0.5"/>
-                                                                        </Trigger>
-                                                                    </ControlTemplate.Triggers>
-                                                                </ControlTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                        </StackPanel>
+                                        <TextBlock Grid.Row="8" Grid.Column="1" x:Name="TxtLocalDownloadSpeed" Text="Not Tested" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"/>
 
                                         <!-- Upload Speed -->
                                         <TextBlock Grid.Row="9" Grid.Column="0" Text="Upload Speed:" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,10,0"/>
@@ -379,6 +349,47 @@
 
                                                 <!-- Info Link -->
                                                 <Button x:Name="Test1InfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/dns-domain-resolution-failure" ToolTip="Read troubleshooting article">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Grid Background="Transparent">
+                                                                <Path Data="{StaticResource IconInfo}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform"/>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Speed Test -->
+                                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12" Cursor="Hand" MouseLeftButtonUp="TestRow_MouseUp" Background="Transparent">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+ 
+                                                <!-- CheckBox -->
+                                                <CheckBox x:Name="ChkTestSpeedTest" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Grid.Column="0"/>
+
+                                                <!-- Status Icon -->
+                                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,15,0">
+                                                    <Ellipse x:Name="TestSpeedTestIconPending" Width="30" Height="30" Fill="#f1f5f9" Stroke="#cbd5e1" StrokeThickness="1"/>
+                                                    <Ellipse x:Name="TestSpeedTestIconRunning" Width="30" Height="30" Fill="#eff6ff" Stroke="{StaticResource AccentBlueBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                                                    <Path x:Name="TestSpeedTestSpinner" Style="{StaticResource TestSpinnerStyle}" Data="{StaticResource IconSpinner}" Fill="{StaticResource AccentBlueBrush}" Width="16" Height="16" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="TestSpeedTestIconPass" Data="{StaticResource IconCheck}" Fill="{StaticResource AccentGreenBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="TestSpeedTestIconFail" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentRedBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                    <Path x:Name="TestSpeedTestIconWarning" Data="{StaticResource IconAlert}" Fill="{StaticResource AccentWarningBrush}" Width="30" Height="30" Stretch="Uniform" Visibility="Collapsed"/>
+                                                </Grid>
+ 
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Bandwidth Speed Test" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock x:Name="TestSpeedTestDetails" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+
+                                                <!-- Info Link -->
+                                                <Button x:Name="TestSpeedTestInfoLink" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,0,0" Width="20" Height="20" Background="Transparent" BorderThickness="0" Cursor="Hand" Visibility="Collapsed" Click="BtnTestHelp_Click" Tag="https://kb.agilicoconnect.co.uk/speed-test-failed" ToolTip="Read troubleshooting article">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Grid Background="Transparent">

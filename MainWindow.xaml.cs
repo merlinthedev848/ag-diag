@@ -117,7 +117,7 @@ namespace agilicomsptoolkit
                 _ = Task.Run(() => _engine.TriggerFirewallPrompt());
 
                 // Trigger startup speed test asynchronously
-                _ = RunStartupSpeedTestAsync();
+                // Removed: Speed test now runs as part of the Diagnostic flow
 
                 // Initialize default Probe sub-tab
                 SelectProbeTab(0, BtnProbeTrace);
@@ -436,7 +436,7 @@ namespace agilicomsptoolkit
                 _engine.LastUploadMbps = _lastUploadMbps;
 
                 // Run
-                await _engine.RunDiagnosticsAsync();
+                bool success = await _engine.RunDiagnosticsAsync(RunSpeedTestAsync);
             }
             catch (Exception ex)
             {
@@ -587,6 +587,7 @@ namespace agilicomsptoolkit
                 int testIndex = testName switch
                 {
                     "DNS Domain & Resolution Check" => 1,
+                    "Bandwidth Speed Test" => -1, // Handled specifically in UpdateTestUI overload
                     "HTTP/HTTPS Outbound Probes" => 2,
                     "NTP Subsystem (UDP 123)" => 3,
                     "Agilico STUN Servers" => 4,
@@ -602,6 +603,10 @@ namespace agilicomsptoolkit
                 if (testIndex > 0)
                 {
                     UpdateTestUI(testIndex, status, details);
+                }
+                else if (testIndex == -1)
+                {
+                    UpdateTestUI("TestSpeedTest", status, details);
                 }
             }));
         }
@@ -672,14 +677,19 @@ namespace agilicomsptoolkit
 
         private void UpdateTestUI(int testNum, string status, string details)
         {
-            var pending = FindName($"Test{testNum}IconPending") as UIElement;
-            var running = FindName($"Test{testNum}IconRunning") as UIElement;
-            var spinner = FindName($"Test{testNum}Spinner") as UIElement;
-            var pass = FindName($"Test{testNum}IconPass") as UIElement;
-            var fail = FindName($"Test{testNum}IconFail") as UIElement;
-            var warning = FindName($"Test{testNum}IconWarning") as UIElement;
-            var helpLink = FindName($"Test{testNum}InfoLink") as UIElement;
-            var text = FindName($"Test{testNum}Details") as TextBlock;
+            UpdateTestUI($"Test{testNum}", status, details);
+        }
+
+        private void UpdateTestUI(string testPrefix, string status, string details)
+        {
+            var pending = FindName($"{testPrefix}IconPending") as UIElement;
+            var running = FindName($"{testPrefix}IconRunning") as UIElement;
+            var spinner = FindName($"{testPrefix}Spinner") as UIElement;
+            var pass = FindName($"{testPrefix}IconPass") as UIElement;
+            var fail = FindName($"{testPrefix}IconFail") as UIElement;
+            var warning = FindName($"{testPrefix}IconWarning") as UIElement;
+            var helpLink = FindName($"{testPrefix}InfoLink") as UIElement;
+            var text = FindName($"{testPrefix}Details") as TextBlock;
 
             if (text != null) text.Text = details;
 
@@ -1990,7 +2000,7 @@ namespace agilicomsptoolkit
 
         private async void BtnRecheckSpeed_Click(object sender, RoutedEventArgs e)
         {
-            await RunStartupSpeedTestAsync();
+            // Removed: speed test is now strictly diagnostic
         }
 
         private void BtnRaiseTicket_Click(object sender, RoutedEventArgs e)
