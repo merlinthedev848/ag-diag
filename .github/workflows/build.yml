@@ -25,6 +25,12 @@ jobs:
       - name: Build Release
         run: dotnet build agilicomsptoolkit.csproj --configuration Release --no-restore
 
+      - name: Restore tests
+        run: dotnet restore tests/AgilicoToolkit.Tests/AgilicoToolkit.Tests.csproj
+
+      - name: Run regression tests
+        run: dotnet test tests/AgilicoToolkit.Tests/AgilicoToolkit.Tests.csproj --configuration Release --no-restore --verbosity normal
+
       - name: Verify repository does not contain generated dumps
         shell: pwsh
         run: |
