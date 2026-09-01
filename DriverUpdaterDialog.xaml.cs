@@ -27,19 +27,9 @@ namespace agilicomsptoolkit
         private static string FormatDriverDate(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return "-";
-            // WMI CIM format: yyyymmddhhmmss.xxxxxx+zzz
-            if (raw.Length >= 8 && raw.Substring(0, 8).All(char.IsDigit))
-            {
-                string y = raw.Substring(0, 4);
-                string m = raw.Substring(4, 2);
-                string d = raw.Substring(6, 2);
-                return $"{d}/{m}/{y}";
-            }
-            if (DateTime.TryParse(raw, out var dt))
-            {
-                return dt.ToString("dd/MM/yyyy");
-            }
-            return raw;
+            if (raw.Length >= 8 && raw[..8].All(char.IsDigit))
+                return $"{raw[..4]}-{raw.Substring(4, 2)}-{raw.Substring(6, 2)}";
+            return DateTime.TryParse(raw, out var dt) ? dt.ToString("yyyy-MM-dd") : raw;
         }
     }
 
@@ -68,13 +58,12 @@ namespace agilicomsptoolkit
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             await RefreshInstalledDriversAsync();
-            _ = CheckForDriverUpdatesAsync(); // Run update check in background
+            _ = CheckForDriverUpdatesAsync();
         }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left)
-                DragMove();
+            if (e.ChangedButton == MouseButton.Left) DragMove();
         }
 
         private async Task RefreshInstalledDriversAsync()
@@ -82,31 +71,26 @@ namespace agilicomsptoolkit
             TxtStatus.Text = "Scanning installed hardware drivers...";
             _allDrivers.Clear();
             _filteredDrivers.Clear();
-
             try
             {
                 await Task.Run(() =>
                 {
                     using var searcher = new ManagementObjectSearcher(
                         "SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate FROM Win32_PnPSignedDriver WHERE DeviceName IS NOT NULL AND DriverVersion IS NOT NULL");
-
                     foreach (ManagementObject obj in searcher.Get())
                     {
-                        var name = obj["DeviceName"]?.ToString()?.Trim() ?? "";
-                        if (string.IsNullOrEmpty(name)) continue;
-
-                        var item = new DriverItem
+                        string name = obj["DeviceName"]?.ToString()?.Trim() ?? string.Empty;
+                        if (name.Length == 0) continue;
+                        _allDrivers.Add(new DriverItem
                         {
                             DeviceName = name,
                             DeviceClass = obj["DeviceClass"]?.ToString()?.Trim() ?? "Other",
                             Manufacturer = obj["Manufacturer"]?.ToString()?.Trim() ?? "Generic / Microsoft",
                             DriverVersion = obj["DriverVersion"]?.ToString()?.Trim() ?? "Unknown",
-                            DriverDate = obj["DriverDate"]?.ToString()?.Trim() ?? ""
-                        };
-                        _allDrivers.Add(item);
+                            DriverDate = obj["DriverDate"]?.ToString()?.Trim() ?? string.Empty
+                        });
                     }
                 });
-
                 ApplyFilter();
                 TxtStatus.Text = "Installed drivers loaded";
                 TxtSummary.Text = $"Total Installed Drivers: {_allDrivers.Count}";
@@ -114,24 +98,21 @@ namespace agilicomsptoolkit
             catch (Exception ex)
             {
                 TxtStatus.Text = "Scan error";
+                Logger.Error("Driver inventory failed", ex, "Drivers");
                 ModernMessageBox.Show($"Failed to query installed drivers: {ex.Message}", "Driver Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void ApplyFilter()
         {
-            if (TxtSummary == null || _allDrivers == null || _filteredDrivers == null || _availableUpdates == null) return;
-
-            string search = TxtDriverSearch?.Text?.Trim().ToLowerInvariant() ?? "";
+            if (TxtSummary == null) return;
+            string search = TxtDriverSearch?.Text?.Trim() ?? string.Empty;
             string selectedClass = (CmbDriverClass?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All Classes";
-
             var filtered = _allDrivers.Where(d =>
             {
-                bool matchesSearch = string.IsNullOrEmpty(search) ||
-                                     d.DeviceName.ToLowerInvariant().Contains(search) ||
-                                     d.Manufacturer.ToLowerInvariant().Contains(search) ||
-                                     d.DeviceClass.ToLowerInvariant().Contains(search);
-
+                bool matchesSearch = search.Length == 0 || d.DeviceName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                     d.Manufacturer.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                     d.DeviceClass.Contains(search, StringComparison.OrdinalIgnoreCase);
                 bool matchesClass = selectedClass switch
                 {
                     "Display / GPU" => d.DeviceClass.Equals("Display", StringComparison.OrdinalIgnoreCase),
@@ -142,53 +123,35 @@ namespace agilicomsptoolkit
                     "System / Chipset" => d.DeviceClass.Equals("System", StringComparison.OrdinalIgnoreCase) || d.DeviceClass.Equals("Processor", StringComparison.OrdinalIgnoreCase),
                     _ => true
                 };
-
                 return matchesSearch && matchesClass;
             }).OrderBy(d => d.DeviceName).ToList();
 
             _filteredDrivers.Clear();
-            foreach (var item in filtered)
-            {
-                _filteredDrivers.Add(item);
-            }
-
+            foreach (var item in filtered) _filteredDrivers.Add(item);
             TxtSummary.Text = $"Showing {_filteredDrivers.Count} of {_allDrivers.Count} Installed Drivers | Available Updates: {_availableUpdates.Count}";
         }
 
-        private void TxtDriverSearch_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            ApplyFilter();
-        }
-
-        private void CmbDriverClass_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            ApplyFilter();
-        }
+        private void TxtDriverSearch_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
+        private void CmbDriverClass_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
 
         private async void BtnScanHardware_Click(object sender, RoutedEventArgs e)
         {
             BtnScanHardware.IsEnabled = false;
             TxtStatus.Text = "Scanning PnP bus for hardware changes...";
-
             try
             {
-                await Task.Run(async () =>
-                {
-                    var psi = new ProcessStartInfo("pnputil", "/scan-devices")
-                    {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true
-                    };
-                    using var p = Process.Start(psi);
-                    if (p != null) await p.WaitForExitAsync();
-                });
-
+                var psi = new ProcessStartInfo("pnputil.exe") { UseShellExecute = false, CreateNoWindow = true };
+                psi.ArgumentList.Add("/scan-devices");
+                using var p = Process.Start(psi);
+                if (p == null) throw new InvalidOperationException("pnputil.exe could not be started.");
+                await p.WaitForExitAsync();
+                if (p.ExitCode != 0) throw new InvalidOperationException($"pnputil exited with code {p.ExitCode}.");
                 await RefreshInstalledDriversAsync();
                 ModernMessageBox.Show("PnP hardware bus scan completed.", "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
+                Logger.Error("PnP device scan failed", ex, "Drivers");
                 ModernMessageBox.Show($"Failed to rescan PnP devices: {ex.Message}", "Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -198,9 +161,42 @@ namespace agilicomsptoolkit
             }
         }
 
-        private async void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
+        private async void BtnCheckUpdates_Click(object sender, RoutedEventArgs e) => await CheckForDriverUpdatesAsync();
+
+        private async Task<string> RunPowerShellScriptAsync(string script)
         {
-            await CheckForDriverUpdatesAsync();
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit", "Temp");
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, $"driver-{Guid.NewGuid():N}.ps1");
+            try
+            {
+                await File.WriteAllTextAsync(path, script, new UTF8Encoding(false));
+                var psi = new ProcessStartInfo
+                {
+                    FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-ExecutionPolicy");
+                psi.ArgumentList.Add("RemoteSigned");
+                psi.ArgumentList.Add("-File");
+                psi.ArgumentList.Add(path);
+                using var process = Process.Start(psi) ?? throw new InvalidOperationException("PowerShell could not be started.");
+                Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+                Task<string> stderr = process.StandardError.ReadToEndAsync();
+                await Task.WhenAll(stdout, stderr);
+                await process.WaitForExitAsync();
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException(stderr.Result.Trim().Length > 0 ? stderr.Result.Trim() : $"PowerShell exited with code {process.ExitCode}.");
+                return stdout.Result;
+            }
+            finally
+            {
+                try { if (File.Exists(path)) File.Delete(path); } catch { }
+            }
         }
 
         private async Task CheckForDriverUpdatesAsync()
@@ -210,200 +206,110 @@ namespace agilicomsptoolkit
             _availableUpdates.Clear();
             PanelNoUpdates.Visibility = Visibility.Collapsed;
             GridDriverUpdates.Visibility = Visibility.Visible;
-
+            const string script = @"
+$ErrorActionPreference = 'Stop'
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$searcher.ServerSelection = 2
+$results = $searcher.Search(\"IsInstalled=0 and Type='Driver'\")
+$list = @($results.Updates | ForEach-Object {
+    [PSCustomObject]@{
+        Title = $_.Title
+        DriverClass = if ($_.DriverClass) { $_.DriverClass } else { 'Driver' }
+        DriverModel = if ($_.DriverModel) { $_.DriverModel } else { '-' }
+        DriverDate = if ($_.DriverVerDate) { $_.DriverVerDate.ToString('dd/MM/yyyy') } else { '-' }
+        Status = 'Available'
+    }
+})
+$list | ConvertTo-Json -Compress
+";
             try
             {
-                string script = @"
-$Session = New-Object -ComObject Microsoft.Update.Session
-$Searcher = $Session.CreateUpdateSearcher()
-$Searcher.ServerSelection = 2
-try {
-    $Results = $Searcher.Search(""IsInstalled=0 and Type='Driver'"")
-    $List = @()
-    foreach ($Update in $Results.Updates) {
-        $List += [PSCustomObject]@{
-            Title = $Update.Title
-            DriverClass = if ($Update.DriverClass) { $Update.DriverClass } else { 'Driver' }
-            DriverModel = if ($Update.DriverModel) { $Update.DriverModel } else { '-' }
-            DriverDate = if ($Update.DriverVerDate) { $Update.DriverVerDate.ToString('dd/MM/yyyy') } else { '-' }
-        }
-    }
-    $List | ConvertTo-Json -Compress
-} catch {
-    Write-Output '[]'
-}
-";
-                string jsonOutput = string.Empty;
-                await Task.Run(async () =>
+                string json = await RunPowerShellScriptAsync(script);
+                if (!string.IsNullOrWhiteSpace(json) && json.Trim() != "[]")
                 {
-                    var psi = new ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -Command \"{script.Replace("\"", "\\\"")}\"")
+                    if (json.TrimStart().StartsWith("["))
                     {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-                    using var p = Process.Start(psi);
-                    if (p != null)
-                    {
-                        jsonOutput = await p.StandardOutput.ReadToEndAsync();
-                        await p.WaitForExitAsync();
+                        foreach (var item in JsonSerializer.Deserialize<List<DriverUpdateItem>>(json) ?? new()) _availableUpdates.Add(item);
                     }
-                });
-
-                if (!string.IsNullOrWhiteSpace(jsonOutput) && jsonOutput.Trim() != "[]")
-                {
-                    try
+                    else
                     {
-                        if (jsonOutput.Trim().StartsWith("["))
-                        {
-                            var updates = JsonSerializer.Deserialize<List<DriverUpdateItem>>(jsonOutput);
-                            if (updates != null)
-                            {
-                                foreach (var u in updates) _availableUpdates.Add(u);
-                            }
-                        }
-                        else if (jsonOutput.Trim().StartsWith("{"))
-                        {
-                            var single = JsonSerializer.Deserialize<DriverUpdateItem>(jsonOutput);
-                            if (single != null) _availableUpdates.Add(single);
-                        }
+                        var item = JsonSerializer.Deserialize<DriverUpdateItem>(json);
+                        if (item != null) _availableUpdates.Add(item);
                     }
-                    catch { }
                 }
 
-                if (_availableUpdates.Count > 0)
-                {
-                    TxtStatus.Text = $"{_availableUpdates.Count} driver update(s) available";
-                    TxtUpdateProgress.Text = $"Found {_availableUpdates.Count} driver update(s) ready to install.";
-                    BtnInstallAllDrivers.Visibility = Visibility.Visible;
-                    GridDriverUpdates.Visibility = Visibility.Visible;
-                    PanelNoUpdates.Visibility = Visibility.Collapsed;
-                    DriverTabControl.SelectedIndex = 1; // Switch to Updates tab
-                }
-                else
-                {
-                    TxtStatus.Text = "All drivers up to date";
-                    TxtUpdateProgress.Text = "No pending driver packages found via Windows Update.";
-                    BtnInstallAllDrivers.Visibility = Visibility.Collapsed;
-                    GridDriverUpdates.Visibility = Visibility.Collapsed;
-                    PanelNoUpdates.Visibility = Visibility.Visible;
-                }
-
+                bool found = _availableUpdates.Count > 0;
+                TxtStatus.Text = found ? $"{_availableUpdates.Count} driver update(s) available" : "All drivers up to date";
+                TxtUpdateProgress.Text = found ? $"Found {_availableUpdates.Count} driver update(s) ready to install." : "No pending driver packages found via Windows Update.";
+                BtnInstallAllDrivers.Visibility = found ? Visibility.Visible : Visibility.Collapsed;
+                GridDriverUpdates.Visibility = found ? Visibility.Visible : Visibility.Collapsed;
+                PanelNoUpdates.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
+                if (found) DriverTabControl.SelectedIndex = 1;
                 ApplyFilter();
             }
             catch (Exception ex)
             {
                 TxtStatus.Text = "Update check failed";
-                TxtUpdateProgress.Text = $"Update check failed: {ex.Message}";
+                TxtUpdateProgress.Text = ex.Message;
+                Logger.Error("Driver update check failed", ex, "Drivers");
             }
-            finally
-            {
-                BtnCheckUpdates.IsEnabled = true;
-            }
+            finally { BtnCheckUpdates.IsEnabled = true; }
         }
 
         private async void BtnInstallAllDrivers_Click(object sender, RoutedEventArgs e)
         {
             if (_availableUpdates.Count == 0) return;
-
             var confirm = ModernMessageBox.Show(
-                $"This will download and install {_availableUpdates.Count} driver updates via Windows Update.\n\nNote: Graphics or network adapter drivers may cause momentary display flashing or temporary network reconnect.\n\nContinue with installation?",
-                "Install Driver Updates",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
+                $"This will download and install {_availableUpdates.Count} driver updates via Windows Update.\n\nNetwork or display drivers can temporarily disconnect the device. Continue?",
+                "Install Driver Updates", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
 
             BtnInstallAllDrivers.IsEnabled = false;
             BtnCheckUpdates.IsEnabled = false;
             TxtStatus.Text = "Downloading and installing driver packages...";
-            TxtUpdateProgress.Text = "Starting Windows Update Agent driver installer...";
-
-            string installScript = @"
-$Session = New-Object -ComObject Microsoft.Update.Session
-$Searcher = $Session.CreateUpdateSearcher()
-$Searcher.ServerSelection = 2
-$Results = $Searcher.Search(""IsInstalled=0 and Type='Driver'"")
-
-if ($Results.Updates.Count -eq 0) {
-    Write-Output 'NO_UPDATES'
-    exit
-}
-
-$Downloader = $Session.CreateUpdateDownloader()
-$Downloader.Updates = $Results.Updates
-Write-Output 'DOWNLOADING'
-$Downloader.Download()
-
-$UpdatesToInstall = New-Object -ComObject Microsoft.Update.UpdateColl
-foreach ($Update in $Results.Updates) {
-    if ($Update.IsDownloaded) {
-        $UpdatesToInstall.Add($Update) | Out-Null
-    }
-}
-
-if ($UpdatesToInstall.Count -gt 0) {
-    $Installer = $Session.CreateUpdateInstaller()
-    $Installer.Updates = $UpdatesToInstall
-    Write-Output 'INSTALLING'
-    $Result = $Installer.Install()
-    Write-Output ""RESULT::$($Result.ResultCode)""
-} else {
-    Write-Output 'DOWNLOAD_FAILED'
-}
+            const string script = @"
+$ErrorActionPreference = 'Stop'
+$session = New-Object -ComObject Microsoft.Update.Session
+$searcher = $session.CreateUpdateSearcher()
+$searcher.ServerSelection = 2
+$results = $searcher.Search(\"IsInstalled=0 and Type='Driver'\")
+if ($results.Updates.Count -eq 0) { [PSCustomObject]@{ ResultCode = -1; RebootRequired = $false; Message = 'NO_UPDATES' } | ConvertTo-Json -Compress; exit }
+$downloader = $session.CreateUpdateDownloader()
+$downloader.Updates = $results.Updates
+$download = $downloader.Download()
+$updatesToInstall = New-Object -ComObject Microsoft.Update.UpdateColl
+foreach ($update in $results.Updates) { if ($update.IsDownloaded) { [void]$updatesToInstall.Add($update) } }
+if ($updatesToInstall.Count -eq 0) { [PSCustomObject]@{ ResultCode = -2; RebootRequired = $false; Message = 'DOWNLOAD_FAILED' } | ConvertTo-Json -Compress; exit }
+$installer = $session.CreateUpdateInstaller()
+$installer.Updates = $updatesToInstall
+$result = $installer.Install()
+[PSCustomObject]@{ ResultCode = [int]$result.ResultCode; RebootRequired = [bool]$result.RebootRequired; Message = 'COMPLETED' } | ConvertTo-Json -Compress
 ";
-
             try
             {
-                string output = string.Empty;
-                await Task.Run(async () =>
-                {
-                    var psi = new ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -Command \"{installScript.Replace("\"", "\\\"")}\"")
-                    {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-                    using var p = Process.Start(psi);
-                    if (p != null)
-                    {
-                        output = await p.StandardOutput.ReadToEndAsync();
-                        await p.WaitForExitAsync();
-                    }
-                });
-
-                bool rebootRequired = output.Contains("True", StringComparison.OrdinalIgnoreCase);
-
-                if (output.Contains("RESULT:2", StringComparison.OrdinalIgnoreCase)) // 2 = OperationResultCode.orcSucceeded
+                string output = await RunPowerShellScriptAsync(script);
+                var result = JsonSerializer.Deserialize<DriverInstallResult>(output);
+                if (result?.ResultCode == 2)
                 {
                     TxtStatus.Text = "Drivers installed successfully";
-                    TxtUpdateProgress.Text = rebootRequired
-                        ? "Installation completed successfully. A system restart is required to apply changes."
-                        : "Installation completed successfully.";
-
-                    string msg = "Driver updates installed successfully.";
-                    if (rebootRequired)
-                    {
-                        msg += "\n\nA system restart is recommended to complete driver initialization.";
-                    }
-                    ModernMessageBox.Show(msg, "Driver Update Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TxtUpdateProgress.Text = result.RebootRequired ? "Installation completed. A restart is required." : "Installation completed successfully.";
+                    ModernMessageBox.Show(result.RebootRequired ? "Driver updates installed. Please restart Windows to complete initialization." : "Driver updates installed successfully.", "Driver Update Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
                 {
-                    TxtStatus.Text = "Installation finished";
-                    TxtUpdateProgress.Text = "Driver update process completed.";
-                    ModernMessageBox.Show("Driver installation routine completed. Re-checking updates...", "Update Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TxtStatus.Text = "Driver installation did not complete";
+                    TxtUpdateProgress.Text = result?.Message ?? "No structured result was returned.";
+                    ModernMessageBox.Show($"Driver update result: {result?.Message ?? "Unknown"}", "Driver Update", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
-
                 await RefreshInstalledDriversAsync();
                 await CheckForDriverUpdatesAsync();
             }
             catch (Exception ex)
             {
                 TxtStatus.Text = "Installation error";
-                TxtUpdateProgress.Text = $"Error installing drivers: {ex.Message}";
+                TxtUpdateProgress.Text = ex.Message;
+                Logger.Error("Driver installation failed", ex, "Drivers");
                 ModernMessageBox.Show($"Error during driver installation: {ex.Message}", "Installation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -411,6 +317,13 @@ if ($UpdatesToInstall.Count -gt 0) {
                 BtnInstallAllDrivers.IsEnabled = true;
                 BtnCheckUpdates.IsEnabled = true;
             }
+        }
+
+        private sealed class DriverInstallResult
+        {
+            public int ResultCode { get; set; }
+            public bool RebootRequired { get; set; }
+            public string Message { get; set; } = string.Empty;
         }
 
         private void BtnExportCsv_Click(object sender, RoutedEventArgs e)
@@ -422,31 +335,23 @@ if ($UpdatesToInstall.Count -gt 0) {
                     FileName = $"Driver_Inventory_{Environment.MachineName}_{DateTime.Now:yyyyMMdd_HHmm}.csv",
                     Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*"
                 };
-
-                if (sfd.ShowDialog(this) == true)
+                if (sfd.ShowDialog(this) != true) return;
+                var sb = new StringBuilder("Device Name,Class,Manufacturer,Driver Version,Driver Date\r\n");
+                foreach (var d in _filteredDrivers)
                 {
-                    var sb = new StringBuilder();
-                    sb.AppendLine("Device Name,Class,Manufacturer,Driver Version,Driver Date");
-
-                    foreach (var d in _filteredDrivers)
-                    {
-                        string escape(string s) => $"\"{s.Replace("\"", "\"\"")}\"";
-                        sb.AppendLine($"{escape(d.DeviceName)},{escape(d.DeviceClass)},{escape(d.Manufacturer)},{escape(d.DriverVersion)},{escape(d.DriverDateDisplay)}");
-                    }
-
-                    File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
-                    ModernMessageBox.Show($"Successfully exported {_filteredDrivers.Count} driver records to:\n\n{sfd.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                    static string Escape(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
+                    sb.AppendLine($"{Escape(d.DeviceName)},{Escape(d.DeviceClass)},{Escape(d.Manufacturer)},{Escape(d.DriverVersion)},{Escape(d.DriverDateDisplay)}");
                 }
+                File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
+                ModernMessageBox.Show($"Successfully exported {_filteredDrivers.Count} driver records.", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
+                Logger.Error("Driver CSV export failed", ex, "Drivers");
                 ModernMessageBox.Show($"Failed to export CSV: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
     }
 }
