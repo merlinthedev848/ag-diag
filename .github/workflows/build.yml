@@ -1,0 +1,34 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore agilicomsptoolkit.csproj
+
+      - name: Build Release
+        run: dotnet build agilicomsptoolkit.csproj --configuration Release --no-restore
+
+      - name: Verify repository does not contain generated dumps
+        shell: pwsh
+        run: |
+          $forbidden = @('patch.diff', 'scratch_dump.txt', 'static_resources.txt')
+          foreach ($path in $forbidden) {
+            if (Test-Path $path) { throw "Generated artifact is tracked: $path" }
+          }
