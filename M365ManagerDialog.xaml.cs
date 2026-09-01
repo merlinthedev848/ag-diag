@@ -48,19 +48,14 @@ namespace agilicomsptoolkit
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.CreateNoWindow = true;
-
                 if (!process.Start()) throw new InvalidOperationException("PowerShell could not be started.");
                 Task<string> readOut = process.StandardOutput.ReadToEndAsync();
                 Task<string> readErr = process.StandardError.ReadToEndAsync();
                 await Task.WhenAll(readOut, readErr).ConfigureAwait(false);
                 await process.WaitForExitAsync().ConfigureAwait(false);
-
                 return readOut.Result + readErr.Result;
             }
-            finally
-            {
-                DeleteTempScript(tempPath);
-            }
+            finally { DeleteTempScript(tempPath); }
         }
 
         private void RunPowerShellInteractive(string script, Action? callback = null)
@@ -68,25 +63,15 @@ namespace agilicomsptoolkit
             string tempPath = CreateTempScript(script);
             try
             {
-                ProcessStartInfo psi = new()
-                {
-                    FileName = GetPowerShellPath(),
-                    UseShellExecute = true
-                };
+                ProcessStartInfo psi = new() { FileName = GetPowerShellPath(), UseShellExecute = true };
                 psi.ArgumentList.Add("-NoProfile");
                 psi.ArgumentList.Add("-ExecutionPolicy");
                 psi.ArgumentList.Add("RemoteSigned");
                 psi.ArgumentList.Add("-NoExit");
                 psi.ArgumentList.Add("-File");
                 psi.ArgumentList.Add(tempPath);
-
                 Process? proc = Process.Start(psi);
-                if (proc == null)
-                {
-                    DeleteTempScript(tempPath);
-                    throw new InvalidOperationException("PowerShell could not be started.");
-                }
-
+                if (proc == null) throw new InvalidOperationException("PowerShell could not be started.");
                 _ = Task.Run(async () =>
                 {
                     try { await proc.WaitForExitAsync().ConfigureAwait(false); }
@@ -94,8 +79,7 @@ namespace agilicomsptoolkit
                     finally
                     {
                         DeleteTempScript(tempPath);
-                        if (callback != null && !Dispatcher.HasShutdownStarted)
-                            Dispatcher.Invoke(callback);
+                        if (callback != null && !Dispatcher.HasShutdownStarted) Dispatcher.Invoke(callback);
                     }
                 });
             }
@@ -108,14 +92,11 @@ namespace agilicomsptoolkit
 
         private string CreateTempScript(string script)
         {
-            string tempDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AgilicoToolkit", "Temp");
+            string tempDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgilicoToolkit", "Temp");
             Directory.CreateDirectory(tempDir);
             string tempPath = Path.Combine(tempDir, $"m365-{Guid.NewGuid():N}.ps1");
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
-            using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
-                writer.Write(script);
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.Write(script);
             _tempFiles.Add(tempPath);
             return tempPath;
         }
@@ -154,7 +135,6 @@ namespace agilicomsptoolkit
                 string output = await RunPowerShellSilentAsync(script);
                 bool exchangeFound = output.Contains("ExchangeOnlineManagement", StringComparison.OrdinalIgnoreCase);
                 bool graphFound = output.Contains("Microsoft.Graph", StringComparison.OrdinalIgnoreCase);
-
                 if (exchangeFound && graphFound)
                 {
                     TxtModuleStatus.Text = "✅ M365 (Microsoft.Graph) and Exchange Online modules are installed.";
@@ -165,11 +145,7 @@ namespace agilicomsptoolkit
                 }
                 else
                 {
-                    string missing = string.Join(" ", new[]
-                    {
-                        exchangeFound ? null : "ExchangeOnlineManagement",
-                        graphFound ? null : "Microsoft.Graph"
-                    }.Where(x => x != null));
+                    string missing = string.Join(" ", new[] { exchangeFound ? null : "ExchangeOnlineManagement", graphFound ? null : "Microsoft.Graph" }.Where(x => x != null));
                     TxtModuleStatus.Text = $"⚠ Missing modules: {missing}. Click below to install.";
                     TxtModuleStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f97316"));
                     BtnInstallModules.IsEnabled = true;
@@ -188,11 +164,8 @@ namespace agilicomsptoolkit
 
         private void BtnInstallModules_Click(object sender, RoutedEventArgs e)
         {
-            var result = ModernMessageBox.Show(
-                "Installing M365 modules requires an active internet connection and may take a few minutes.\n\nThis opens a user-level PowerShell window. Continue?",
-                "Install Modules", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var result = ModernMessageBox.Show("Installing M365 modules requires an active internet connection and may take a few minutes.\n\nThis opens a user-level PowerShell window. Continue?", "Install Modules", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes) return;
-
             string script =
                 "Set-StrictMode -Version Latest; $ErrorActionPreference = 'Stop'; " +
                 "Write-Host 'Installing ExchangeOnlineManagement...' -ForegroundColor Cyan; " +
@@ -202,14 +175,9 @@ namespace agilicomsptoolkit
                 "Write-Host 'Installation complete.' -ForegroundColor Green; " +
                 "Get-Module -ListAvailable ExchangeOnlineManagement, Microsoft.Graph | Select-Object Name, Version; " +
                 "Write-Host 'Press Enter to return to toolkit...'; Read-Host";
-
             try
             {
-                RunPowerShellInteractive(script, async () =>
-                {
-                    await CheckPowerShellModulesAsync();
-                    GeneratePreviewScript();
-                });
+                RunPowerShellInteractive(script, async () => { await CheckPowerShellModulesAsync(); GeneratePreviewScript(); });
             }
             catch (Exception ex)
             {
@@ -273,13 +241,16 @@ namespace agilicomsptoolkit
             const string symbols = "!@#$%^&*()_+";
             const string all = upper + lower + digits + symbols;
             char[] password = new char[16];
-            password[0] = upper[RandomNumberGenerator.GetInt32(upper.Length)];
-            password[1] = lower[RandomNumberGenerator.GetInt32(lower.Length)];
-            password[2] = digits[RandomNumberGenerator.GetInt32(digits.Length)];
-            password[3] = symbols[RandomNumberGenerator.GetInt32(symbols.Length)];
-            for (int i = 4; i < password.Length; i++)
-                password[i] = all[RandomNumberGenerator.GetInt32(all.Length)];
-            RandomNumberGenerator.Shuffle(password);
+            password[0] = System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length) >= 0 ? upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)] : 'A';
+            password[1] = lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(lower.Length)];
+            password[2] = digits[System.Security.Cryptography.RandomNumberGenerator.GetInt32(digits.Length)];
+            password[3] = symbols[System.Security.Cryptography.RandomNumberGenerator.GetInt32(symbols.Length)];
+            for (int i = 4; i < password.Length; i++) password[i] = all[System.Security.Cryptography.RandomNumberGenerator.GetInt32(all.Length)];
+            for (int i = password.Length - 1; i > 0; i--)
+            {
+                int j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+                (password[i], password[j]) = (password[j], password[i]);
+            }
             TxtResetPassword.Text = new string(password);
         }
 
@@ -315,8 +286,6 @@ namespace agilicomsptoolkit
                 sb.AppendLine("# Microsoft 365 Mailbox & Calendar Delegation");
                 sb.AppendLine("Import-Module ExchangeOnlineManagement");
                 sb.AppendLine("Connect-ExchangeOnline");
-                sb.AppendLine();
-
                 string mailPerm = (ComboMailboxPerm.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "None";
                 if (mailPerm != "None")
                 {
@@ -324,14 +293,11 @@ namespace agilicomsptoolkit
                     if (mailPerm == "FullAccess") sb.AppendLine($"Add-MailboxPermission -Identity \"{mailbox}\" -User \"{delegateUser}\" -AccessRights FullAccess -InheritanceType All");
                     else if (mailPerm == "SendAs") sb.AppendLine($"Add-RecipientPermission -Identity \"{mailbox}\" -Trustee \"{delegateUser}\" -AccessRights SendAs -Confirm:$false");
                     else if (mailPerm == "SendOnBehalf") sb.AppendLine($"Set-Mailbox -Identity \"{mailbox}\" -GrantSendOnBehalfTo \"{delegateUser}\"");
-                    sb.AppendLine();
                 }
-
                 string calPerm = (ComboCalendarPerm.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "None";
                 if (calPerm != "None")
                 {
                     string permValue = calPerm.Split(' ')[0];
-                    sb.AppendLine($"# Granting Calendar Folder Permission: {permValue}");
                     sb.AppendLine($"$targetPath = \"{mailbox}:\\Calendar\"");
                     sb.AppendLine("try {");
                     sb.AppendLine($"    Add-MailboxFolderPermission -Identity $targetPath -User \"{delegateUser}\" -AccessRights {permValue} -ErrorAction Stop");
@@ -347,7 +313,6 @@ namespace agilicomsptoolkit
                 sb.AppendLine("# Microsoft 365 Account Security & Password Management");
                 sb.AppendLine("Import-Module Microsoft.Graph");
                 sb.AppendLine("Connect-MgGraph -Scopes 'User.ReadWrite.All'");
-                sb.AppendLine();
                 if (!string.IsNullOrWhiteSpace(pass))
                 {
                     bool forceChange = ChkForceChange.IsChecked ?? false;
@@ -358,7 +323,6 @@ namespace agilicomsptoolkit
                     sb.AppendLine("    }");
                     sb.AppendLine("}");
                     sb.AppendLine($"Update-MgUser -UserId \"{user}\" -BodyParameter $params");
-                    sb.AppendLine();
                 }
                 if (ChkRevokeSessions.IsChecked ?? false) sb.AppendLine($"Revoke-MgUserSignInSession -UserId \"{user}\"");
                 string accountState = (ComboAccountState.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Keep Current State";
@@ -379,48 +343,25 @@ namespace agilicomsptoolkit
                 sb.AppendLine("Connect-MgGraph -Scopes 'Group.ReadWrite.All'");
                 sb.AppendLine($"$targetUser = Get-MgUser -UserId \"{member}\"");
                 if (operation.StartsWith("Add", StringComparison.OrdinalIgnoreCase))
-                {
-                    sb.AppendLine(isOwner
-                        ? $"Add-MgGroupOwnerByRef -GroupId \"{group}\" -OdataId $targetUser.Id"
-                        : $"Add-MgGroupMemberByRef -GroupId \"{group}\" -OdataId $targetUser.Id");
-                }
+                    sb.AppendLine(isOwner ? $"Add-MgGroupOwnerByRef -GroupId \"{group}\" -OdataId $targetUser.Id" : $"Add-MgGroupMemberByRef -GroupId \"{group}\" -OdataId $targetUser.Id");
                 else
-                {
-                    sb.AppendLine(isOwner
-                        ? $"Remove-MgGroupOwnerByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id"
-                        : $"Remove-MgGroupMemberByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id");
-                }
+                    sb.AppendLine(isOwner ? $"Remove-MgGroupOwnerByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id" : $"Remove-MgGroupMemberByRef -GroupId \"{group}\" -DirectoryObjectId $targetUser.Id");
             }
             TxtScriptPreview.Text = sb.ToString();
         }
 
         private void BtnCopyScript_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                Clipboard.SetText(TxtScriptPreview.Text);
-                TxtStatus.Text = "Script copied to clipboard!";
-            }
-            catch (Exception ex)
-            {
-                ModernMessageBox.Show($"Failed to copy script: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            try { Clipboard.SetText(TxtScriptPreview.Text); TxtStatus.Text = "Script copied to clipboard!"; }
+            catch (Exception ex) { ModernMessageBox.Show($"Failed to copy script: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         private void BtnRunScript_Click(object sender, RoutedEventArgs e)
         {
-            var result = ModernMessageBox.Show(
-                "This will launch a visible PowerShell window to run the generated commands.\n\nYou may be prompted to sign into Microsoft 365.\n\nExecute script?",
-                "Run Script", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var result = ModernMessageBox.Show("This will launch a visible PowerShell window to run the generated commands.\n\nYou may be prompted to sign into Microsoft 365.\n\nExecute script?", "Run Script", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes) return;
-
-            if (Owner is MainWindow mainWindow)
-                mainWindow.LogAuditAction("Executed Microsoft 365 / Teams automation script.");
-
-            try
-            {
-                RunPowerShellInteractive(TxtScriptPreview.Text);
-            }
+            if (Owner is MainWindow mainWindow) mainWindow.LogAuditAction("Executed Microsoft 365 / Teams automation script.");
+            try { RunPowerShellInteractive(TxtScriptPreview.Text); }
             catch (Exception ex)
             {
                 Logger.Error("Microsoft 365 script launch failed", ex, "M365");
