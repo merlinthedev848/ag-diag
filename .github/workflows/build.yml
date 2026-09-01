@@ -32,7 +32,17 @@ jobs:
         run: dotnet restore agilicomsptoolkit.csproj
 
       - name: Build Release
-        run: dotnet build agilicomsptoolkit.csproj --configuration Release --no-restore
+        shell: pwsh
+        run: dotnet build agilicomsptoolkit.csproj --configuration Release --no-restore --nologo -bl:build.binlog
+        continue-on-error: false
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: build.binlog
+          if-no-files-found: ignore
 
       - name: Restore tests
         run: dotnet restore tests/AgilicoToolkit.Tests/AgilicoToolkit.Tests.csproj
