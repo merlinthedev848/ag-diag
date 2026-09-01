@@ -27,8 +27,7 @@ namespace agilicomsptoolkit
         private static string FormatDriverDate(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return "-";
-            if (raw.Length >= 8 && raw[..8].All(char.IsDigit))
-                return $"{raw[..4]}-{raw.Substring(4, 2)}-{raw.Substring(6, 2)}";
+            if (raw.Length >= 8 && raw[..8].All(char.IsDigit)) return $"{raw[..4]}-{raw.Substring(4, 2)}-{raw.Substring(6, 2)}";
             return DateTime.TryParse(raw, out var dt) ? dt.ToString("yyyy-MM-dd") : raw;
         }
     }
@@ -75,8 +74,7 @@ namespace agilicomsptoolkit
             {
                 await Task.Run(() =>
                 {
-                    using var searcher = new ManagementObjectSearcher(
-                        "SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate FROM Win32_PnPSignedDriver WHERE DeviceName IS NOT NULL AND DriverVersion IS NOT NULL");
+                    using var searcher = new ManagementObjectSearcher("SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate FROM Win32_PnPSignedDriver WHERE DeviceName IS NOT NULL AND DriverVersion IS NOT NULL");
                     foreach (ManagementObject obj in searcher.Get())
                     {
                         string name = obj["DeviceName"]?.ToString()?.Trim() ?? string.Empty;
@@ -110,9 +108,7 @@ namespace agilicomsptoolkit
             string selectedClass = (CmbDriverClass?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All Classes";
             var filtered = _allDrivers.Where(d =>
             {
-                bool matchesSearch = search.Length == 0 || d.DeviceName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                                     d.Manufacturer.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                                     d.DeviceClass.Contains(search, StringComparison.OrdinalIgnoreCase);
+                bool matchesSearch = search.Length == 0 || d.DeviceName.Contains(search, StringComparison.OrdinalIgnoreCase) || d.Manufacturer.Contains(search, StringComparison.OrdinalIgnoreCase) || d.DeviceClass.Contains(search, StringComparison.OrdinalIgnoreCase);
                 bool matchesClass = selectedClass switch
                 {
                     "Display / GPU" => d.DeviceClass.Equals("Display", StringComparison.OrdinalIgnoreCase),
@@ -125,7 +121,6 @@ namespace agilicomsptoolkit
                 };
                 return matchesSearch && matchesClass;
             }).OrderBy(d => d.DeviceName).ToList();
-
             _filteredDrivers.Clear();
             foreach (var item in filtered) _filteredDrivers.Add(item);
             TxtSummary.Text = $"Showing {_filteredDrivers.Count} of {_allDrivers.Count} Installed Drivers | Available Updates: {_availableUpdates.Count}";
@@ -142,8 +137,7 @@ namespace agilicomsptoolkit
             {
                 var psi = new ProcessStartInfo("pnputil.exe") { UseShellExecute = false, CreateNoWindow = true };
                 psi.ArgumentList.Add("/scan-devices");
-                using var p = Process.Start(psi);
-                if (p == null) throw new InvalidOperationException("pnputil.exe could not be started.");
+                using var p = Process.Start(psi) ?? throw new InvalidOperationException("pnputil.exe could not be started.");
                 await p.WaitForExitAsync();
                 if (p.ExitCode != 0) throw new InvalidOperationException($"pnputil exited with code {p.ExitCode}.");
                 await RefreshInstalledDriversAsync();
@@ -154,11 +148,7 @@ namespace agilicomsptoolkit
                 Logger.Error("PnP device scan failed", ex, "Drivers");
                 ModernMessageBox.Show($"Failed to rescan PnP devices: {ex.Message}", "Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            finally
-            {
-                BtnScanHardware.IsEnabled = true;
-                TxtStatus.Text = "Ready";
-            }
+            finally { BtnScanHardware.IsEnabled = true; TxtStatus.Text = "Ready"; }
         }
 
         private async void BtnCheckUpdates_Click(object sender, RoutedEventArgs e) => await CheckForDriverUpdatesAsync();
@@ -189,14 +179,10 @@ namespace agilicomsptoolkit
                 Task<string> stderr = process.StandardError.ReadToEndAsync();
                 await Task.WhenAll(stdout, stderr);
                 await process.WaitForExitAsync();
-                if (process.ExitCode != 0)
-                    throw new InvalidOperationException(stderr.Result.Trim().Length > 0 ? stderr.Result.Trim() : $"PowerShell exited with code {process.ExitCode}.");
+                if (process.ExitCode != 0) throw new InvalidOperationException(stderr.Result.Trim().Length > 0 ? stderr.Result.Trim() : $"PowerShell exited with code {process.ExitCode}.");
                 return stdout.Result;
             }
-            finally
-            {
-                try { if (File.Exists(path)) File.Delete(path); } catch { }
-            }
+            finally { try { if (File.Exists(path)) File.Delete(path); } catch { } }
         }
 
         private async Task CheckForDriverUpdatesAsync()
@@ -206,12 +192,13 @@ namespace agilicomsptoolkit
             _availableUpdates.Clear();
             PanelNoUpdates.Visibility = Visibility.Collapsed;
             GridDriverUpdates.Visibility = Visibility.Visible;
-            const string script = @"
+
+            const string script = """
 $ErrorActionPreference = 'Stop'
 $session = New-Object -ComObject Microsoft.Update.Session
 $searcher = $session.CreateUpdateSearcher()
 $searcher.ServerSelection = 2
-$results = $searcher.Search(\"IsInstalled=0 and Type='Driver'\")
+$results = $searcher.Search("IsInstalled=0 and Type='Driver'")
 $list = @($results.Updates | ForEach-Object {
     [PSCustomObject]@{
         Title = $_.Title
@@ -222,7 +209,7 @@ $list = @($results.Updates | ForEach-Object {
     }
 })
 $list | ConvertTo-Json -Compress
-";
+""";
             try
             {
                 string json = await RunPowerShellScriptAsync(script);
@@ -238,7 +225,6 @@ $list | ConvertTo-Json -Compress
                         if (item != null) _availableUpdates.Add(item);
                     }
                 }
-
                 bool found = _availableUpdates.Count > 0;
                 TxtStatus.Text = found ? $"{_availableUpdates.Count} driver update(s) available" : "All drivers up to date";
                 TxtUpdateProgress.Text = found ? $"Found {_availableUpdates.Count} driver update(s) ready to install." : "No pending driver packages found via Windows Update.";
@@ -260,24 +246,23 @@ $list | ConvertTo-Json -Compress
         private async void BtnInstallAllDrivers_Click(object sender, RoutedEventArgs e)
         {
             if (_availableUpdates.Count == 0) return;
-            var confirm = ModernMessageBox.Show(
-                $"This will download and install {_availableUpdates.Count} driver updates via Windows Update.\n\nNetwork or display drivers can temporarily disconnect the device. Continue?",
-                "Install Driver Updates", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var confirm = ModernMessageBox.Show($"This will download and install {_availableUpdates.Count} driver updates via Windows Update.\n\nNetwork or display drivers can temporarily disconnect the device. Continue?", "Install Driver Updates", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
 
             BtnInstallAllDrivers.IsEnabled = false;
             BtnCheckUpdates.IsEnabled = false;
             TxtStatus.Text = "Downloading and installing driver packages...";
-            const string script = @"
+
+            const string script = """
 $ErrorActionPreference = 'Stop'
 $session = New-Object -ComObject Microsoft.Update.Session
 $searcher = $session.CreateUpdateSearcher()
 $searcher.ServerSelection = 2
-$results = $searcher.Search(\"IsInstalled=0 and Type='Driver'\")
+$results = $searcher.Search("IsInstalled=0 and Type='Driver'")
 if ($results.Updates.Count -eq 0) { [PSCustomObject]@{ ResultCode = -1; RebootRequired = $false; Message = 'NO_UPDATES' } | ConvertTo-Json -Compress; exit }
 $downloader = $session.CreateUpdateDownloader()
 $downloader.Updates = $results.Updates
-$download = $downloader.Download()
+[void]$downloader.Download()
 $updatesToInstall = New-Object -ComObject Microsoft.Update.UpdateColl
 foreach ($update in $results.Updates) { if ($update.IsDownloaded) { [void]$updatesToInstall.Add($update) } }
 if ($updatesToInstall.Count -eq 0) { [PSCustomObject]@{ ResultCode = -2; RebootRequired = $false; Message = 'DOWNLOAD_FAILED' } | ConvertTo-Json -Compress; exit }
@@ -285,7 +270,7 @@ $installer = $session.CreateUpdateInstaller()
 $installer.Updates = $updatesToInstall
 $result = $installer.Install()
 [PSCustomObject]@{ ResultCode = [int]$result.ResultCode; RebootRequired = [bool]$result.RebootRequired; Message = 'COMPLETED' } | ConvertTo-Json -Compress
-";
+""";
             try
             {
                 string output = await RunPowerShellScriptAsync(script);
@@ -330,18 +315,11 @@ $result = $installer.Install()
         {
             try
             {
-                var sfd = new SaveFileDialog
-                {
-                    FileName = $"Driver_Inventory_{Environment.MachineName}_{DateTime.Now:yyyyMMdd_HHmm}.csv",
-                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*"
-                };
+                var sfd = new SaveFileDialog { FileName = $"Driver_Inventory_{Environment.MachineName}_{DateTime.Now:yyyyMMdd_HHmm}.csv", Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*" };
                 if (sfd.ShowDialog(this) != true) return;
+                static string Escape(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
                 var sb = new StringBuilder("Device Name,Class,Manufacturer,Driver Version,Driver Date\r\n");
-                foreach (var d in _filteredDrivers)
-                {
-                    static string Escape(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
-                    sb.AppendLine($"{Escape(d.DeviceName)},{Escape(d.DeviceClass)},{Escape(d.Manufacturer)},{Escape(d.DriverVersion)},{Escape(d.DriverDateDisplay)}");
-                }
+                foreach (var d in _filteredDrivers) sb.AppendLine($"{Escape(d.DeviceName)},{Escape(d.DeviceClass)},{Escape(d.Manufacturer)},{Escape(d.DriverVersion)},{Escape(d.DriverDateDisplay)}");
                 File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
                 ModernMessageBox.Show($"Successfully exported {_filteredDrivers.Count} driver records.", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
             }
