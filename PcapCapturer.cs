@@ -16,8 +16,7 @@ namespace agilicomsptoolkit
     {
         private const uint MaxCaptureBytes = 25u * 1024u * 1024u;
         private const int MaxPackets = 50_000;
-        private const uint LinkTypeRaw = 101; // DLT_RAW: raw IPv4/IPv6 packet, no fabricated Ethernet header.
-
+        private const uint LinkTypeRaw = 101;
         private readonly MemoryStream _outputStream = new();
         private readonly object _lock = new();
         private CancellationTokenSource? _captureCts;
@@ -29,26 +28,11 @@ namespace agilicomsptoolkit
         private DateTime? _startTime;
         private string? _ipFilter;
 
-        public string? IpFilter
-        {
-            get { lock (_lock) return _ipFilter; }
-            set { lock (_lock) _ipFilter = value; }
-        }
-
+        public string? IpFilter { get { lock (_lock) return _ipFilter; } set { lock (_lock) _ipFilter = value; } }
         public int PacketCount { get { lock (_lock) return _packetCount; } }
         public long TotalBytes { get { lock (_lock) return _totalBytes; } }
         public bool ContainsSyntheticPackets { get; private set; }
-
-        public double DurationSeconds
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return _startTime.HasValue ? (DateTime.UtcNow - _startTime.Value).TotalSeconds : 0;
-                }
-            }
-        }
+        public double DurationSeconds { get { lock (_lock) return _startTime.HasValue ? (DateTime.UtcNow - _startTime.Value).TotalSeconds : 0; } }
 
         public void Start(bool startRawSniffer = false, string? ipFilter = null, string? adapterIp = null)
         {
@@ -64,9 +48,7 @@ namespace agilicomsptoolkit
                 _ipFilter = string.IsNullOrWhiteSpace(ipFilter) ? null : ipFilter.Trim();
                 _isWriting = true;
             }
-
-            if (startRawSniffer)
-                StartRawSocketSniffer(adapterIp);
+            if (startRawSniffer) StartRawSocketSniffer(adapterIp);
         }
 
         public void Stop()
@@ -82,26 +64,16 @@ namespace agilicomsptoolkit
                 _rawSocket = null;
                 _captureTask = null;
             }
-
             try { cts?.Cancel(); } catch (ObjectDisposedException) { }
             try { socket?.Dispose(); } catch (ObjectDisposedException) { }
             try { cts?.Dispose(); } catch (ObjectDisposedException) { }
         }
 
-        public void Dispose()
-        {
-            Stop();
-            _outputStream.Dispose();
-        }
-
-        public byte[] GetPcapBytes()
-        {
-            lock (_lock) return _outputStream.ToArray();
-        }
+        public void Dispose() { Stop(); _outputStream.Dispose(); }
+        public byte[] GetPcapBytes() { lock (_lock) return _outputStream.ToArray(); }
 
         private void WriteGlobalHeader()
         {
-            // PCAP global header, little endian, raw IP link type.
             WriteUInt32(0xa1b2c3d4);
             WriteUInt16(2);
             WriteUInt16(4);
@@ -111,17 +83,12 @@ namespace agilicomsptoolkit
             WriteUInt32(LinkTypeRaw);
         }
 
-        /// <summary>
-        /// Records a synthetic IPv4 packet for compatibility with existing diagnostics.
-        /// It is not presented as a real Ethernet capture and is marked via ContainsSyntheticPackets.
-        /// </summary>
+        /// <summary>Creates a synthetic IPv4 packet for compatibility. It is not a real packet capture.</summary>
         public void RecordPacket(byte[] payload, string srcIp, int srcPort, string destIp, int destPort, bool isUdp)
         {
             if (payload == null) throw new ArgumentNullException(nameof(payload));
             if (!TryParseIpv4(srcIp, out var source) || !TryParseIpv4(destIp, out var destination)) return;
-            if (!IsPortValid(srcPort) || !IsPortValid(destPort)) return;
-            if (!PassesFilter(source, destination)) return;
-
+            if (!IsPortValid(srcPort) || !IsPortValid(destPort) || !PassesFilter(source, destination)) return;
             byte[] packet = BuildSyntheticIpv4Packet(payload, source, srcPort, destination, destPort, isUdp);
             ContainsSyntheticPackets = true;
             WritePcapRecord(packet);
@@ -132,7 +99,6 @@ namespace agilicomsptoolkit
             if (ipPacket == null || ipPacket.Length < 20) return;
             int version = ipPacket[0] >> 4;
             if (version != 4 && version != 6) return;
-
             if (version == 4)
             {
                 int headerLength = (ipPacket[0] & 0x0F) * 4;
@@ -141,11 +107,7 @@ namespace agilicomsptoolkit
                 var destination = new IPAddress(ipPacket.AsSpan(16, 4));
                 if (!PassesFilter(source, destination)) return;
             }
-            else if (ipPacket.Length < 40)
-            {
-                return;
-            }
-
+            else if (ipPacket.Length < 40) return;
             WritePcapRecord(ipPacket);
         }
 
@@ -153,14 +115,10 @@ namespace agilicomsptoolkit
         {
             lock (_lock)
             {
-                if (!_isWriting || packet.Length == 0) return;
-                if (_packetCount >= MaxPackets || _totalBytes + 16L + packet.Length > MaxCaptureBytes) return;
-
+                if (!_isWriting || packet.Length == 0 || _packetCount >= MaxPackets || _totalBytes + 16L + packet.Length > MaxCaptureBytes) return;
                 try
                 {
-                    DateTime now = DateTime.UtcNow;
-                    long unixTicks = now.Ticks - DateTime.UnixEpoch.Ticks;
-                    long micros = unixTicks / TimeSpan.TicksPerMicrosecond;
+                    long micros = (DateTime.UtcNow.Ticks - DateTime.UnixEpoch.Ticks) / TimeSpan.TicksPerMicrosecond;
                     WriteUInt32((uint)(micros / 1_000_000));
                     WriteUInt32((uint)(micros % 1_000_000));
                     WriteUInt32((uint)packet.Length);
@@ -169,39 +127,25 @@ namespace agilicomsptoolkit
                     _packetCount++;
                     _totalBytes += 16L + packet.Length;
                 }
-                catch (IOException)
-                {
-                    _isWriting = false;
-                }
-                catch (ObjectDisposedException)
-                {
-                    _isWriting = false;
-                }
+                catch (IOException) { _isWriting = false; }
+                catch (ObjectDisposedException) { _isWriting = false; }
             }
         }
 
         private bool PassesFilter(IPAddress source, IPAddress destination)
         {
             string? filter = IpFilter;
-            return string.IsNullOrWhiteSpace(filter) ||
-                   string.Equals(source.ToString(), filter, StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(destination.ToString(), filter, StringComparison.OrdinalIgnoreCase);
+            return string.IsNullOrWhiteSpace(filter) || string.Equals(source.ToString(), filter, StringComparison.OrdinalIgnoreCase) || string.Equals(destination.ToString(), filter, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool TryParseIpv4(string value, out IPAddress address)
-        {
-            return IPAddress.TryParse(value, out address!) && address.AddressFamily == AddressFamily.InterNetwork;
-        }
-
+        private static bool TryParseIpv4(string value, out IPAddress address) => IPAddress.TryParse(value, out address!) && address.AddressFamily == AddressFamily.InterNetwork;
         private static bool IsPortValid(int port) => port is >= 0 and <= 65535;
 
-        private static byte[] BuildSyntheticIpv4Packet(byte[] payload, IPAddress source, int sourcePort,
-            IPAddress destination, int destinationPort, bool isUdp)
+        private static byte[] BuildSyntheticIpv4Packet(byte[] payload, IPAddress source, int sourcePort, IPAddress destination, int destinationPort, bool isUdp)
         {
             int transportLength = isUdp ? 8 : 20;
             int totalLength = checked(20 + transportLength + payload.Length);
             if (totalLength > ushort.MaxValue) throw new ArgumentOutOfRangeException(nameof(payload));
-
             byte[] packet = new byte[totalLength];
             packet[0] = 0x45;
             packet[8] = 64;
@@ -210,26 +154,25 @@ namespace agilicomsptoolkit
             packet[3] = (byte)totalLength;
             source.GetAddressBytes().CopyTo(packet, 12);
             destination.GetAddressBytes().CopyTo(packet, 16);
-
             int offset = 20;
             WriteUInt16(packet, offset, (ushort)sourcePort);
             WriteUInt16(packet, offset + 2, (ushort)destinationPort);
-
             if (isUdp)
             {
                 WriteUInt16(packet, offset + 4, (ushort)(8 + payload.Length));
-                // UDP checksum is optional for IPv4; calculate it so the synthetic packet is valid.
-                WriteUInt16(packet, offset + 6, ComputeTransportChecksum(packet, offset, 8 + payload.Length, 17));
+                WriteUInt16(packet, offset + 6, 0);
             }
             else
             {
                 packet[offset + 12] = 0x50;
-                packet[offset + 13] = 0x18; // PSH + ACK; synthetic sequence numbers are deliberately not claimed as captured state.
+                packet[offset + 13] = 0x18;
                 WriteUInt16(packet, offset + 14, 64240);
-                WriteUInt16(packet, offset + 16, ComputeTransportChecksum(packet, offset, 20 + payload.Length, 6));
+                WriteUInt16(packet, offset + 16, 0);
             }
-
             Buffer.BlockCopy(payload, 0, packet, offset + transportLength, payload.Length);
+            ushort transportChecksum = ComputeTransportChecksum(packet, offset, transportLength + payload.Length, (byte)(isUdp ? 17 : 6));
+            WriteUInt16(packet, offset + (isUdp ? 6 : 16), transportChecksum);
+            WriteUInt16(packet, 10, 0);
             WriteUInt16(packet, 10, ComputeIpChecksum(packet, 0, 20));
             return packet;
         }
@@ -252,8 +195,7 @@ namespace agilicomsptoolkit
         private static ushort ComputeIpChecksum(byte[] packet, int offset, int length)
         {
             uint sum = 0;
-            for (int i = offset; i < offset + length; i += 2)
-                sum += (uint)((packet[i] << 8) | packet[i + 1]);
+            for (int i = offset; i < offset + length; i += 2) sum += (uint)((packet[i] << 8) | packet[i + 1]);
             return FoldChecksum(sum);
         }
 
@@ -276,22 +218,14 @@ namespace agilicomsptoolkit
             try
             {
                 string localIp = !string.IsNullOrWhiteSpace(adapterIp) ? adapterIp : GetLocalIpAddress();
-                if (!TryParseIpv4(localIp, out var address) || IPAddress.IsLoopback(address))
-                    throw new InvalidOperationException("No active IPv4 address was found for packet capture.");
-
+                if (!TryParseIpv4(localIp, out var address) || IPAddress.IsLoopback(address)) throw new InvalidOperationException("No active IPv4 address was found for packet capture.");
                 socket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.IP);
                 socket.Bind(new IPEndPoint(address, 0));
                 socket.IOControl(IOControlCode.ReceiveAll, new byte[] { 1, 0, 0, 0 }, new byte[4]);
-
                 cts = new CancellationTokenSource();
                 lock (_lock)
                 {
-                    if (!_isWriting)
-                    {
-                        socket.Dispose();
-                        cts.Dispose();
-                        return;
-                    }
+                    if (!_isWriting) { socket.Dispose(); cts.Dispose(); return; }
                     _rawSocket = socket;
                     _captureCts = cts;
                     _captureTask = Task.Run(() => CaptureLoopAsync(cts.Token), cts.Token);
@@ -299,16 +233,10 @@ namespace agilicomsptoolkit
             }
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AccessDenied || ex.ErrorCode == 10013)
             {
-                socket?.Dispose();
-                cts?.Dispose();
+                socket?.Dispose(); cts?.Dispose();
                 throw new UnauthorizedAccessException("Administrative privileges are required for raw packet capture on Windows.", ex);
             }
-            catch
-            {
-                socket?.Dispose();
-                cts?.Dispose();
-                throw;
-            }
+            catch { socket?.Dispose(); cts?.Dispose(); throw; }
         }
 
         private async Task CaptureLoopAsync(CancellationToken token)
@@ -337,8 +265,7 @@ namespace agilicomsptoolkit
 
         private static string GetLocalIpAddress()
         {
-            foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName()))
-                if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip)) return ip.ToString();
+            foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName())) if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip)) return ip.ToString();
             return string.Empty;
         }
 
@@ -349,9 +276,7 @@ namespace agilicomsptoolkit
             _outputStream.WriteByte((byte)(value >> 16));
             _outputStream.WriteByte((byte)(value >> 24));
         }
-
         private void WriteInt32(int value) => WriteUInt32(unchecked((uint)value));
-
         private void WriteUInt16(ushort value)
         {
             _outputStream.WriteByte((byte)value);
