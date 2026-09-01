@@ -1,8 +1,12 @@
-# Build directories
+# Build output
 bin/
 obj/
+publish/
+publish_output/
+build_lite/
+build_standalone/
 
-# Visual Studio / Rider cache & user settings
+# IDE / user state
 .vs/
 *.user
 *.userosscache
@@ -14,19 +18,16 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Temp and build files
-build_lite/
-build_standalone/
-test_run.log
-# Backup / locked files
+# Logs, diagnostics and temporary files
+*.log
+*.tmp
+*.bak
 *.old
-
-publish/
-publish_output/
+*.dmp
+*.coverage
+.coverage/
+TestResults/
 
 # Generated release artifacts
-*.exe
 *.pdb
 *.zip
-*.tmp
-*.log
