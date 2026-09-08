@@ -50,6 +50,21 @@ jobs:
       - name: Run regression tests
         run: dotnet test tests/AgilicoToolkit.Tests/AgilicoToolkit.Tests.csproj --configuration Release --no-restore --verbosity normal
 
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: dotnet tool install --global wix
+
+      - name: Build All Distributions and MSI Installers
+        shell: pwsh
+        run: .\publish.ps1
+
+      - name: Upload Release Binaries & Installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: agilico-msp-toolkit-installers
+          path: publish_output/
+          if-no-files-found: warn
+
       - name: Verify repository does not contain generated dumps
         shell: pwsh
         run: |

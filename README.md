@@ -6,10 +6,12 @@ An advanced, premium-themed desktop diagnostic application built for Windows, de
 
 ## 📥 Downloads (Latest v4.1.0)
 
-| Flavour | Executable File | Size | Description |
-| :--- | :--- | :--- | :--- |
-| **Standard (Full)** | [⬇️ `Agilico.MSP.Toolkit.exe`](https://github.com/merlinthedev848/ag-diag/releases/download/v4.1.0/Agilico.MSP.Toolkit.exe) | ~228 MB | **Self-contained** (no .NET runtime required), includes Audio Converter & Admin drag-and-drop. |
-| **Lite** | [⬇️ `Agilico.MSP.Toolkit.Lite.exe`](https://github.com/merlinthedev848/ag-diag/releases/download/v4.1.0/Agilico.MSP.Toolkit.Lite.exe) | ~2.2 MB | **Lightweight** (requires .NET 8.0 Desktop Runtime). |
+| Distribution | Package Type | File Name | Size | Target Environment |
+| :--- | :--- | :--- | :--- | :--- |
+| **Standard (Full)** | **MSI Installer** | `Agilico_MSP_Toolkit.msi` | ~76.6 MB | Enterprise deployments (Intune / SCCM / GPO). Includes .NET 8 & FFmpeg. |
+| **Standard (Full)** | **Single-File EXE** | `Agilico MSP Toolkit.exe` | ~78.3 MB | Portable engineer use (self-contained, no prerequisites). |
+| **Lite** | **MSI Installer** | `Agilico_MSP_Toolkit_Lite.msi` | ~1.71 MB | Lightweight installation for systems with .NET 8 Desktop Runtime. |
+| **Lite** | **Single-File EXE** | `Agilico MSP Toolkit Lite.exe` | ~4.47 MB | High-performance ReadyToRun native accelerated binary. |
 
 ---
 
