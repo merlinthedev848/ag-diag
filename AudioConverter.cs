@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -61,7 +62,8 @@ namespace agilicomsptoolkit
 
                 using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 double totalSeconds = 0;
-                string stderr = string.Empty;
+                var stderr = new StringBuilder();
+                var errLock = new object();
                 process.ErrorDataReceived += (_, e) =>
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
@@ -79,7 +81,10 @@ namespace agilicomsptoolkit
                         double percent = Math.Clamp((ms / 1000.0) / totalSeconds * 100.0, 0, 100);
                         progressCallback?.Invoke(percent);
                     }
-                    stderr += e.Data + Environment.NewLine;
+                    lock (errLock)
+                    {
+                        stderr.AppendLine(e.Data);
+                    }
                 };
 
                 if (!process.Start()) return (false, string.Empty, "Failed to start FFmpeg.");
@@ -93,7 +98,9 @@ namespace agilicomsptoolkit
                 }
 
                 try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
-                string detail = stderr.Length > 1000 ? stderr[^1000..] : stderr;
+                string errOutput;
+                lock (errLock) { errOutput = stderr.ToString(); }
+                string detail = errOutput.Length > 1000 ? errOutput[^1000..] : errOutput;
                 return (false, string.Empty, $"Conversion failed (FFmpeg exited with code {process.ExitCode}). {detail.Trim()}");
             }
             catch (Exception ex)

@@ -171,7 +171,6 @@ namespace agilicomsptoolkit
             {
                 using var searcher = new ManagementObjectSearcher("SELECT Name, EstimatedChargeRemaining, DesignCapacity, FullChargeCapacity, BatteryStatus FROM Win32_Battery");
                 using var collection = searcher.Get();
-                if (collection.Count == 0) return; // Desktop PC, no battery
 
                 foreach (ManagementObject obj in collection)
                 {
