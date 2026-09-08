@@ -111,3 +111,27 @@ public class DiagnosticsModelTests
         Assert.AreEqual("Healthy", item.Status);
     }
 }
+
+[TestClass]
+public class ServiceLayerTests
+{
+    [TestMethod]
+    public async Task PowerShellRunner_BasicEchoCommand_ExecutesSuccessfully()
+    {
+        var runner = new agilicomsptoolkit.Services.PowerShellRunner();
+        var result = await runner.ExecuteCommandAsync("Write-Output 'AGILICO_TEST_OK'", TimeSpan.FromSeconds(15));
+        
+        Assert.AreEqual(0, result.exitCode);
+        Assert.IsTrue(result.stdout.Contains("AGILICO_TEST_OK"));
+    }
+
+    [TestMethod]
+    public async Task SoundConverterService_InvalidPath_ReturnsHelpfulError()
+    {
+        var service = new agilicomsptoolkit.Services.SoundConverterService();
+        var result = await service.ConvertToTelephonyWavAsync("C:\\non_existent_audio_file.mp3", null);
+        
+        Assert.IsFalse(result.success);
+        Assert.IsTrue(result.message.Contains("does not exist") || result.message.Contains("No input file"));
+    }
+}
