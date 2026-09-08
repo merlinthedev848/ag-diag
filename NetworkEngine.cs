@@ -556,7 +556,7 @@ namespace agilicomsptoolkit
             OnProgress?.Invoke(testName, status, details);
         }
 
-        public async Task<bool> RunDiagnosticsAsync(Func<CancellationToken, Task<(double download, double upload)>> speedTestCallback = null)
+        public async Task<bool> RunDiagnosticsAsync(Func<CancellationToken, Task<(double download, double upload)>>? speedTestCallback = null)
         {
             var localCts = new CancellationTokenSource();
             var oldCts = Interlocked.Exchange(ref _cts, localCts);

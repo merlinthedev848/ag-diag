@@ -44,3 +44,32 @@ public class PcapCapturerTests
         Assert.AreEqual(0, capturer.PacketCount);
     }
 }
+
+[TestClass]
+public class Crc32Tests
+{
+    [TestMethod]
+    public void Compute_EmptyArray_ReturnsZero()
+    {
+        byte[] empty = Array.Empty<byte>();
+        uint result = agilicomsptoolkit.Crc32.Compute(empty);
+        Assert.AreEqual(0u, result);
+    }
+
+    [TestMethod]
+    public void Compute_StandardAsciiString_MatchesStandardChecksum()
+    {
+        // CRC32 of "123456789" is standard 0xCBF43926
+        byte[] input = System.Text.Encoding.ASCII.GetBytes("123456789");
+        uint result = agilicomsptoolkit.Crc32.Compute(input);
+        Assert.AreEqual(0xCBF43926u, result);
+    }
+
+    [TestMethod]
+    public void ComputeHex_ReturnsCorrectFormattedHexString()
+    {
+        byte[] input = System.Text.Encoding.ASCII.GetBytes("123456789");
+        string hex = agilicomsptoolkit.Crc32.ComputeHex(input);
+        Assert.AreEqual("CBF43926", hex);
+    }
+}

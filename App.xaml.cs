@@ -59,7 +59,7 @@ public partial class App : Application
             System.Diagnostics.Debug.WriteLine($"UI Unhandled Exception: {args.Exception.Message}\n{args.Exception.StackTrace}");
             LogStartupError("DispatcherUnhandledException", args.Exception);
             string errorMsg = args.Exception.Message;
-            Exception inner = args.Exception.InnerException;
+            Exception? inner = args.Exception.InnerException;
             while (inner != null)
             {
                 errorMsg += "\nInner: " + inner.Message;
