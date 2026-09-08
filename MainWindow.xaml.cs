@@ -106,12 +106,40 @@ namespace agilicomsptoolkit
         private void Window_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
-                this.DragMove();
+            {
+                if (e.ClickCount == 2)
+                {
+                    ToggleMaximize();
+                }
+                else
+                {
+                    this.DragMove();
+                }
+            }
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e)
         {
             this.WindowState = WindowState.Minimized;
+        }
+
+        private void BtnMaximize_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleMaximize();
+        }
+
+        private void ToggleMaximize()
+        {
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal;
+                if (BtnMaximize != null) BtnMaximize.Content = "🗖";
+            }
+            else
+            {
+                this.WindowState = WindowState.Maximized;
+                if (BtnMaximize != null) BtnMaximize.Content = "🗗";
+            }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
