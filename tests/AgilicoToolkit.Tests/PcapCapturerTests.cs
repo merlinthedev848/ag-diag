@@ -73,3 +73,41 @@ public class Crc32Tests
         Assert.AreEqual("CBF43926", hex);
     }
 }
+
+[TestClass]
+public class DiagnosticsModelTests
+{
+    [TestMethod]
+    public void LanDevice_DefaultProperties_InitializedCorrectly()
+    {
+        var device = new agilicomsptoolkit.LanDevice
+        {
+            IpAddress = "192.168.1.100",
+            MacAddress = "00:15:65:11:22:33",
+            Manufacturer = "Yealink",
+            Hostname = "DeskPhone-101"
+        };
+
+        Assert.AreEqual("192.168.1.100", device.IpAddress);
+        Assert.AreEqual("00:15:65:11:22:33", device.MacAddress);
+        Assert.AreEqual("Yealink", device.Manufacturer);
+        Assert.AreEqual("Online", device.Status);
+    }
+
+    [TestMethod]
+    public void HardwareItem_HealthyState_ReflectedProperly()
+    {
+        var item = new agilicomsptoolkit.HardwareItem
+        {
+            ComponentType = "Processor (CPU)",
+            Name = "Intel Core i7",
+            Status = "Healthy",
+            Details = "Cores: 8 | Max Speed: 3200 MHz",
+            IsHealthy = true
+        };
+
+        Assert.IsTrue(item.IsHealthy);
+        Assert.AreEqual("Processor (CPU)", item.ComponentType);
+        Assert.AreEqual("Healthy", item.Status);
+    }
+}

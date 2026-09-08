@@ -44,6 +44,17 @@ public static class Logger
             string json = JsonSerializer.Serialize(entry) + Environment.NewLine;
             lock (Sync)
             {
+                try
+                {
+                    var fileInfo = new FileInfo(LogFile);
+                    if (fileInfo.Exists && fileInfo.Length > 10 * 1024 * 1024)
+                    {
+                        string backup = Path.Combine(fileInfo.DirectoryName ?? "", "activity_log.1.jsonl");
+                        File.Move(LogFile, backup, true);
+                    }
+                }
+                catch { /* Ignore rotation race errors */ }
+
                 File.AppendAllText(LogFile, json);
             }
         }
