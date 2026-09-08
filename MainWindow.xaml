@@ -7,8 +7,8 @@
         mc:Ignorable="d"
         Title="Agilico MSP Toolkit" 
         Icon="logo.ico"
-        Width="1174" Height="1020" 
-        MinHeight="900" MinWidth="1174"
+        Width="1100" Height="720" 
+        MinHeight="550" MinWidth="850"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
         WindowStyle="None"
@@ -109,7 +109,8 @@
 
                 <!-- TAB 1: DASHBOARD -->
                 <TabItem>
-                    <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid>
                         <Grid.ColumnDefinitions>
                             <!-- Controls & Summary -->
                             <ColumnDefinition Width="4*"/>
@@ -774,6 +775,7 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    </ScrollViewer>
                 </TabItem>
 
                 <!-- TAB 2: IT TOOLS -->

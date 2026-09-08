@@ -42,6 +42,7 @@ namespace agilicomsptoolkit
         public MainWindow()
         {
             InitializeComponent();
+            EnsureWindowFitsScreen();
             Logger.Log("MainWindow loaded.");
             _engine = new NetworkEngine();
             _lanScanner = new LanScanner();
@@ -59,6 +60,46 @@ namespace agilicomsptoolkit
 
 
             Loaded += MainWindow_Loaded;
+        }
+
+        private void EnsureWindowFitsScreen()
+        {
+            try
+            {
+                var workArea = SystemParameters.WorkArea;
+
+                // Restrain bounds to available screen work area (excluding taskbar)
+                this.MaxHeight = workArea.Height;
+                this.MaxWidth = workArea.Width;
+
+                if (this.Height > workArea.Height || this.Height >= 1000)
+                {
+                    this.Height = Math.Max(550, workArea.Height - 30);
+                }
+
+                if (this.MinHeight > workArea.Height)
+                {
+                    this.MinHeight = Math.Max(500, workArea.Height - 40);
+                }
+
+                if (this.Width > workArea.Width)
+                {
+                    this.Width = Math.Max(850, workArea.Width - 20);
+                }
+
+                if (this.MinWidth > workArea.Width)
+                {
+                    this.MinWidth = Math.Max(800, workArea.Width - 30);
+                }
+
+                // Center window within work area bounds so it never extends off-screen or behind the taskbar
+                this.Top = workArea.Top + Math.Max(0, (workArea.Height - this.Height) / 2);
+                this.Left = workArea.Left + Math.Max(0, (workArea.Width - this.Width) / 2);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log("Failed to fit window to work area: " + ex.Message);
+            }
         }
 
         // Custom Titlebar Handlers for Glassmorphism 
@@ -80,6 +121,7 @@ namespace agilicomsptoolkit
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            EnsureWindowFitsScreen();
             LogAuditAction("Application started successfully. MainWindow loaded.");
             try
             {
