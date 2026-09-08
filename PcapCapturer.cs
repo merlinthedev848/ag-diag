@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -74,13 +75,15 @@ namespace agilicomsptoolkit
 
         private void WriteGlobalHeader()
         {
-            WriteUInt32(0xa1b2c3d4);
-            WriteUInt16(2);
-            WriteUInt16(4);
-            WriteInt32(0);
-            WriteUInt32(0);
-            WriteUInt32(65535);
-            WriteUInt32(LinkTypeRaw);
+            Span<byte> header = stackalloc byte[24];
+            BinaryPrimitives.WriteUInt32LittleEndian(header[0..4], 0xa1b2c3d4);
+            BinaryPrimitives.WriteUInt16LittleEndian(header[4..6], 2);
+            BinaryPrimitives.WriteUInt16LittleEndian(header[6..8], 4);
+            BinaryPrimitives.WriteInt32LittleEndian(header[8..12], 0);
+            BinaryPrimitives.WriteUInt32LittleEndian(header[12..16], 0);
+            BinaryPrimitives.WriteUInt32LittleEndian(header[16..20], 65535);
+            BinaryPrimitives.WriteUInt32LittleEndian(header[20..24], LinkTypeRaw);
+            _outputStream.Write(header);
         }
 
         /// <summary>Creates a synthetic IPv4 packet for compatibility. It is not a real packet capture.</summary>
@@ -119,10 +122,12 @@ namespace agilicomsptoolkit
                 try
                 {
                     long micros = (DateTime.UtcNow.Ticks - DateTime.UnixEpoch.Ticks) / TimeSpan.TicksPerMicrosecond;
-                    WriteUInt32((uint)(micros / 1_000_000));
-                    WriteUInt32((uint)(micros % 1_000_000));
-                    WriteUInt32((uint)packet.Length);
-                    WriteUInt32((uint)packet.Length);
+                    Span<byte> header = stackalloc byte[16];
+                    BinaryPrimitives.WriteUInt32LittleEndian(header[0..4], (uint)(micros / 1_000_000));
+                    BinaryPrimitives.WriteUInt32LittleEndian(header[4..8], (uint)(micros % 1_000_000));
+                    BinaryPrimitives.WriteUInt32LittleEndian(header[8..12], (uint)packet.Length);
+                    BinaryPrimitives.WriteUInt32LittleEndian(header[12..16], (uint)packet.Length);
+                    _outputStream.Write(header);
                     _outputStream.Write(packet, 0, packet.Length);
                     _packetCount++;
                     _totalBytes += 16L + packet.Length;
@@ -152,8 +157,8 @@ namespace agilicomsptoolkit
             packet[9] = (byte)(isUdp ? 17 : 6);
             packet[2] = (byte)(totalLength >> 8);
             packet[3] = (byte)totalLength;
-            source.GetAddressBytes().CopyTo(packet, 12);
-            destination.GetAddressBytes().CopyTo(packet, 16);
+            source.TryWriteBytes(packet.AsSpan(12, 4), out _);
+            destination.TryWriteBytes(packet.AsSpan(16, 4), out _);
             int offset = 20;
             WriteUInt16(packet, offset, (ushort)sourcePort);
             WriteUInt16(packet, offset + 2, (ushort)destinationPort);
@@ -267,20 +272,6 @@ namespace agilicomsptoolkit
         {
             foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName())) if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip)) return ip.ToString();
             return string.Empty;
-        }
-
-        private void WriteUInt32(uint value)
-        {
-            _outputStream.WriteByte((byte)value);
-            _outputStream.WriteByte((byte)(value >> 8));
-            _outputStream.WriteByte((byte)(value >> 16));
-            _outputStream.WriteByte((byte)(value >> 24));
-        }
-        private void WriteInt32(int value) => WriteUInt32(unchecked((uint)value));
-        private void WriteUInt16(ushort value)
-        {
-            _outputStream.WriteByte((byte)value);
-            _outputStream.WriteByte((byte)(value >> 8));
         }
     }
 }
