@@ -170,7 +170,7 @@ namespace agilicomsptoolkit
                 GridActiveSockets.ItemsSource = _displayedSockets;
                 
                 // Initialize view
-                SelectTab(0, BtnDashboard);
+                SelectTab(0, BtnDashboard, animate: false);
                 ResetTestStatuses();
                 PanelSummaryDefault.Visibility = Visibility.Visible;
                 
@@ -217,18 +217,26 @@ namespace agilicomsptoolkit
 
         #region Navigation
 
-        private void SelectTab(int index, Button activeButton)
+        private void SelectTab(int index, Button activeButton, bool animate = true)
         {
             PageTabControl.SelectedIndex = index;
             
-            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250));
-            var slideUp = new System.Windows.Media.Animation.ThicknessAnimation(new Thickness(0, 15, 0, -15), new Thickness(0), TimeSpan.FromMilliseconds(250))
+            if (animate)
             {
-                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
-            };
-            
-            PageTabControl.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-            PageTabControl.BeginAnimation(FrameworkElement.MarginProperty, slideUp);
+                var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+                var slideUp = new System.Windows.Media.Animation.ThicknessAnimation(new Thickness(0, 10, 0, -10), new Thickness(0), TimeSpan.FromMilliseconds(200))
+                {
+                    EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+                };
+                
+                PageTabControl.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+                PageTabControl.BeginAnimation(FrameworkElement.MarginProperty, slideUp);
+            }
+            else
+            {
+                PageTabControl.Opacity = 1.0;
+                PageTabControl.Margin = new Thickness(0);
+            }
 
             foreach (var btn in _navButtons)
             {

@@ -130,37 +130,59 @@ public partial class App : Application
         }
         else
         {
-            // Prevent WPF from initiating shutdown while TermsDialog is showing
+            // Prevent WPF from initiating premature shutdown
             this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // Launch GUI
-            LogStartupMessage("Instantiating TermsDialog.");
-            var terms = new TermsDialog();
-            LogStartupMessage("Showing TermsDialog.");
-            bool? result = terms.ShowDialog();
-            LogStartupMessage($"TermsDialog result: {result}");
-            if (result == true)
+            // Check if Terms have already been accepted on this machine
+            bool termsAccepted = false;
+            try
             {
-                try
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Agilico\AgilicoMSPToolkit");
+                if (key != null && (int)(key.GetValue("TermsAccepted", 0) ?? 0) == 1)
                 {
-                    LogStartupMessage("Instantiating MainWindow.");
-                    var mainWindow = new MainWindow();
-                    this.MainWindow = mainWindow;
-                    this.ShutdownMode = ShutdownMode.OnMainWindowClose;
-                    LogStartupMessage("Showing MainWindow.");
-                    mainWindow.Show();
-                }
-                catch (Exception ex)
-                {
-                    LogStartupError("MainWindowInstantiation", ex);
-                    ModernMessageBox.Show($"Failed to initialize main window.\n\nError: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Shutdown(1);
+                    termsAccepted = true;
                 }
             }
-            else
+            catch { }
+
+            if (!termsAccepted)
             {
-                LogStartupMessage("User declined terms or closed dialog. Shutting down.");
-                Shutdown(0);
+                // First launch: show Terms Dialog
+                LogStartupMessage("First run: Instantiating TermsDialog.");
+                var terms = new TermsDialog();
+                bool? result = terms.ShowDialog();
+                LogStartupMessage($"TermsDialog result: {result}");
+                if (result == true)
+                {
+                    try
+                    {
+                        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Agilico\AgilicoMSPToolkit");
+                        key?.SetValue("TermsAccepted", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+                    catch { }
+                }
+                else
+                {
+                    LogStartupMessage("User declined terms or closed dialog. Shutting down.");
+                    Shutdown(0);
+                    return;
+                }
+            }
+
+            try
+            {
+                LogStartupMessage("Instantiating MainWindow.");
+                var mainWindow = new MainWindow();
+                this.MainWindow = mainWindow;
+                this.ShutdownMode = ShutdownMode.OnMainWindowClose;
+                LogStartupMessage("Showing MainWindow.");
+                mainWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                LogStartupError("MainWindowInstantiation", ex);
+                ModernMessageBox.Show($"Failed to initialize main window.\n\nError: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
             }
         }
     }

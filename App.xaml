@@ -7,8 +7,8 @@
         <SolidColorBrush x:Key="SidebarBgBrush" Color="#000033"/>
         <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#80000033"/>
         <SolidColorBrush x:Key="HeaderBgBrush" Color="#000033"/>
-        <SolidColorBrush x:Key="AppBgBrush" Color="#E6f5f6fa"/>
-        <SolidColorBrush x:Key="CardBgBrush" Color="#E6ffffff"/>
+        <SolidColorBrush x:Key="AppBgBrush" Color="#f5f6fa"/>
+        <SolidColorBrush x:Key="CardBgBrush" Color="#ffffff"/>
         
         <SolidColorBrush x:Key="AccentGreenBrush" Color="#00b862"/>
         <SolidColorBrush x:Key="AccentGreenHoverBrush" Color="#00d672"/>

@@ -34,7 +34,8 @@ Write-Host "Publishing Lite Release (framework-dependent, single-file)..."
 dotnet publish -c Release -r win-x64 --self-contained false `
     -p:PublishSingleFile=true `
     -p:PublishReadyToRun=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=false `
+    -p:IncludeNativeLibrariesForSelfExtract=false `
     -p:IsFullVersion=false `
     -p:AssemblyName="Agilico MSP Toolkit Lite" `
     -o "bin\Publish\Lite"
