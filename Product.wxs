@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Agilico MSP Toolkit" 
            Manufacturer="Agilico" 
-           Version="4.1.0" 
+           Version="4.1.2" 
            UpgradeCode="a630aad3-9be4-4417-99af-754932d7093c"
            Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of Agilico MSP Toolkit is already installed." />

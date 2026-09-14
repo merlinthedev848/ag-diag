@@ -197,10 +197,13 @@ namespace agilicomsptoolkit
                 // Detect and set version/title based on Standard vs Lite mode
                 try
                 {
-                    string procName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+                    using var curProc = System.Diagnostics.Process.GetCurrentProcess();
+                    string procName = curProc.ProcessName;
                     bool isLite = procName.Contains("Lite", StringComparison.OrdinalIgnoreCase);
                     string mode = isLite ? "Lite" : "Standard";
-                    TxtVersion.Text = $"v4.1.0 ({mode})";
+                    var asmVer = typeof(MainWindow).Assembly.GetName().Version;
+                    string verStr = asmVer != null ? $"v{asmVer.Major}.{asmVer.Minor}.{asmVer.Build}" : "v4.1.2";
+                    TxtVersion.Text = $"{verStr} ({mode})";
                     TxtTitleBar.Text = "Agilico MSP Toolkit";
                 }
                 catch { }

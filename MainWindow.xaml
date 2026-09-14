@@ -90,7 +90,7 @@
 
                 <!-- Sidebar Footer -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,20" VerticalAlignment="Bottom">
-                    <TextBlock x:Name="TxtVersion" Text="v4.0.0" FontSize="10.5" Foreground="#f1f5f9" Opacity="0.95" HorizontalAlignment="Center" FontWeight="Medium"/>
+                    <TextBlock x:Name="TxtVersion" Text="v4.1.2" FontSize="10.5" Foreground="#f1f5f9" Opacity="0.95" HorizontalAlignment="Center" FontWeight="Medium"/>
                 </StackPanel>
             </Grid>
         </Border>
