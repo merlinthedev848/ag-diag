@@ -60,7 +60,13 @@ namespace agilicomsptoolkit
                 process.Start();
                 var errorTask = process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw new TimeoutException("Adapter query timed out after 30 seconds.");
+                }
                 _ = await errorTask;
 
                 if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))
@@ -150,11 +156,17 @@ namespace agilicomsptoolkit
                         }
                     };
                     process.Start();
+                    var stdoutTask = process.StandardOutput.ReadToEndAsync();
                     var errorTask = process.StandardError.ReadToEndAsync();
-                    var outputTask = process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
+                    using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(120));
+                    try { await process.WaitForExitAsync(timeoutCts.Token); }
+                    catch (OperationCanceledException)
+                    {
+                        try { if (!process.HasExited) process.Kill(true); } catch { }
+                        throw new TimeoutException("NIC optimization timed out after 120 seconds.");
+                    }
                     string errOutput = await errorTask;
-                    _ = await outputTask;
+                    _ = await stdoutTask;
 
                     if (!string.IsNullOrWhiteSpace(errOutput) && errOutput.Contains("Access is denied", StringComparison.OrdinalIgnoreCase))
                     {

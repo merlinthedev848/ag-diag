@@ -157,9 +157,18 @@ namespace agilicomsptoolkit
                 };
 
                 process.Start();
+                // Read stdout concurrently with WaitForExitAsync to prevent pipe buffer deadlock.
+                // winget output on machines with many packages can exceed the 4KB OS pipe buffer.
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
                 var errorTask = process.StandardError.ReadToEndAsync();
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(60));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw; // will be caught by outer catch and show "Failed to check for updates"
+                }
+                string output = await stdoutTask;
                 _ = await errorTask;
 
                 int updateCount = 0;

@@ -161,9 +161,16 @@ namespace agilicomsptoolkit
             };
 
             process.Start();
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
-            string output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+            try { await process.WaitForExitAsync(timeoutCts.Token); }
+            catch (OperationCanceledException)
+            {
+                try { if (!process.HasExited) process.Kill(true); } catch { }
+                throw new TimeoutException($"'{exe}' timed out after 15 seconds. Domain controller may be unreachable.");
+            }
+            string output = await stdoutTask;
             _ = await errorTask;
             return output;
         }

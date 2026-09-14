@@ -177,8 +177,14 @@ namespace agilicomsptoolkit
                 using var process = Process.Start(psi) ?? throw new InvalidOperationException("PowerShell could not be started.");
                 Task<string> stdout = process.StandardOutput.ReadToEndAsync();
                 Task<string> stderr = process.StandardError.ReadToEndAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromMinutes(10));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw new TimeoutException("PowerShell script timed out after 10 minutes.");
+                }
                 await Task.WhenAll(stdout, stderr);
-                await process.WaitForExitAsync();
                 if (process.ExitCode != 0) throw new InvalidOperationException(stderr.Result.Trim().Length > 0 ? stderr.Result.Trim() : $"PowerShell exited with code {process.ExitCode}.");
                 return stdout.Result;
             }

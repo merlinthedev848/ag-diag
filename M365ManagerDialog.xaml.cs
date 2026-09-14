@@ -51,8 +51,14 @@ namespace agilicomsptoolkit
                 if (!process.Start()) throw new InvalidOperationException("PowerShell could not be started.");
                 Task<string> readOut = process.StandardOutput.ReadToEndAsync();
                 Task<string> readErr = process.StandardError.ReadToEndAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try { await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw new TimeoutException("PowerShell module check timed out after 30 seconds.");
+                }
                 await Task.WhenAll(readOut, readErr).ConfigureAwait(false);
-                await process.WaitForExitAsync().ConfigureAwait(false);
                 return readOut.Result + readErr.Result;
             }
             finally { DeleteTempScript(tempPath); }
@@ -241,7 +247,7 @@ namespace agilicomsptoolkit
             const string symbols = "!@#$%^&*()_+";
             const string all = upper + lower + digits + symbols;
             char[] password = new char[16];
-            password[0] = System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length) >= 0 ? upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)] : 'A';
+            password[0] = upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)];
             password[1] = lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(lower.Length)];
             password[2] = digits[System.Security.Cryptography.RandomNumberGenerator.GetInt32(digits.Length)];
             password[3] = symbols[System.Security.Cryptography.RandomNumberGenerator.GetInt32(symbols.Length)];

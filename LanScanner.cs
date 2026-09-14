@@ -28,7 +28,16 @@ namespace agilicomsptoolkit
         [DllImport("iphlpapi.dll", ExactSpelling = true, SetLastError = true)]
         private static extern int SendARP(int DestIP, int SrcIP, byte[] pMacAddr, ref int PhyAddrLen);
 
-        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        private static readonly HttpClient _httpClient = new HttpClient(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            ConnectTimeout = TimeSpan.FromSeconds(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(5),
+            DefaultRequestVersion = System.Net.HttpVersion.Version20,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+        };
         private static readonly ConcurrentDictionary<string, string> _ouiCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static readonly SemaphoreSlim _macApiSemaphore = new SemaphoreSlim(1, 1);
 
@@ -273,9 +282,12 @@ namespace agilicomsptoolkit
             if (_ouiCache.TryGetValue(prefix, out string? cached) && cached != null)
                 return cached;
 
-            await _macApiSemaphore.WaitAsync(token);
+            bool acquired = false;
             try
             {
+                await _macApiSemaphore.WaitAsync(token);
+                acquired = true;
+
                 // Double check cache after obtaining the semaphore
                 if (_ouiCache.TryGetValue(prefix, out string? cachedVal) && cachedVal != null)
                     return cachedVal;
@@ -296,15 +308,18 @@ namespace agilicomsptoolkit
                     return "Unknown (Rate Limited)";
                 }
             }
-            catch { } 
+            catch { }
             finally
             {
-                // Delay releasing the semaphore for 600ms to stay within the 2 req/sec rate limit of api.macvendors.com
-                _ = Task.Run(async () =>
+                if (acquired)
                 {
-                    try { await Task.Delay(600, CancellationToken.None); } catch { }
-                    try { _macApiSemaphore.Release(); } catch { }
-                });
+                    // Delay releasing the semaphore for 600ms to stay within the 2 req/sec rate limit of api.macvendors.com
+                    _ = Task.Run(async () =>
+                    {
+                        try { await Task.Delay(600, CancellationToken.None); } catch { }
+                        try { _macApiSemaphore.Release(); } catch { }
+                    });
+                }
             }
 
             _ouiCache[prefix] = "Unknown";

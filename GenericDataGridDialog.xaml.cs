@@ -166,9 +166,17 @@ namespace agilicomsptoolkit
 
                 using var proc = Process.Start(procInfo);
                 if (proc == null) return;
-                
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                await proc.WaitForExitAsync();
+
+                // Read stdout concurrently with WaitForExitAsync to prevent pipe buffer deadlock
+                var readTask = proc.StandardOutput.ReadToEndAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(60));
+                try { await proc.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!proc.HasExited) proc.Kill(true); } catch { }
+                    return; // silently suppress — winget not available or too slow
+                }
+                string output = await readTask;
 
                 if (output.Contains("upgrades available", StringComparison.OrdinalIgnoreCase))
                 {

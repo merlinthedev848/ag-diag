@@ -111,9 +111,11 @@ namespace agilicomsptoolkit
                 {
                     ToggleMaximize();
                 }
-                else
+                else if (this.WindowState != WindowState.Maximized)
                 {
-                    this.DragMove();
+                    // DragMove throws InvalidOperationException when window is Maximized or
+                    // when the left mouse button is not in the pressed state.
+                    try { this.DragMove(); } catch (InvalidOperationException) { }
                 }
             }
         }
