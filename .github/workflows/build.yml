@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -43,10 +43,10 @@ jobs:
 
           # Fallback if Git LFS bandwidth is exceeded on GitHub
           if (-not (Test-Path "ffmpeg.exe") -or (Get-Item "ffmpeg.exe").Length -lt 1000000) {
-            Write-Host "Downloading fallback FFmpeg binary from release..."
+            Write-Host "Downloading fallback FFmpeg binary..."
             $zipPath = "$env:TEMP\ffmpeg.zip"
             $extractPath = "$env:TEMP\ffmpeg_extracted"
-            Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $zipPath -UseBasicParsing
+            curl.exe -sSL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o $zipPath
             Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
             $bin = Get-ChildItem -Path $extractPath -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
             if ($bin) {
