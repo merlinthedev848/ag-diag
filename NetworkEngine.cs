@@ -140,13 +140,20 @@ namespace agilicomsptoolkit
                     int currentPid = Environment.ProcessId;
                     foreach (var proc in System.Diagnostics.Process.GetProcesses())
                     {
-                        if (proc.Id == currentPid) continue;
-                        string name = proc.ProcessName.ToLower();
-                        if (name.Contains("toolkit")) continue;
-                        if (name.Contains("agilicoconnect") || name.Contains("softphone") || name.Contains("dmc") || (name.Contains("agilico") && !name.Contains("toolkit")))
+                        using (proc)
                         {
-                            Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
-                            procFound = true;
+                            try
+                            {
+                                if (proc.Id == currentPid) continue;
+                                string name = proc.ProcessName.ToLower();
+                                if (name.Contains("toolkit")) continue;
+                                if (name.Contains("agilicoconnect") || name.Contains("softphone") || name.Contains("dmc") || (name.Contains("agilico") && !name.Contains("toolkit")))
+                                {
+                                    Log($"Active Softphone Process: '{proc.ProcessName}' (PID: {proc.Id}) is running.");
+                                    procFound = true;
+                                }
+                            }
+                            catch { }
                         }
                     }
                     if (!procFound) Log("Active Softphone Process: No running softphone processes detected.");
@@ -883,7 +890,7 @@ namespace agilicomsptoolkit
                     var ips = await Dns.GetHostAddressesAsync(domain, token);
                     if (ips.Length > 0)
                     {
-                        Log($"Success: Resolved '{domain}' to: {string.Join(", ", (object[])ips)}");
+                        Log($"Success: Resolved '{domain}' to: {string.Join(", ", ips.Select(ip => ip.ToString()))}");
                         resolvedCount++;
                     }
                     else

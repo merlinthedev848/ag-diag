@@ -135,3 +135,68 @@ public class ServiceLayerTests
         Assert.IsTrue(result.message.Contains("does not exist") || result.message.Contains("No input file"));
     }
 }
+
+[TestClass]
+public class VoipToolsTests
+{
+    [TestMethod]
+    public void CalculateMosScore_IdealConditions_ReturnsHighMosScore()
+    {
+        // 10ms latency, 2ms jitter, 0% loss
+        double mos = agilicomsptoolkit.VoipTools.CalculateMosScore(10, 2, 0);
+        Assert.IsTrue(mos >= 4.0 && mos <= 4.4, $"Expected excellent MOS >= 4.0, got {mos}");
+    }
+
+    [TestMethod]
+    public void CalculateMosScore_HighPacketLoss_ReturnsDegradedMosScore()
+    {
+        // 200ms latency, 50ms jitter, 25% loss
+        double mos = agilicomsptoolkit.VoipTools.CalculateMosScore(200, 50, 25);
+        Assert.IsTrue(mos < 3.0, $"Expected degraded MOS < 3.0, got {mos}");
+    }
+
+    [TestMethod]
+    public void CalculateMosScore_ExtremeImpairment_ClampsToMinimumScore()
+    {
+        // 1000ms latency, 500ms jitter, 90% loss
+        double mos = agilicomsptoolkit.VoipTools.CalculateMosScore(1000, 500, 90);
+        Assert.AreEqual(1.0, mos);
+    }
+
+    [TestMethod]
+    public void PortProbeResult_DisplayProperties_FormattedCorrectly()
+    {
+        var result = new agilicomsptoolkit.PortProbeResult
+        {
+            Port = 5060,
+            Protocol = "UDP",
+            ServiceName = "SIP Signalling",
+            Target = "sip.agilico.co.uk",
+            Status = "Open",
+            RttMs = 24.56
+        };
+
+        Assert.AreEqual("UDP 5060", result.PortDisplay);
+        Assert.AreEqual("24.6 ms", result.RttDisplay);
+    }
+}
+
+[TestClass]
+public class PingTrackerTests
+{
+    [TestMethod]
+    public void PingTracker_InitialState_NotRunning()
+    {
+        var tracker = new agilicomsptoolkit.PingTracker();
+        Assert.IsFalse(tracker.IsRunning);
+        Assert.AreEqual(string.Empty, tracker.CurrentTarget);
+    }
+
+    [TestMethod]
+    public void PingTracker_Stop_CanBeCalledSafelyWhenNotRunning()
+    {
+        var tracker = new agilicomsptoolkit.PingTracker();
+        tracker.Stop(); // Should not throw
+        Assert.IsFalse(tracker.IsRunning);
+    }
+}

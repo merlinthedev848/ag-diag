@@ -17,13 +17,25 @@ namespace agilicomsptoolkit
                     LogAuditAction("Executed Network Configuration Reset (ipconfig flushdns/release/renew).");
                     
                     using var p1 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
-                    if (p1 != null) await p1.WaitForExitAsync();
+                    if (p1 != null)
+                    {
+                        using var cts1 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                        try { await p1.WaitForExitAsync(cts1.Token); } catch (OperationCanceledException) { try { if (!p1.HasExited) p1.Kill(true); } catch { } }
+                    }
                     
                     using var p2 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/release") { CreateNoWindow = true, UseShellExecute = false });
-                    if (p2 != null) await p2.WaitForExitAsync();
+                    if (p2 != null)
+                    {
+                        using var cts2 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                        try { await p2.WaitForExitAsync(cts2.Token); } catch (OperationCanceledException) { try { if (!p2.HasExited) p2.Kill(true); } catch { } }
+                    }
                     
                     using var p3 = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ipconfig", "/renew") { CreateNoWindow = true, UseShellExecute = false });
-                    if (p3 != null) await p3.WaitForExitAsync();
+                    if (p3 != null)
+                    {
+                        using var cts3 = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        try { await p3.WaitForExitAsync(cts3.Token); } catch (OperationCanceledException) { try { if (!p3.HasExited) p3.Kill(true); } catch { } }
+                    }
                     
                     ModernMessageBox.Show("Network configuration successfully reset and renewed.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -151,7 +163,13 @@ namespace agilicomsptoolkit
                 
                 var outTask = process.StandardOutput.ReadToEndAsync();
                 var errTask = process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw new TimeoutException($"Audit command timed out after 30 seconds.");
+                }
                 
                 string output = await outTask;
                 string err = await errTask;
@@ -204,7 +222,13 @@ namespace agilicomsptoolkit
                 
                 var outTask = process.StandardOutput.ReadToEndAsync();
                 var errTask = process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    throw new TimeoutException($"Tool command timed out after 30 seconds.");
+                }
                 
                 string output = await outTask;
                 string err = await errTask;

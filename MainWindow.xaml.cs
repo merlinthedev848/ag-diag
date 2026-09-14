@@ -899,28 +899,31 @@ namespace agilicomsptoolkit
         private static string? ForceCloseAgilicoConnect()
         {
             string? exePath = null;
-            int currentPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            int currentPid = Environment.ProcessId;
             foreach (var p in System.Diagnostics.Process.GetProcesses())
             {
-                try
+                using (p)
                 {
-                    if (p.Id == currentPid) continue;
-
-                    string name = p.ProcessName.ToLower();
-                    if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
+                    try
                     {
-                        try { exePath = p.MainModule?.FileName; } catch { }
-                        // Attempt graceful close first
-                        p.CloseMainWindow();
-                        if (!p.WaitForExit(2000))
+                        if (p.Id == currentPid) continue;
+
+                        string name = p.ProcessName.ToLower();
+                        if (name.Contains("agilico") && !name.Contains("diagnostic") && !name.Contains("checker"))
                         {
-                            // Force-kill if still alive
-                            p.Kill();
-                            p.WaitForExit(2000);
+                            try { exePath = p.MainModule?.FileName; } catch { }
+                            // Attempt graceful close first
+                            p.CloseMainWindow();
+                            if (!p.WaitForExit(2000))
+                            {
+                                // Force-kill if still alive
+                                p.Kill();
+                                p.WaitForExit(2000);
+                            }
                         }
                     }
+                    catch { }
                 }
-                catch { }
             }
             return exePath;
         }
@@ -2494,15 +2497,26 @@ namespace agilicomsptoolkit
                 using var process = System.Diagnostics.Process.Start(psi);
                 if (process == null) return sockets;
 
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                var outTask = process.StandardOutput.ReadToEndAsync();
+                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                try { await process.WaitForExitAsync(timeoutCts.Token); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(true); } catch { }
+                    return sockets;
+                }
+
+                string output = await outTask;
 
                 // Build a cache of PIDs to Process Names
                 var processes = System.Diagnostics.Process.GetProcesses();
                 var pidMap = new Dictionary<int, string>();
                 foreach (var p in processes)
                 {
-                    pidMap[p.Id] = p.ProcessName;
+                    using (p)
+                    {
+                        try { pidMap[p.Id] = p.ProcessName; } catch { }
+                    }
                 }
 
                 string[] lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
