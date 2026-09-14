@@ -72,24 +72,24 @@ namespace agilicomsptoolkit
                 this.MaxHeight = workArea.Height;
                 this.MaxWidth = workArea.Width;
 
-                if (this.Height > workArea.Height || this.Height >= 1000)
-                {
-                    this.Height = Math.Max(550, workArea.Height - 30);
-                }
-
                 if (this.MinHeight > workArea.Height)
                 {
                     this.MinHeight = Math.Max(500, workArea.Height - 40);
                 }
 
-                if (this.Width > workArea.Width)
-                {
-                    this.Width = Math.Max(850, workArea.Width - 20);
-                }
-
                 if (this.MinWidth > workArea.Width)
                 {
                     this.MinWidth = Math.Max(800, workArea.Width - 30);
+                }
+
+                if (this.Height > workArea.Height - 20)
+                {
+                    this.Height = Math.Max(this.MinHeight, workArea.Height - 30);
+                }
+
+                if (this.Width > workArea.Width - 20)
+                {
+                    this.Width = Math.Max(this.MinWidth, workArea.Width - 30);
                 }
 
                 // Center window within work area bounds so it never extends off-screen or behind the taskbar
