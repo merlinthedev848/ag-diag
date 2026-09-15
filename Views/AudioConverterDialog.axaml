@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.AudioConverterDialog"
+        Title="Agilico VoIP Audio Converter"
+        Width="640" Height="360"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="#0B0F19">
+  <Border Margin="16" Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="8" Padding="20">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+      <!-- Title -->
+      <StackPanel Grid.Row="0" Margin="0,0,0,14">
+        <TextBlock Text="VoIP Audio Converter (PCM 8kHz 16-bit Mono)" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+        <TextBlock Text="Converts audio files (MP3, WAV, M4A) to the strict standard format required by Agilico Phone Systems." FontSize="12" Foreground="#9CA3AF"/>
+      </StackPanel>
+
+      <!-- Input file selection -->
+      <Grid Grid.Row="1" Margin="0,0,0,14" ColumnDefinitions="*,Auto">
+        <TextBox x:Name="TxtInputPath" Grid.Column="0" Watermark="Select audio file to convert..." Background="#1F2937" Foreground="#F9FAFB" BorderBrush="#374151" CornerRadius="6" Padding="10,8"/>
+        <Button x:Name="BtnBrowse" Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Background="#374151" Foreground="#F9FAFB" Padding="14,8" CornerRadius="6" Click="BtnBrowse_Click"/>
+      </Grid>
+
+      <!-- Progress -->
+      <StackPanel Grid.Row="2" Margin="0,0,0,14" Spacing="6">
+        <ProgressBar x:Name="PrgConvert" Height="8" Foreground="#3B82F6" Background="#1F2937" Minimum="0" Maximum="100" Value="0"/>
+        <TextBlock x:Name="TxtProgress" Text="Ready to convert." FontSize="12" Foreground="#9CA3AF"/>
+      </StackPanel>
+
+      <!-- Status note -->
+      <TextBlock x:Name="TxtOutputInfo" Grid.Row="3" Text="Output file will be saved to your Desktop with suffix '-AG.wav'." TextWrapping="Wrap" FontSize="11" Foreground="#6B7280"/>
+
+      <!-- Action buttons -->
+      <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+        <Button Content="Close" Background="#374151" Foreground="#F9FAFB" Padding="16,8" CornerRadius="6" Click="BtnClose_Click"/>
+        <Button x:Name="BtnConvert" Content="Convert Audio" Background="#10B981" Foreground="#FFFFFF" Padding="20,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnConvert_Click"/>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

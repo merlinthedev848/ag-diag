@@ -1,0 +1,32 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AgilicoDiagMac.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+  </Application.Styles>
+
+  <Application.Resources>
+    <!-- Dark Navy Slate Palette -->
+    <Color x:Key="BgColor">#0B0F19</Color>
+    <Color x:Key="CardBgColor">#111827</Color>
+    <Color x:Key="CardHeaderBgColor">#1F2937</Color>
+    <Color x:Key="BorderColor">#374151</Color>
+    <Color x:Key="BrandBlueColor">#3B82F6</Color>
+    <Color x:Key="BrandBlueHoverColor">#2563EB</Color>
+    <Color x:Key="BrandGreenColor">#10B981</Color>
+    <Color x:Key="BrandRedColor">#EF4444</Color>
+    <Color x:Key="BrandAmberColor">#F59E0B</Color>
+
+    <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="{StaticResource CardBgColor}"/>
+    <SolidColorBrush x:Key="CardHeaderBgBrush" Color="{StaticResource CardHeaderBgColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BrandBlueBrush" Color="{StaticResource BrandBlueColor}"/>
+    <SolidColorBrush x:Key="BrandBlueHoverBrush" Color="{StaticResource BrandBlueHoverColor}"/>
+    <SolidColorBrush x:Key="BrandGreenBrush" Color="{StaticResource BrandGreenColor}"/>
+    <SolidColorBrush x:Key="BrandRedBrush" Color="{StaticResource BrandRedColor}"/>
+    <SolidColorBrush x:Key="BrandAmberBrush" Color="{StaticResource BrandAmberColor}"/>
+  </Application.Resources>
+</Application>

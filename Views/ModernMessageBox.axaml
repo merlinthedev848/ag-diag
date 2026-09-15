@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.ModernMessageBox"
+        Title="Agilico Notification"
+        Width="480" Height="220"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="#0B0F19">
+  <Border Margin="16" Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="8" Padding="20">
+    <Grid RowDefinitions="*,Auto">
+      <StackPanel Grid.Row="0" Spacing="10">
+        <TextBlock x:Name="TxtTitle" Text="Message" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+        <ScrollViewer MaxHeight="90">
+          <TextBlock x:Name="TxtMessage" Text="Details..." TextWrapping="Wrap" FontSize="13" Foreground="#9CA3AF"/>
+        </ScrollViewer>
+      </StackPanel>
+      <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,12,0,0">
+        <Button x:Name="BtnCancel" Content="Cancel" IsVisible="False" Background="#374151" Foreground="#F9FAFB" Padding="16,8" CornerRadius="6" Click="BtnCancel_Click"/>
+        <Button x:Name="BtnOk" Content="OK" Background="#3B82F6" Foreground="#FFFFFF" Padding="20,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnOk_Click"/>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.WifiAnalyzerDialog"
+        Title="macOS Wi-Fi &amp; Interface Quality Analyzer"
+        Width="680" Height="460"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="#0B0F19">
+  <Grid Margin="20" RowDefinitions="Auto,*,Auto">
+    <!-- Title -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,16">
+      <TextBlock Text="Wi-Fi Signal &amp; Network Interface Metrics" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+      <TextBlock Text="Assess wireless RF signal quality, RSSI noise ratios, channel interference, and voice readiness on macOS." FontSize="12" Foreground="#9CA3AF"/>
+    </StackPanel>
+
+    <!-- Metrics Cards -->
+    <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="20">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="200,*">
+        <!-- SSID -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Connected Wi-Fi SSID:" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+        <TextBlock x:Name="TxtSsid" Grid.Row="0" Grid.Column="1" Text="Scanning..." FontWeight="Bold" Foreground="#3B82F6" Margin="0,0,0,12"/>
+
+        <!-- Signal RSSI & Noise -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Signal Strength (RSSI / Noise):" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+        <TextBlock x:Name="TxtRssiNoise" Grid.Row="1" Grid.Column="1" Text="Scanning..." Foreground="#F9FAFB" Margin="0,0,0,12"/>
+
+        <!-- Signal Quality & Voice Suitability -->
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="VoIP Readiness Assessment:" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+        <TextBlock x:Name="TxtQuality" Grid.Row="2" Grid.Column="1" Text="Scanning..." FontWeight="SemiBold" Foreground="#10B981" Margin="0,0,0,12"/>
+
+        <!-- Channel & Tx Rate -->
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Channel &amp; Transmit Rate:" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+        <TextBlock x:Name="TxtChannelTx" Grid.Row="3" Grid.Column="1" Text="Scanning..." Foreground="#F9FAFB" Margin="0,0,0,12"/>
+
+        <!-- Router IP & Security -->
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Gateway / Security:" FontWeight="SemiBold" Foreground="#9CA3AF"/>
+        <TextBlock x:Name="TxtRouterSecurity" Grid.Row="4" Grid.Column="1" Text="Scanning..." Foreground="#F9FAFB"/>
+      </Grid>
+    </Border>
+
+    <!-- Footer -->
+    <Grid Grid.Row="2" Margin="0,16,0,0" ColumnDefinitions="Auto,*,Auto">
+      <Button x:Name="BtnRefresh" Grid.Column="0" Content="Re-Scan Wi-Fi" Background="#374151" Foreground="#F9FAFB" Padding="14,8" CornerRadius="6" Click="BtnRefresh_Click"/>
+      <Button Grid.Column="2" Content="Close" Background="#3B82F6" Foreground="#FFFFFF" Padding="20,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnClose_Click"/>
+    </Grid>
+  </Grid>
+</Window>

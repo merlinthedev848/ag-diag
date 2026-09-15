@@ -1,0 +1,64 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.PingTrackerDialog"
+        Title="Continuous Ping Latency &amp; Stability Tracker"
+        Width="860" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0F19">
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Header -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+      <TextBlock Text="Continuous Ping Latency &amp; Jitter Monitor" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+      <TextBlock Text="Track packet loss, latency jitter, and round-trip performance over time to any destination host." FontSize="12" Foreground="#9CA3AF"/>
+    </StackPanel>
+
+    <!-- Controls &amp; Stats Bar -->
+    <Grid Grid.Row="1" Margin="0,0,0,12" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+        <TextBox x:Name="TxtTarget" Width="180" Text="8.8.8.8" Watermark="Hostname or IP..." Background="#111827" Foreground="#F9FAFB" BorderBrush="#374151" CornerRadius="6" Padding="10,6"/>
+        <Button x:Name="BtnTogglePing" Content="Start Ping" Background="#3B82F6" Foreground="#FFFFFF" Padding="16,6" FontWeight="SemiBold" CornerRadius="6" Click="BtnTogglePing_Click"/>
+      </StackPanel>
+
+      <!-- Live Stats Cards -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
+        <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="10,4">
+          <TextBlock x:Name="TxtCurrentRtt" Text="Current: - ms" Foreground="#3B82F6" FontWeight="Bold"/>
+        </Border>
+        <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="10,4">
+          <TextBlock x:Name="TxtAvgRtt" Text="Avg: - ms" Foreground="#10B981" FontWeight="Bold"/>
+        </Border>
+        <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="10,4">
+          <TextBlock x:Name="TxtJitter" Text="Jitter: - ms" Foreground="#F59E0B" FontWeight="Bold"/>
+        </Border>
+        <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="6" Padding="10,4">
+          <TextBlock x:Name="TxtLoss" Text="Loss: 0.0%" Foreground="#EF4444" FontWeight="Bold"/>
+        </Border>
+      </StackPanel>
+
+      <Button x:Name="BtnExportCsv" Grid.Column="2" Content="Export CSV" Margin="8,0,0,0" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnExportCsv_Click"/>
+      <Button x:Name="BtnClear" Grid.Column="3" Content="Clear" Margin="8,0,0,0" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnClear_Click"/>
+      <Button x:Name="BtnClose" Grid.Column="4" Content="Close" Margin="8,0,0,0" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnClose_Click"/>
+    </Grid>
+
+    <!-- DataGrid of Ping History -->
+    <Border Grid.Row="2" Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="8" Padding="2">
+      <DataGrid x:Name="GridPings" AutoGenerateColumns="False" IsReadOnly="True"
+                GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                Background="Transparent" RowBackground="#111827">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Timestamp (UTC)" Binding="{Binding Timestamp, StringFormat={}{0:HH:mm:ss.fff}}" Width="150"/>
+          <DataGridTextColumn Header="Target Host" Binding="{Binding Target}" Width="160"/>
+          <DataGridTextColumn Header="Round-Trip Latency" Binding="{Binding LatencyDisplay}" Width="160"/>
+          <DataGridTextColumn Header="ICMP Status" Binding="{Binding Status}" Width="*"/>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Footer -->
+    <Grid Grid.Row="3" Margin="0,10,0,0" ColumnDefinitions="*,Auto">
+      <TextBlock x:Name="TxtFooter" Grid.Column="0" Text="Enter target host and click Start Ping." VerticalAlignment="Center" Foreground="#9CA3AF" FontSize="12"/>
+      <TextBlock x:Name="TxtTotalPings" Grid.Column="1" Text="0 packets transmitted" VerticalAlignment="Center" Foreground="#F9FAFB" FontWeight="SemiBold" FontSize="12"/>
+    </Grid>
+  </Grid>
+</Window>
+

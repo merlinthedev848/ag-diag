@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <NoWarn>CA1416;CS0219</NoWarn>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>Assets/app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>AgilicoDiagMac</AssemblyName>
+    <RootNamespace>AgilicoDiagMac</RootNamespace>
+    <Authors>Chris Kendall</Authors>
+    <Company>Agilico</Company>
+    <Product>Agilico MSP Toolkit for macOS</Product>
+    <Copyright>Copyright (c) 2026 Agilico. All rights reserved.</Copyright>
+    <Description>Cross-platform network diagnostic and IT engineering toolkit for Agilico Connect (macOS edition).</Description>
+    <Version>4.1.2</Version>
+    <AssemblyVersion>4.1.2.0</AssemblyVersion>
+    <FileVersion>4.1.2.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
+  </ItemGroup>
+</Project>
+
+

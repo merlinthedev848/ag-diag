@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.AudioDeviceInspectorDialog"
+        Title="macOS CoreAudio &amp; Voice Hardware Inspector"
+        Width="740" Height="460"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0F19">
+  <Grid Margin="16" RowDefinitions="Auto,*,Auto">
+    <!-- Header -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+      <TextBlock Text="Audio Hardware &amp; Microphone Inspector (CoreAudio)" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+      <TextBlock Text="Inspect default voice input/output devices, headset connections, and sample rates for softphone call clarity." FontSize="12" Foreground="#9CA3AF"/>
+    </StackPanel>
+
+    <!-- DataGrid -->
+    <Border Grid.Row="1" Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="8" Padding="2">
+      <DataGrid x:Name="GridAudio" AutoGenerateColumns="False" IsReadOnly="True"
+                GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                Background="Transparent" RowBackground="#111827">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Device Name" Binding="{Binding Name}" Width="*"/>
+          <DataGridTextColumn Header="Endpoint Type" Binding="{Binding Type}" Width="190"/>
+          <DataGridTextColumn Header="Interface / Bus" Binding="{Binding Transport}" Width="120"/>
+          <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="160"/>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Footer -->
+    <Grid Grid.Row="2" Margin="0,12,0,0" ColumnDefinitions="Auto,*,Auto">
+      <Button x:Name="BtnRefresh" Grid.Column="0" Content="Refresh Devices" Background="#374151" Foreground="#F9FAFB" Padding="14,8" CornerRadius="6" Click="BtnRefresh_Click"/>
+      <Button Grid.Column="2" Content="Close" Background="#3B82F6" Foreground="#FFFFFF" Padding="18,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnClose_Click"/>
+    </Grid>
+  </Grid>
+</Window>

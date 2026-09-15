@@ -1,0 +1,17 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+publish_output/
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

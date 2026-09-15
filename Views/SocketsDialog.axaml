@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.Views.SocketsDialog"
+        Title="Active Socket Monitor (Netstat Viewer)"
+        Width="880" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0F19">
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Header -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+      <TextBlock Text="Active Socket Monitor (Netstat Viewer)" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+      <TextBlock Text="Real-time inspection of open network sockets, listening ports, remote connections, and owning processes." FontSize="12" Foreground="#9CA3AF"/>
+    </StackPanel>
+
+    <!-- Filter Bar -->
+    <Grid Grid.Row="1" Margin="0,0,0,10" ColumnDefinitions="*,Auto">
+      <TextBox x:Name="TxtSearch" Grid.Column="0" Watermark="Filter by port, IP address, process name, or PID..." Margin="0,0,10,0" TextChanged="TxtSearch_TextChanged" Background="#111827" Foreground="#F9FAFB" BorderBrush="#374151" CornerRadius="6" Padding="10,6"/>
+      <Button x:Name="BtnRefresh" Grid.Column="1" Content="Refresh" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnRefresh_Click"/>
+    </Grid>
+
+    <!-- DataGrid -->
+    <Border Grid.Row="2" Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="8" Padding="2">
+      <DataGrid x:Name="GridSockets" AutoGenerateColumns="False" IsReadOnly="True"
+                GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                Background="Transparent" RowBackground="#111827">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70"/>
+          <DataGridTextColumn Header="Local Endpoint" Binding="{Binding LocalEndpoint}" Width="190"/>
+          <DataGridTextColumn Header="Remote Endpoint" Binding="{Binding RemoteEndpoint}" Width="190"/>
+          <DataGridTextColumn Header="State" Binding="{Binding State}" Width="110"/>
+          <DataGridTextColumn Header="Process Name" Binding="{Binding ProcessName}" Width="160"/>
+          <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="80"/>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Footer -->
+    <Grid Grid.Row="3" Margin="0,10,0,0" ColumnDefinitions="Auto,*,Auto">
+      <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Inspecting active sockets..." VerticalAlignment="Center" Foreground="#9CA3AF" FontSize="12"/>
+      <Button Grid.Column="2" Content="Close" Background="#3B82F6" Foreground="#FFFFFF" Padding="18,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnClose_Click"/>
+    </Grid>
+  </Grid>
+</Window>

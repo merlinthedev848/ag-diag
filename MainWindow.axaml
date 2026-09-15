@@ -1,0 +1,380 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AgilicoDiagMac.MainWindow"
+        Title="Agilico MSP Toolkit for macOS"
+        Width="1180" Height="780"
+        MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B0F19">
+  <Grid RowDefinitions="Auto,*">
+    <!-- Top Bar -->
+    <Border Grid.Row="0" Background="#111827" BorderBrush="#1F2937" BorderThickness="0,0,0,1" Padding="20,14">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <!-- Title & Version -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Border Width="36" Height="36" CornerRadius="8" Background="#3B82F6">
+            <TextBlock Text="AG" FontWeight="Bold" FontSize="16" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="Agilico MSP Toolkit" FontSize="18" FontWeight="Bold" Foreground="#F9FAFB"/>
+            <TextBlock Text="macOS Network Diagnostics &amp; Voice Engineering v4.1.2" FontSize="11" Foreground="#9CA3AF"/>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Network Info Badges -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+          <Border Background="#1F2937" CornerRadius="6" Padding="10,5">
+            <TextBlock x:Name="BadgePublicIp" Text="Public IP: Probing..." FontSize="12" Foreground="#9CA3AF"/>
+          </Border>
+          <Border Background="#1F2937" CornerRadius="6" Padding="10,5">
+            <TextBlock x:Name="BadgeLocalIp" Text="Local IP: Probing..." FontSize="12" Foreground="#9CA3AF"/>
+          </Border>
+          <Border Background="#1F2937" CornerRadius="6" Padding="10,5">
+            <TextBlock x:Name="BadgeScore" Text="Score: 100/100" FontSize="12" FontWeight="Bold" Foreground="#10B981"/>
+          </Border>
+        </StackPanel>
+
+        <!-- Main Actions -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Button x:Name="BtnQuickFix" Content="One-Click Fix" Background="#374151" Foreground="#F9FAFB" Padding="14,8" CornerRadius="6" Click="BtnQuickFix_Click"/>
+          <Button x:Name="BtnRunDiagnostics" Content="Run All Diagnostics" Background="#3B82F6" Foreground="#FFFFFF" FontWeight="SemiBold" Padding="18,8" CornerRadius="6" Click="BtnRunDiagnostics_Click"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Main Navigation & Content Area -->
+    <TabControl Grid.Row="1" Background="Transparent" Margin="16,8,16,16">
+      <!-- TAB 1: Core Outbound Probes -->
+      <TabItem Header="Outbound Diagnostics" FontSize="14" FontWeight="SemiBold">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="0,12,0,0">
+          <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="10-Point Outbound Readiness &amp; VoIP Test Suite" FontSize="16" FontWeight="Bold" Foreground="#F9FAFB"/>
+            <TextBlock Text="Parallel verification of DNS, HTTP/S, NTP, STUN, NAT Routing, SIP ALG, RTP Jitter/MOS, and SignalR." FontSize="12" Foreground="#9CA3AF"/>
+          </StackPanel>
+
+          <!-- Diagnostic Check Items -->
+          <ScrollViewer Grid.Row="1">
+            <StackPanel x:Name="PnlTestCards" Spacing="8">
+              <!-- Item 0: DNS -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest0" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="1. DNS Resolution &amp; Public DNS" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc0" Grid.Column="2" Text="Probing hp2k.co.uk service endpoints and Google DNS..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus0" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 1: HTTP/HTTPS -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest1" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="2. HTTP/HTTPS Outbound (80/443)" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc1" Grid.Column="2" Text="Validating SSL handshakes and outbound web connectivity..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus1" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 2: NTP Subsystem -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest2" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="3. NTP Subsystem (UDP 123)" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc2" Grid.Column="2" Text="Verifying local clock offset and UDP 123 time server sync..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus2" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 3: Agilico STUN -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest3" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="4. Agilico STUN Servers" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc3" Grid.Column="2" Text="Querying primary STUN infrastructure for NAT translation..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus3" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 4: Google STUN -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest4" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="5. Google STUN Backup" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc4" Grid.Column="2" Text="Validating secondary STUN endpoints..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus4" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 5: NAT Routing -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest5" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="6. NAT Routing &amp; Hops" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc5" Grid.Column="2" Text="Checking gateway hops and detecting Double NAT configurations..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus5" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 6: NAT Port Translation -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest6" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="7. NAT Port Translation" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc6" Grid.Column="2" Text="Checking whether outbound UDP ports are preserved or randomized..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus6" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 7: SIP ALG -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest7" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="8. SIP ALG Detection" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc7" Grid.Column="2" Text="Probing for SIP Application Layer Gateway packet modification..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus7" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 8: RTP Jitter & Loss -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest8" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="9. RTP Voice Jitter &amp; MOS" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc8" Grid.Column="2" Text="Simulating G.711 media stream to measure jitter, loss, and MOS score..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus8" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+
+              <!-- Item 9: SignalR Inbound Signalling -->
+              <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="14,10">
+                <Grid ColumnDefinitions="30,220,*,120">
+                  <CheckBox x:Name="ChkTest9" Grid.Column="0" IsChecked="True" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="10. SignalR Hub &amp; Presence" FontWeight="SemiBold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestDesc9" Grid.Column="2" Text="Testing real-time WebSocket connection to core signalling hubs..." Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TxtTestStatus9" Grid.Column="3" Text="Ready" FontWeight="SemiBold" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- Overall Progress -->
+          <ProgressBar x:Name="PrgOverall" Grid.Row="2" Height="6" Margin="0,12,0,0" Background="#1F2937" Foreground="#3B82F6" Minimum="0" Maximum="100" Value="0"/>
+        </Grid>
+      </TabItem>
+
+      <!-- TAB 2: Speed Test -->
+      <TabItem Header="Speed Test" FontSize="14" FontWeight="SemiBold">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="0,12,0,0">
+          <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="High-Performance Throughput &amp; Bandwidth Test" FontSize="16" FontWeight="Bold" Foreground="#F9FAFB"/>
+            <TextBlock Text="Multi-CDN download failover (Cloudflare, CacheFly, ThinkBroadband) and parallel non-looping upload stream." FontSize="12" Foreground="#9CA3AF"/>
+          </StackPanel>
+
+          <!-- Gauges / Cards -->
+          <Grid Grid.Row="1" ColumnDefinitions="*,*">
+            <!-- Download Card -->
+            <Border Grid.Column="0" Margin="0,0,10,0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="24">
+              <StackPanel Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock Text="DOWNLOAD SPEED" FontWeight="Bold" FontSize="14" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="TxtDownloadSpeed" Text="0.0" FontSize="54" FontWeight="Bold" Foreground="#3B82F6" HorizontalAlignment="Center"/>
+                <TextBlock Text="Mbps" FontSize="16" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
+                <ProgressBar x:Name="PrgDownload" Height="8" Width="280" Background="#1F2937" Foreground="#3B82F6" Minimum="0" Maximum="100" Value="0"/>
+              </StackPanel>
+            </Border>
+
+            <!-- Upload Card -->
+            <Border Grid.Column="1" Margin="10,0,0,0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="24">
+              <StackPanel Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock Text="UPLOAD SPEED" FontWeight="Bold" FontSize="14" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="TxtUploadSpeed" Text="0.0" FontSize="54" FontWeight="Bold" Foreground="#10B981" HorizontalAlignment="Center"/>
+                <TextBlock Text="Mbps" FontSize="16" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
+                <ProgressBar x:Name="PrgUpload" Height="8" Width="280" Background="#1F2937" Foreground="#10B981" Minimum="0" Maximum="100" Value="0"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <!-- Speed Test Button -->
+          <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0" Spacing="16">
+            <Button x:Name="BtnStartSpeedTest" Content="Start Speed Test" Background="#3B82F6" Foreground="#FFFFFF" Padding="28,12" FontSize="15" FontWeight="Bold" CornerRadius="6" Click="BtnStartSpeedTest_Click"/>
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <!-- TAB 3: Traceroute -->
+      <TabItem Header="Traceroute &amp; GeoIP" FontSize="14" FontWeight="SemiBold">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="0,12,0,0">
+          <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Network Path Tracing &amp; GeoIP / ASN Inspection" FontSize="16" FontWeight="Bold" Foreground="#F9FAFB"/>
+            <TextBlock Text="Hop-by-hop latency, reverse DNS router lookup, and autonomous system number resolution." FontSize="12" Foreground="#9CA3AF"/>
+          </StackPanel>
+
+          <!-- Target & Run -->
+          <Grid Grid.Row="1" Margin="0,0,0,12" ColumnDefinitions="*,Auto">
+            <TextBox x:Name="TxtTraceTarget" Grid.Column="0" Text="customerportal.hp2k.co.uk" Watermark="Enter host or IP to trace..." Margin="0,0,10,0" Background="#111827" Foreground="#F9FAFB" BorderBrush="#374151" CornerRadius="6" Padding="10,8"/>
+            <Button x:Name="BtnRunTrace" Grid.Column="1" Content="Start Traceroute" Background="#3B82F6" Foreground="#FFFFFF" Padding="20,8" FontWeight="SemiBold" CornerRadius="6" Click="BtnRunTrace_Click"/>
+          </Grid>
+
+          <!-- Results Grid -->
+          <Border Grid.Row="2" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="2">
+            <DataGrid x:Name="GridTraceroute" AutoGenerateColumns="False" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                      Background="Transparent" RowBackground="#111827">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Hop" Binding="{Binding Hop}" Width="60"/>
+                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="150"/>
+                <DataGridTextColumn Header="Latency" Binding="{Binding LatencyDisplay}" Width="100"/>
+                <DataGridTextColumn Header="Hostname / Reverse DNS" Binding="{Binding Hostname}" Width="240"/>
+                <DataGridTextColumn Header="GeoIP Location" Binding="{Binding Location}" Width="160"/>
+                <DataGridTextColumn Header="AS Number (ASN)" Binding="{Binding Asn}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Border>
+
+          <!-- Status Footer -->
+          <TextBlock x:Name="TxtTraceStatus" Grid.Row="3" Text="Enter target and click Start Traceroute." Margin="0,8,0,0" Foreground="#9CA3AF" FontSize="12"/>
+        </Grid>
+      </TabItem>
+
+      <!-- TAB 4: macOS Network & Voice Tools -->
+      <TabItem Header="macOS Voice &amp; Network Tools" FontSize="14" FontWeight="SemiBold">
+        <ScrollViewer Margin="0,12,0,0">
+          <Grid RowDefinitions="Auto,*" Margin="0,0,0,16">
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+              <TextBlock Text="macOS Voice &amp; Network Engineering Tools" FontSize="16" FontWeight="Bold" Foreground="#F9FAFB"/>
+              <TextBlock Text="Specialized diagnostic utilities for macOS network configuration, Wi-Fi RF quality, CoreAudio devices, sockets, and client maintenance." FontSize="12" Foreground="#9CA3AF"/>
+            </StackPanel>
+
+            <WrapPanel Grid.Row="1">
+              <!-- Flush DNS & Reset mDNS -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Flush macOS DNS" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Flush macOS DNS cache and restart mDNSResponder service." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Flush DNS" Background="#374151" Foreground="#F9FAFB" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnFlushDns_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Renew DHCP Lease -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Renew DHCP Lease" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Renew IP lease with your local router / DHCP server via networksetup." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Renew DHCP" Background="#374151" Foreground="#F9FAFB" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnRenewDhcp_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Wi-Fi RF Signal Analyzer -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Wi-Fi Signal &amp; RF Quality" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Inspect RSSI dBm signal, channel, noise, and wireless voice readiness." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Analyze Wi-Fi" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenWifiAnalyzer_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- CoreAudio Devices & Mic -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="CoreAudio &amp; Microphones" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Inspect default voice playback &amp; recording headsets on macOS." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Audio Devices" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenAudioDevices_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Active Socket Monitor -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Active Socket Monitor" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Inspect open TCP/UDP ports, sockets, and owning macOS PIDs." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Open Netstat" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenSockets_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Local Subnet Scanner -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Subnet LAN Scanner" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Scan local subnet for active IP phones, PBX, MACs, and vendors." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Open Scanner" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenLanScanner_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Continuous Ping Tracker -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Ping Latency Tracker" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Continuous latency, jitter, and packet loss monitor with CSV export." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Open Tracker" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenPingTracker_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Audio Converter -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="VoIP Audio Converter" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Convert audio to 8kHz 16-bit Mono PCM for phone systems." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Open Converter" Background="#3B82F6" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnOpenAudioConverter_Click"/>
+                </Grid>
+              </Border>
+
+              <!-- Agilico Connect Cache Cleaner -->
+              <Border Width="260" Height="140" Margin="0,0,12,12" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Grid RowDefinitions="*,Auto">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Agilico Client Reset" FontWeight="Bold" FontSize="14" Foreground="#F9FAFB"/>
+                    <TextBlock Text="Wipe local app caches &amp; clean restart the Agilico Connect softphone." FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button Grid.Row="1" Content="Reset Client" Background="#EF4444" Foreground="#FFFFFF" Padding="12,6" CornerRadius="6" HorizontalAlignment="Right" Click="BtnResetClient_Click"/>
+                </Grid>
+              </Border>
+            </WrapPanel>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- TAB 5: Activity Log & Capture -->
+      <TabItem Header="Activity &amp; PCAP Log" FontSize="14" FontWeight="SemiBold">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="0,12,0,0">
+          <!-- Log Actions Bar -->
+          <Grid Grid.Row="0" Margin="0,0,0,10" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+            <TextBlock Grid.Column="0" Text="Live Diagnostic Log Console" FontSize="16" FontWeight="Bold" Foreground="#F9FAFB" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+              <Button x:Name="BtnTogglePcap" Content="Start PCAP Capture" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnTogglePcap_Click"/>
+              <Button x:Name="BtnExportPcap" Content="Export PCAP" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnExportPcap_Click"/>
+            </StackPanel>
+            <Button x:Name="BtnExportReport" Grid.Column="3" Content="Export Full Report" Margin="8,0,0,0" Background="#10B981" Foreground="#FFFFFF" FontWeight="SemiBold" Padding="14,6" CornerRadius="6" Click="BtnExportReport_Click"/>
+            <Button x:Name="BtnClearLogs" Grid.Column="4" Content="Clear" Margin="8,0,0,0" Background="#374151" Foreground="#F9FAFB" Padding="14,6" CornerRadius="6" Click="BtnClearLogs_Click"/>
+          </Grid>
+
+          <!-- Console Text -->
+          <Border Grid.Row="1" Background="#0A0E1A" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="6" Padding="10">
+            <ScrollViewer x:Name="ScrLogs">
+              <TextBox x:Name="TxtLogs" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                       FontFamily="Consolas,Menlo,Monospace" FontSize="12"
+                       Foreground="#10B981" Background="Transparent" BorderThickness="0"/>
+            </ScrollViewer>
+          </Border>
+
+          <!-- Footer -->
+          <TextBlock x:Name="TxtPcapStats" Grid.Row="2" Text="PCAP Capturer: Idle (0 packets recorded)" Margin="0,8,0,0" Foreground="#9CA3AF" FontSize="12"/>
+        </Grid>
+      </TabItem>
+    </TabControl>
+  </Grid>
+</Window>
