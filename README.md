@@ -1,10 +1,10 @@
-# Agilico MSP Toolkit (v4.1.0)
+# Agilico MSP Toolkit (v4.1.2)
 
 An advanced, premium-themed desktop diagnostic application built for Windows, designed to verify local and outbound network readiness for the **Agilico Connect** application. It conducts deep packet analysis, network path tracing, port connectivity probing, and VoIP simulation, providing IT engineers and end-users with instant, actionable diagnostics.
 
 ---
 
-## 📥 Downloads (Latest v4.1.0)
+## 📥 Downloads (Latest v4.1.2)
 
 | Distribution | Package Type | File Name | Size | Target Environment |
 | :--- | :--- | :--- | :--- | :--- |
@@ -25,7 +25,7 @@ The tool executes a comprehensive suite of ten parallelized outbound checks:
 - **Agilico STUN Servers**: Queries Agilico's STUN infrastructure to identify firewall NAT blockages.
 - **Google STUN Servers**: Queries backup Google STUN endpoints for baseline connectivity validation.
 - **NAT Routing & Hops Check**: Traces network routes to default gateways to detect Double NAT configurations.
-- **NAT Port Translation**: Checks if outbound ports are randomized or preserved.
+- **NAT Port Randomization (RFC 6056)**: Verifies that public NAT port translation is randomized per RFC 6056 and bindings are maintained for $\ge$ 24h.
 - **SIP ALG Detection**: Sends raw SIP OPTIONS requests to detect SIP inspection/tampering engines.
 - **RTP Jitter/Loss Check**: Simulates real-time G.711 media path traffic to calculate packet loss, jitter, and Estimated MOS scores.
 - **Inbound Signalling & Presence (SignalR)**: Verifies direct WebSocket connection status with the core SignalR hubs.

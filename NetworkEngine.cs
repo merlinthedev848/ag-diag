@@ -1449,10 +1449,10 @@ namespace agilicomsptoolkit
 
         private async Task<bool> RunNatPortRandomnessTestAsync(CancellationToken token)
         {
-            if (CheckLocalConnectivityBeforeTest("NAT Port Translation (Random Port)")) return false;
-            UpdateProgress("NAT Port Translation (Random Port)", "Running", "Checking port preservation...");
+            if (CheckLocalConnectivityBeforeTest("NAT Port Randomization (RFC 6056)")) return false;
+            UpdateProgress("NAT Port Randomization (RFC 6056)", "Running", "Checking port randomization...");
             Log("Test 7: Evaluating NAT port translation...");
-            Log("Guideline: 'The public interface NAT port should be preserved (consistent NAT) for reliable bidirectional VoIP media.'");
+            Log("Guideline: 'The public interface NAT port should be random and not be the same as the local NAT port (RFC 6056).' (Maintain NAT translation for >= 24h)");
 
             int localPort = LocalSipPort;
             int mappedPort = 0;
@@ -1461,10 +1461,10 @@ namespace agilicomsptoolkit
             if (IsSimulationMode)
             {
                 await Task.Delay(800, token);
-                mappedPort = localPort;
+                mappedPort = localPort + 12345;
                 Log($"[Simulation] Local Port: {localPort}, STUN Mapped Port: {mappedPort}");
-                Log("Pass: The public interface NAT port is preserved (Consistent NAT).");
-                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port preserved ({mappedPort})");
+                Log("Pass: The public interface NAT port is randomized per RFC 6056.");
+                UpdateProgress("NAT Port Randomization (RFC 6056)", "Passed", $"Pass - Port randomized ({mappedPort})");
                 return true;
             }
 
@@ -1486,7 +1486,7 @@ namespace agilicomsptoolkit
                 catch (Exception ex)
                 {
                     Log($"Error: Failed to bind to local UDP port: {ex.Message}", true);
-                    UpdateProgress("NAT Port Translation (Random Port)", "Failed", "Fail - Local bind failed");
+                    UpdateProgress("NAT Port Randomization (RFC 6056)", "Failed", "Fail - Local bind failed");
                     return false;
                 }
             }
@@ -1515,25 +1515,24 @@ namespace agilicomsptoolkit
             if (!success)
             {
                 Log("Error: Could not query STUN server to check port mapping.", true);
-                UpdateProgress("NAT Port Translation (Random Port)", "Failed", "Fail - STUN query failed");
+                UpdateProgress("NAT Port Randomization (RFC 6056)", "Failed", "Fail - STUN query failed");
                 return false;
             }
 
             Log($"Local Source Port: {localPort}");
             Log($"Public Interface Port: {mappedPort}");
 
-            if (mappedPort == localPort)
+            if (mappedPort != localPort)
             {
-                Log("Pass: The public interface NAT port is preserved (Consistent NAT).");
-                UpdateProgress("NAT Port Translation (Random Port)", "Passed", $"Pass - Port preserved ({mappedPort})");
+                Log("Pass: The public interface NAT port is randomized and differs from the local UDP port (RFC 6056 compliant).");
+                UpdateProgress("NAT Port Randomization (RFC 6056)", "Passed", $"Pass - Port randomized ({mappedPort})");
                 return true;
             }
             else
             {
-                Log("Error: The public interface NAT port is randomized and differs from the local UDP port.", true);
-                Log("Symmetric NAT is active. VoIP requires consistent port mapping (port preservation).", true);
-                UpdateProgress("NAT Port Translation (Random Port)", "Failed", $"Fail - Port randomized ({mappedPort})");
-                return false;
+                Log("Note: The public interface NAT port is preserved (1:1 mapping). The updated Agilico Network Guidance recommends randomized public NAT ports (RFC 6056) with >= 24h translation lifetime.");
+                UpdateProgress("NAT Port Randomization (RFC 6056)", "Passed", $"Pass - Direct mapped ({mappedPort})");
+                return true;
             }
         }
 

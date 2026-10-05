@@ -676,7 +676,7 @@ namespace agilicomsptoolkit
                     "Agilico STUN Servers" => 4,
                     "Google STUN Servers" => 5,
                     "NAT Routing & Hops Check" => 6,
-                    "NAT Port Translation (Random Port)" => 7,
+                    "NAT Port Randomization (RFC 6056)" or "NAT Port Translation (Random Port)" or "NAT Port Randomization" => 7,
                     "SIP ALG Detection" => 8,
                     "RTP Jitter/Loss Check" => 9,
                     "Inbound Signalling & Presence" => 10,

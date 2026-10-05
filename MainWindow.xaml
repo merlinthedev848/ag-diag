@@ -139,7 +139,7 @@
                                 <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="4,4,4,4">
                                     <StackPanel Margin="18,14">
                                         <TextBlock Text="Diagnostic Controls" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBlock Text="Validate firewall compatibility for incoming call setup, port preservation and packet inspection." 
+                                        <TextBlock Text="Validate firewall compatibility for incoming call setup, RFC 6056 port randomization, and packet inspection." 
                                                    TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" Margin="0,4,0,14"/>
 
                                         <!-- Action Buttons -->
@@ -301,7 +301,7 @@
                                             <TextBlock Text="Next Steps:" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,4"/>
                                             
                                             <!-- Failure details -->
-                                            <TextBlock x:Name="TxtFailInstructions" Text="- Disable SIP ALG in your router settings.&#x0a;- Configure Port Preservation on your firewall.&#x0a;- Ensure UDP port 5060 and 5090 outbound are not blocked."
+                                            <TextBlock x:Name="TxtFailInstructions" Text="- Disable SIP ALG in your router settings.&#x0a;- Maintain NAT translation bindings for at least 24 hours.&#x0a;- Ensure outbound ports (HTTP 80/443, NTP 123, DNS 53, and ephemeral UDP) are permitted."
                                                        TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMutedBrush}" LineHeight="16"/>
                                             <Button x:Name="BtnRaiseTicket" Content="Raise Helpdesk Ticket" Style="{StaticResource CriticalActionButtonStyle}" Margin="0,10,0,0" HorizontalAlignment="Left" Click="BtnRaiseTicket_Click" Visibility="Collapsed"/>
                                         </StackPanel>
@@ -640,7 +640,7 @@
                                                     </Grid>
      
                                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                        <TextBlock Text="NAT Port Preservation Check" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
+                                                        <TextBlock Text="NAT Port Randomization (RFC 6056)" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextDarkBrush}"/>
                                                         <TextBlock x:Name="Test7Details" Text="Pending" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
                                                     </StackPanel>
 
@@ -2189,9 +2189,9 @@
 
                                     <Border x:Name="Result7Card" Visibility="Collapsed" Background="#fef2f2" BorderBrush="#fecaca" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,10">
                                         <StackPanel>
-                                            <TextBlock Text="❌ Test 7: NAT Port Preservation" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
+                                            <TextBlock Text="❌ Test 7: NAT Port Randomization (RFC 6056)" FontSize="13" FontWeight="Bold" Foreground="#dc2626"/>
                                             <TextBlock x:Name="Result7Detail" Text="" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" TextWrapping="Wrap"/>
-                                            <TextBlock Text="→ NAT port preservation is not active (Symmetric NAT detected). Configure consistent NAT/port preservation on your router for reliable call audio." 
+                                            <TextBlock Text="→ STUN mapping failed or the router is restricting dynamic NAT ports. Ensure outbound UDP to STUN (3478) is permitted and NAT translation bindings are retained for at least 24 hours." 
                                                        FontSize="12" Foreground="#7f1d1d" TextWrapping="Wrap" FontStyle="Italic"/>
                                             <TextBlock Margin="0,6,0,0">
                                                 <Hyperlink NavigateUri="https://kb.agilicoconnect.co.uk/nat-port-preservation" RequestNavigate="Hyperlink_RequestNavigate">
@@ -2360,5 +2360,6 @@
     </Grid>
     </Border>
 </Window>
+
 
 
