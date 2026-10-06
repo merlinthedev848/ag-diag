@@ -18,6 +18,9 @@
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <TieredPGO>true</TieredPGO>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>logo.ico</ApplicationIcon>
     <AssemblyName>Agilico MSP Toolkit</AssemblyName>

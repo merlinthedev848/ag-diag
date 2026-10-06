@@ -21,7 +21,7 @@ Write-Host ""
 Write-Host "Publishing Standalone Release (self-contained, single-file)..."
 dotnet publish -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true `
-    -p:PublishReadyToRun=false `
+    -p:PublishReadyToRun=true `
     -p:EnableCompressionInSingleFile=false `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:IsFullVersion=true `
