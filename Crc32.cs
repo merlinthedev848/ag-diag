@@ -24,7 +24,9 @@ namespace agilicomsptoolkit
             }
         }
 
-        public static uint Compute(byte[] buffer)
+        public static uint Compute(byte[] buffer) => Compute(buffer.AsSpan());
+
+        public static uint Compute(ReadOnlySpan<byte> buffer)
         {
             uint crc = 0xFFFFFFFF;
             for (int i = 0; i < buffer.Length; i++)
@@ -35,7 +37,9 @@ namespace agilicomsptoolkit
             return ~crc;
         }
 
-        public static string ComputeHex(byte[] buffer)
+        public static string ComputeHex(byte[] buffer) => ComputeHex(buffer.AsSpan());
+
+        public static string ComputeHex(ReadOnlySpan<byte> buffer)
         {
             return Compute(buffer).ToString("X8");
         }

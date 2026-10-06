@@ -57,6 +57,17 @@ public class Crc32Tests
     }
 
     [TestMethod]
+    public void Compute_ReadOnlySpan_MatchesByteArray()
+    {
+        byte[] input = System.Text.Encoding.ASCII.GetBytes("123456789");
+        ReadOnlySpan<byte> span = input.AsSpan();
+        uint resultSpan = agilicomsptoolkit.Crc32.Compute(span);
+        uint resultArr = agilicomsptoolkit.Crc32.Compute(input);
+        Assert.AreEqual(resultArr, resultSpan);
+        Assert.AreEqual(0xCBF43926u, resultSpan);
+    }
+
+    [TestMethod]
     public void Compute_StandardAsciiString_MatchesStandardChecksum()
     {
         // CRC32 of "123456789" is standard 0xCBF43926
@@ -70,6 +81,14 @@ public class Crc32Tests
     {
         byte[] input = System.Text.Encoding.ASCII.GetBytes("123456789");
         string hex = agilicomsptoolkit.Crc32.ComputeHex(input);
+        Assert.AreEqual("CBF43926", hex);
+    }
+
+    [TestMethod]
+    public void ComputeHex_ReadOnlySpan_ReturnsCorrectFormattedHexString()
+    {
+        byte[] input = System.Text.Encoding.ASCII.GetBytes("123456789");
+        string hex = agilicomsptoolkit.Crc32.ComputeHex(input.AsSpan());
         Assert.AreEqual("CBF43926", hex);
     }
 }
@@ -179,6 +198,44 @@ public class VoipToolsTests
         Assert.AreEqual("UDP 5060", result.PortDisplay);
         Assert.AreEqual("24.6 ms", result.RttDisplay);
     }
+
+    [TestMethod]
+    public void BuildStunRequest_ProducesValidStunBindingHeader()
+    {
+        byte[] txId = new byte[12] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+        byte[] stunPacket = agilicomsptoolkit.VoipTools.BuildStunRequest(txId);
+
+        Assert.AreEqual(20, stunPacket.Length);
+        Assert.AreEqual(0x00, stunPacket[0]);
+        Assert.AreEqual(0x01, stunPacket[1]); // STUN Binding Request
+        Assert.AreEqual(0x21, stunPacket[4]); // Magic Cookie byte 1
+        Assert.AreEqual(0x12, stunPacket[5]); // Magic Cookie byte 2
+        Assert.AreEqual(0xA4, stunPacket[6]); // Magic Cookie byte 3
+        Assert.AreEqual(0x42, stunPacket[7]); // Magic Cookie byte 4
+    }
+
+    [TestMethod]
+    public void BuildSipOptionsRequest_ContainsValidSipHeaders()
+    {
+        byte[] sipBytes = agilicomsptoolkit.VoipTools.BuildSipOptionsRequest("hp2k.co.uk", 5060);
+        string sipString = System.Text.Encoding.UTF8.GetString(sipBytes);
+
+        Assert.IsTrue(sipString.StartsWith("OPTIONS sip:hp2k.co.uk SIP/2.0\r\n"));
+        Assert.IsTrue(sipString.Contains("User-Agent: Agilico MSP Toolkit\r\n"));
+        Assert.IsTrue(sipString.Contains("CSeq: 1 OPTIONS\r\n"));
+    }
+
+    [TestMethod]
+    public void BuildSrvQuery_ConstructsDnsHeaderAndLabels()
+    {
+        ushort txId = 0x1234;
+        byte[] query = agilicomsptoolkit.VoipTools.BuildSrvQuery("_sip._udp", "hp2k.co.uk", txId);
+
+        Assert.IsTrue(query.Length > 12);
+        Assert.AreEqual(0x12, query[0]);
+        Assert.AreEqual(0x34, query[1]);
+        Assert.AreEqual(0x01, query[2]); // Standard Query
+    }
 }
 
 [TestClass]
@@ -198,5 +255,21 @@ public class PingTrackerTests
         var tracker = new agilicomsptoolkit.PingTracker();
         tracker.Stop(); // Should not throw
         Assert.IsFalse(tracker.IsRunning);
+    }
+}
+
+[TestClass]
+public class NetworkEngineTests
+{
+    [TestMethod]
+    public void NetworkEngine_DefaultSettings_MatchNetworkGuidance()
+    {
+        var engine = new agilicomsptoolkit.NetworkEngine();
+        
+        Assert.AreEqual("customerportal.hp2k.co.uk", engine.DomainToCheck);
+        Assert.AreEqual("stun-gb-a.hp2k.co.uk", engine.StunServer);
+        Assert.AreEqual(3478, engine.StunPort);
+        Assert.AreEqual(10, engine.SelectedTests.Length);
+        Assert.IsTrue(engine.SelectedTests.All(t => t));
     }
 }

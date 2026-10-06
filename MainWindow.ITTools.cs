@@ -141,44 +141,19 @@ namespace agilicomsptoolkit
             dialog.ShowDialog();
         }
 
+        private readonly Services.IPowerShellRunner _powerShellRunner = new Services.PowerShellRunner();
+
         private async Task RunGenericAuditAsync(string title, string description, string jsonCommand)
         {
             try
             {
-                string exe = "powershell.exe";
-                string args = $"-NoProfile -Command \"{jsonCommand}\"";
-                
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = exe,
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                var (exitCode, stdout, stderr) = await _powerShellRunner.ExecuteCommandAsync(jsonCommand, TimeSpan.FromSeconds(30));
 
-                using var process = System.Diagnostics.Process.Start(startInfo);
-                if (process == null) return;
-                
-                var outTask = process.StandardOutput.ReadToEndAsync();
-                var errTask = process.StandardError.ReadToEndAsync();
-                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
-                try { await process.WaitForExitAsync(timeoutCts.Token); }
-                catch (OperationCanceledException)
+                if (string.IsNullOrWhiteSpace(stdout))
                 {
-                    try { if (!process.HasExited) process.Kill(true); } catch { }
-                    throw new TimeoutException($"Audit command timed out after 30 seconds.");
-                }
-                
-                string output = await outTask;
-                string err = await errTask;
-                
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    if (!string.IsNullOrWhiteSpace(err))
+                    if (!string.IsNullOrWhiteSpace(stderr))
                     {
-                        ModernMessageBox.Show($"Command failed with error:\n{err}", "Audit Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        ModernMessageBox.Show($"Command failed with error:\n{stderr}", "Audit Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     else
                     {
@@ -189,7 +164,7 @@ namespace agilicomsptoolkit
 
                 Dispatcher.Invoke(() =>
                 {
-                    var dialog = new GenericDataGridDialog(title, description, output) { Owner = this };
+                    var dialog = new GenericDataGridDialog(title, description, stdout) { Owner = this };
                     dialog.ShowDialog();
                 });
             }
@@ -203,40 +178,15 @@ namespace agilicomsptoolkit
         {
             try
             {
-                // Run via PowerShell to support rich formatting and modern cmdlets
-                string exe = "powershell.exe";
-                string args = $"-NoProfile -Command \"{command}\"";
-                
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = exe,
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                var (exitCode, stdout, stderr) = await _powerShellRunner.ExecuteCommandAsync(command, TimeSpan.FromSeconds(30));
 
-                using var process = System.Diagnostics.Process.Start(startInfo);
-                if (process == null) return;
-                
-                var outTask = process.StandardOutput.ReadToEndAsync();
-                var errTask = process.StandardError.ReadToEndAsync();
-                using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
-                try { await process.WaitForExitAsync(timeoutCts.Token); }
-                catch (OperationCanceledException)
-                {
-                    try { if (!process.HasExited) process.Kill(true); } catch { }
-                    throw new TimeoutException($"Tool command timed out after 30 seconds.");
-                }
-                
-                string output = await outTask;
-                string err = await errTask;
-                
-                if (string.IsNullOrWhiteSpace(output) && !string.IsNullOrWhiteSpace(err))
-                    output = $"Error Output:\n{err}";
-                else if (string.IsNullOrWhiteSpace(output))
+                string output;
+                if (string.IsNullOrWhiteSpace(stdout) && !string.IsNullOrWhiteSpace(stderr))
+                    output = $"Error Output:\n{stderr}";
+                else if (string.IsNullOrWhiteSpace(stdout))
                     output = "Command completed successfully (no output).";
+                else
+                    output = stdout;
 
                 Dispatcher.Invoke(() =>
                 {
