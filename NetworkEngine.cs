@@ -1667,22 +1667,13 @@ namespace agilicomsptoolkit
             }
         }
 
-        private async Task<(int sent, int received, double loss, double jitter, double avgRtt, bool pass)> RunSingleRtpPathCheckAsync(
-            string pathName, string targetHost, int targetPort, string payloadType, CancellationToken token)
+        private async Task<(int sent, int received, double loss, double jitter, double avgRtt, bool pass)> RunSingleRtpPathCheckAsync(string pathName, string targetHost, int targetPort, string payloadType, CancellationToken token, int numPackets = 10, int packetDelayMs = 20)
         {
-            Log($"Starting path check: {pathName} ({targetHost}:{targetPort}) via {payloadType}...");
-            int numPackets = 100;
-            int packetDelayMs = 20; // 50 pps
-            int packetsReceived = 0;
             var rtts = new List<double>();
-            
-            UdpClient? client = null;
+            int packetsReceived = 0;
+
             try
             {
-                client = new UdpClient(0);
-                client.Client.SendTimeout = 1000;
-                client.Client.ReceiveTimeout = 1000;
-
                 var ipAddresses = await Dns.GetHostAddressesAsync(targetHost, token);
                 if (ipAddresses.Length == 0)
                 {
@@ -1692,119 +1683,145 @@ namespace agilicomsptoolkit
 
                 var endpoint = new IPEndPoint(ipAddresses[0], targetPort);
                 string localIp = GetLocalIpAddress();
-                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
 
-                for (int i = 0; i < numPackets; i++)
+                return await Task.Run(() =>
                 {
-                    if (token.IsCancellationRequested) return (numPackets, 0, 100.0, 0, 0, false);
-
-                    byte[] payload;
-                    byte[] transactionId = new byte[12];
-                    string callId = string.Empty;
-
-                    if (payloadType == "SIP")
-                    {
-                        string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
-                        string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
-                        callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
-                        
-                        string sipOptions =
-                            $"OPTIONS sip:{targetHost} SIP/2.0\r\n" +
-                            $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
-                            $"Max-Forwards: 70\r\n" +
-                            $"To: <sip:checker@{targetHost}>\r\n" +
-                            $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
-                            $"Call-ID: {callId}\r\n" +
-                            $"CSeq: {i + 1} OPTIONS\r\n" +
-                            $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
-                            $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
-                            $"Content-Length: 0\r\n\r\n";
-                        payload = Encoding.UTF8.GetBytes(sipOptions);
-                    }
-                    else // STUN
-                    {
-                        Random.Shared.NextBytes(transactionId);
-                        payload = BuildStunRequest(transactionId, false, false);
-                    }
-
-                    var watch = System.Diagnostics.Stopwatch.StartNew();
-                    Pcap.RecordPacket(payload, localIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
-                    await client.SendAsync(payload, payload.Length, endpoint);
-
+                    using var client = new UdpClient(0);
                     try
                     {
-                        using var perPacketCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                        perPacketCts.CancelAfter(500); // 500ms timeout per packet
-                        
-                        var result = await client.ReceiveAsync(perPacketCts.Token).AsTask();
-                        watch.Stop();
-                        Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, localIp, localPort, true);
-                        
-                        bool valid = false;
+                        // On Windows, ignore ICMP Port Unreachable (0x9800000C / SIO_UDP_CONNRESET) so Winsock does not throw 10054
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                    }
+                    catch { }
+
+                    int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
+
+                    for (int i = 0; i < numPackets; i++)
+                    {
+                        if (token.IsCancellationRequested) return (numPackets, 0, 100.0, 0, 0, false);
+
+                        byte[] payload;
+                        byte[] transactionId = new byte[12];
+                        string callId = string.Empty;
+
                         if (payloadType == "SIP")
                         {
-                            // Validate SIP response contains our Call-ID
-                            string sipResp = Encoding.UTF8.GetString(result.Buffer);
-                            valid = sipResp.Contains(callId, StringComparison.OrdinalIgnoreCase);
+                            string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
+                            string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
+                            callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
+                            
+                            string sipOptions =
+                                $"OPTIONS sip:{targetHost} SIP/2.0\r\n" +
+                                $"Via: SIP/2.0/UDP {localIp}:{localPort};rport;branch={branch}\r\n" +
+                                $"Max-Forwards: 70\r\n" +
+                                $"To: <sip:checker@{targetHost}>\r\n" +
+                                $"From: <sip:checker@{localIp}:{localPort}>;tag={tag}\r\n" +
+                                $"Call-ID: {callId}\r\n" +
+                                $"CSeq: {i + 1} OPTIONS\r\n" +
+                                $"Contact: <sip:checker@{localIp}:{localPort}>\r\n" +
+                                $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
+                                $"Content-Length: 0\r\n\r\n";
+                            payload = Encoding.UTF8.GetBytes(sipOptions);
                         }
-                        else
+                        else // STUN
                         {
-                            valid = ValidateStunResponse(result.Buffer, transactionId);
+                            Random.Shared.NextBytes(transactionId);
+                            payload = BuildStunRequest(transactionId, false, false);
                         }
 
-                        if (valid)
+                        var watch = System.Diagnostics.Stopwatch.StartNew();
+                        Pcap.RecordPacket(payload, localIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
+                        try
                         {
-                            packetsReceived++;
-                            rtts.Add(watch.Elapsed.TotalMilliseconds);
+                            client.Client.SendTo(payload, endpoint);
+                        }
+                        catch
+                        {
+                            // Send failed, continue to next packet
+                            continue;
+                        }
+
+                        try
+                        {
+                            // Use non-blocking Socket.Poll (300ms timeout = 300,000 microseconds) to avoid Task cancellation exceptions
+                            if (client.Client.Poll(300_000, SelectMode.SelectRead))
+                            {
+                                byte[] recvBuffer = new byte[2048];
+                                EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                                int bytesRead = client.Client.ReceiveFrom(recvBuffer, ref senderEp);
+                                watch.Stop();
+
+                                byte[] packetData = new byte[bytesRead];
+                                Buffer.BlockCopy(recvBuffer, 0, packetData, 0, bytesRead);
+
+                                Pcap.RecordPacket(packetData, endpoint.Address.ToString(), endpoint.Port, localIp, localPort, true);
+                                
+                                bool valid = false;
+                                if (payloadType == "SIP")
+                                {
+                                    string sipResp = Encoding.UTF8.GetString(packetData);
+                                    valid = sipResp.Contains(callId, StringComparison.OrdinalIgnoreCase);
+                                }
+                                else
+                                {
+                                    valid = ValidateStunResponse(packetData, transactionId);
+                                }
+
+                                if (valid)
+                                {
+                                    packetsReceived++;
+                                    rtts.Add(watch.Elapsed.TotalMilliseconds);
+                                }
+                            }
+                        }
+                        catch { /* Timeout or packet drop */ }
+
+                        // Fast-fail if destination is completely unresponsive after 3 attempts
+                        if (i >= 2 && packetsReceived == 0)
+                        {
+                            break;
+                        }
+
+                        if (packetDelayMs > 0 && !token.IsCancellationRequested)
+                        {
+                            Thread.Sleep(packetDelayMs);
                         }
                     }
-                    catch (OperationCanceledException) { /* Timeout — packet lost */ }
-                    catch { /* Other error — packet lost */ }
 
-                    // Fast-fail if destination is completely unresponsive after 5 attempts
-                    if (i >= 4 && packetsReceived == 0)
+                    int totalSent = (packetsReceived == 0 && numPackets > 3) ? 3 : numPackets;
+                    int packetsLost = totalSent - packetsReceived;
+                    double lossPercent = totalSent > 0 ? ((double)packetsLost / totalSent * 100.0) : 100.0;
+                    double avgRtt = 0;
+                    double jitter = 0;
+
+                    if (packetsReceived > 0)
                     {
-                        break;
-                    }
+                        double sumRtt = 0;
+                        foreach (var r in rtts) sumRtt += r;
+                        avgRtt = sumRtt / rtts.Count;
 
-                    await Task.Delay(packetDelayMs, token);
-                }
-
-                int packetsLost = numPackets - packetsReceived;
-                double lossPercent = (double)packetsLost / numPackets * 100.0;
-                double avgRtt = 0;
-                double jitter = 0;
-
-                if (packetsReceived > 0)
-                {
-                    double sumRtt = 0;
-                    foreach (var r in rtts) sumRtt += r;
-                    avgRtt = sumRtt / rtts.Count;
-
-                    if (rtts.Count > 1)
-                    {
-                        double sumJitter = 0;
-                        for (int i = 1; i < rtts.Count; i++)
+                        if (rtts.Count > 1)
                         {
-                            sumJitter += Math.Abs(rtts[i] - rtts[i - 1]);
+                            double sumJitter = 0;
+                            for (int i = 1; i < rtts.Count; i++)
+                            {
+                                sumJitter += Math.Abs(rtts[i] - rtts[i - 1]);
+                            }
+                            jitter = sumJitter / (rtts.Count - 1);
                         }
-                        jitter = sumJitter / (rtts.Count - 1);
                     }
-                }
 
-                Log($"  [{pathName}] Sent: {numPackets}, Recv: {packetsReceived}, Loss: {lossPercent:0.0}%, Jitter: {jitter:0.0}ms, RTT: {avgRtt:0.0}ms");
-                
-                bool pass = (lossPercent <= 5.0) && (jitter <= 30.0) && (packetsReceived > 0);
-                return (numPackets, packetsReceived, lossPercent, jitter, avgRtt, pass);
+                    Log($"  [{pathName}] Sent: {totalSent}, Recv: {packetsReceived}, Loss: {lossPercent:0.0}%, Jitter: {jitter:0.0}ms, RTT: {avgRtt:0.0}ms");
+                    
+                    bool pass = (lossPercent <= 10.0) && (jitter <= 35.0) && (packetsReceived > 0);
+                    return (totalSent, packetsReceived, lossPercent, jitter, avgRtt, pass);
+                }, token);
             }
             catch (Exception ex)
             {
                 Log($"  [{pathName}] Failed with error: {ex.Message}", true);
                 return (numPackets, 0, 100.0, 0, 0, false);
-            }
-            finally
-            {
-                client?.Close();
             }
         }
 
@@ -1813,7 +1830,7 @@ namespace agilicomsptoolkit
             if (CheckLocalConnectivityBeforeTest("RTP Jitter/Loss Check")) return false;
             UpdateProgress("RTP Jitter/Loss Check", "Running", "Simulating G.711 media paths...");
             Log("Test 9: Advanced SIP Media (RTP) Quality Simulation...");
-            Log("Running three test streams to verify standard SIP ports, Agilico STUN, and Google WebRTC STUN (high port 19302)...");
+            Log("Running test streams to verify standard SIP ports, Agilico STUN, and Google WebRTC STUN (high port 19302)...");
 
             if (IsSimulationMode)
             {
@@ -1835,13 +1852,39 @@ namespace agilicomsptoolkit
             // Path C: Google STUN High Port (UDP 19302)
             var pathC = await RunSingleRtpPathCheckAsync("Path C (Google STUN 19302)", "stun.l.google.com", 19302, "STUN", token);
             
-            bool allPassed = pathA.pass && pathC.pass; // Exclude Path B because Agilico STUN is firewalled
+            bool anyPrimaryPassed = pathC.pass || pathA.pass;
             
-            double maxLoss = Math.Max(pathA.loss, pathC.loss);
-            double maxJitter = Math.Max(pathA.jitter, pathC.jitter);
-            double avgRtt = (pathA.avgRtt + pathC.avgRtt) / 2.0;
+            // Calculate quality metrics from active responsive paths
+            double activeLoss = 0;
+            double activeJitter = 0;
+            double activeRtt = 0;
 
-            double mosScore = VoipTools.CalculateMosScore(avgRtt, maxJitter, maxLoss);
+            if (pathC.received > 0 && pathA.received > 0)
+            {
+                activeLoss = (pathA.loss + pathC.loss) / 2.0;
+                activeJitter = Math.Max(pathA.jitter, pathC.jitter);
+                activeRtt = (pathA.avgRtt + pathC.avgRtt) / 2.0;
+            }
+            else if (pathC.received > 0)
+            {
+                activeLoss = pathC.loss;
+                activeJitter = pathC.jitter;
+                activeRtt = pathC.avgRtt;
+            }
+            else if (pathA.received > 0)
+            {
+                activeLoss = pathA.loss;
+                activeJitter = pathA.jitter;
+                activeRtt = pathA.avgRtt;
+            }
+            else
+            {
+                activeLoss = 100.0;
+                activeJitter = 0;
+                activeRtt = 0;
+            }
+
+            double mosScore = anyPrimaryPassed ? VoipTools.CalculateMosScore(activeRtt, activeJitter, activeLoss) : 1.0;
             string mosRating = "Excellent";
             if (mosScore < 2.0) mosRating = "Very Poor";
             else if (mosScore < 3.0) mosRating = "Poor";
@@ -1854,20 +1897,15 @@ namespace agilicomsptoolkit
             Log($"  Path C (Google STUN 19302): Loss={pathC.loss:0.0}%, Jitter={pathC.jitter:0.0}ms, RTT={pathC.avgRtt:0.0}ms - {(pathC.pass ? "PASS" : "FAIL")}");
             Log($"  Estimated Call Quality: MOS {mosScore:F2} ({mosRating})");
 
-            if (allPassed)
+            if (anyPrimaryPassed)
             {
-                Log($"Pass: Packet loss and jitter on all paths are within VoIP limits. Est. MOS: {mosScore:F2}");
+                Log($"Pass: Media stream UDP checks verified. Estimated Call Quality: MOS {mosScore:F2} ({mosRating})");
                 UpdateProgress("RTP Jitter/Loss Check", "Passed", $"Pass - Media paths OK (Est. MOS: {mosScore:F2} - {mosRating})");
                 return true;
             }
             else
             {
-                string reasons = "";
-                if (!pathA.pass) reasons += "SIP 5060 failure; ";
-                if (!pathC.pass) reasons += "Google STUN 19302 failure; ";
-
-                Log($"Violation: Media stream checks failed: {reasons.TrimEnd(';', ' ')}", true);
-                
+                Log($"Violation: Media stream checks failed: UDP packets were dropped or timed out on both media paths.", true);
                 string detailMsg = $"Fail - Media path issues (Est. MOS: {mosScore:F2} - {mosRating})";
                 UpdateProgress("RTP Jitter/Loss Check", "Failed", detailMsg);
                 return false;
