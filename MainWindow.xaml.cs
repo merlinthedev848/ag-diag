@@ -1452,10 +1452,14 @@ namespace agilicomsptoolkit
                             {
                                 long currentBytes = System.Threading.Interlocked.Read(ref totalDownloaded);
                                 double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
-                                _ = Dispatcher.BeginInvoke(() =>
+                                if (!Dispatcher.HasShutdownStarted)
                                 {
-                                    TxtLocalDownloadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
-                                });
+                                    _ = Dispatcher.BeginInvoke(() =>
+                                    {
+                                        if (!Dispatcher.HasShutdownStarted)
+                                            TxtLocalDownloadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
+                                    });
+                                }
                             }
                         }
                         catch (OperationCanceledException) { break; }
@@ -1525,11 +1529,17 @@ namespace agilicomsptoolkit
             }
 
             // Update UI to show final download speed
-            _ = Dispatcher.BeginInvoke(() =>
+            if (!Dispatcher.HasShutdownStarted)
             {
-                TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
-                TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
-            });
+                _ = Dispatcher.BeginInvoke(() =>
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        TxtLocalDownloadSpeed.Text = $"{downloadMbps:F1} Mbps";
+                        TxtLocalDownloadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+                    }
+                });
+            }
 
             // 2. Upload Test (continuous 6-second upload window)
             try
@@ -1554,10 +1564,14 @@ namespace agilicomsptoolkit
                             {
                                 long currentBytes = System.Threading.Interlocked.Read(ref totalUploaded);
                                 double mbps = (currentBytes * 8.0) / (elapsed * 1000000.0);
-                                _ = Dispatcher.BeginInvoke(() =>
+                                if (!Dispatcher.HasShutdownStarted)
                                 {
-                                    TxtLocalUploadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
-                                });
+                                    _ = Dispatcher.BeginInvoke(() =>
+                                    {
+                                        if (!Dispatcher.HasShutdownStarted)
+                                            TxtLocalUploadSpeed.Text = $"{mbps:F1} Mbps (Testing...)";
+                                    });
+                                }
                             }
                         }
                         catch (OperationCanceledException) { break; }
@@ -1579,7 +1593,7 @@ namespace agilicomsptoolkit
                         {
                             try
                             {
-                                using var memoryStream = new System.IO.MemoryStream(uploadBuffer);
+                                using var memoryStream = new System.IO.MemoryStream(uploadBuffer, writable: false);
                                 using var progressStream = new ProgressStream(memoryStream, (bytesRead) =>
                                 {
                                     System.Threading.Interlocked.Add(ref totalUploaded, bytesRead);
@@ -1619,11 +1633,17 @@ namespace agilicomsptoolkit
                 System.Diagnostics.Debug.WriteLine($"Upload test failed: {ex.Message}");
             }
 
-            _ = Dispatcher.BeginInvoke(() =>
+            if (!Dispatcher.HasShutdownStarted)
             {
-                TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
-                TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
-            });
+                _ = Dispatcher.BeginInvoke(() =>
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                    {
+                        TxtLocalUploadSpeed.Text = $"{uploadMbps:F1} Mbps";
+                        TxtLocalUploadSpeed.Foreground = (Brush)FindResource("TextDarkBrush");
+                    }
+                });
+            }
 
             return (Math.Round(downloadMbps, 1), Math.Round(uploadMbps, 1));
         }
@@ -2742,17 +2762,41 @@ namespace agilicomsptoolkit
         public override int Read(byte[] buffer, int offset, int count)
         {
             int read = _innerStream.Read(buffer, offset, count);
-            _onBytesRead?.Invoke(read);
+            if (read > 0) _onBytesRead?.Invoke(read);
             return read;
         }
         public override async System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
         {
             int read = await _innerStream.ReadAsync(buffer, offset, count, cancellationToken);
-            _onBytesRead?.Invoke(read);
+            if (read > 0) _onBytesRead?.Invoke(read);
+            return read;
+        }
+        public override async System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default)
+        {
+            int read = await _innerStream.ReadAsync(buffer, cancellationToken);
+            if (read > 0) _onBytesRead?.Invoke(read);
+            return read;
+        }
+        public override int Read(System.Span<byte> buffer)
+        {
+            int read = _innerStream.Read(buffer);
+            if (read > 0) _onBytesRead?.Invoke(read);
             return read;
         }
         public override long Seek(long offset, System.IO.SeekOrigin origin) => _innerStream.Seek(offset, origin);
         public override void SetLength(long value) => _innerStream.SetLength(value);
         public override void Write(byte[] buffer, int offset, int count) => _innerStream.Write(buffer, offset, count);
+        public override void Write(System.ReadOnlySpan<byte> buffer) => _innerStream.Write(buffer);
+        public override System.Threading.Tasks.Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) => _innerStream.WriteAsync(buffer, offset, count, cancellationToken);
+        public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) => _innerStream.WriteAsync(buffer, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _innerStream.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 }
