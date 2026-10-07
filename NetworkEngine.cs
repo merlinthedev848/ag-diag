@@ -983,30 +983,47 @@ namespace agilicomsptoolkit
 
                 var data = query.ToArray();
                 var endpoint = new IPEndPoint(serverIp, 53);
+                string localIp = GetLocalIpAddress();
+                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
 
                 // Record sent packet
-                Pcap.RecordPacket(data, GetLocalIpAddress(), ((IPEndPoint)client.Client.LocalEndPoint!).Port, dnsServer, 53, true);
+                Pcap.RecordPacket(data, localIp, localPort, dnsServer, 53, true);
 
-                await client.SendAsync(data, data.Length, endpoint);
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(2000, token);
-
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
+                bool responded = await Task.Run(() =>
                 {
-                    var result = await receiveTask;
-                    // Record received packet
-                    Pcap.RecordPacket(result.Buffer, dnsServer, 53, GetLocalIpAddress(), ((IPEndPoint)client.Client.LocalEndPoint!).Port, true);
-                    if (result.Buffer.Length > 12 && result.Buffer[0] == txId[0] && result.Buffer[1] == txId[1])
+                    try
                     {
-                        Log($"Google DNS {dnsServer} responded successfully to domain check.");
-                        return true;
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
                     }
-                }
-                else
-                {
-                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                }
+                    catch { }
+
+                    try
+                    {
+                        client.Client.SendTo(data, endpoint);
+                        if (client.Client.Poll(2_000_000, SelectMode.SelectRead))
+                        {
+                            byte[] recvBuffer = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int bytesRead = client.Client.ReceiveFrom(recvBuffer, ref senderEp);
+
+                            byte[] packetData = new byte[bytesRead];
+                            Buffer.BlockCopy(recvBuffer, 0, packetData, 0, bytesRead);
+
+                            Pcap.RecordPacket(packetData, dnsServer, 53, localIp, localPort, true);
+                            if (packetData.Length > 12 && packetData[0] == txId[0] && packetData[1] == txId[1])
+                            {
+                                Log($"Google DNS {dnsServer} responded successfully to domain check.");
+                                return true;
+                            }
+                        }
+                    }
+                    catch { }
+                    return false;
+                }, token);
+
+                if (responded) return true;
+
                 Log($"Google DNS {dnsServer} did not return a valid response.", true);
                 return false;
             }
@@ -1187,44 +1204,52 @@ namespace agilicomsptoolkit
                 if (addresses.Length == 0) return (false, null);
                 var endPoint = new IPEndPoint(addresses[0], 123);
 
-                using var client = new UdpClient(0);
-                client.Client.SendTimeout = 2000;
-                client.Client.ReceiveTimeout = 2000;
-
                 string localIp = GetLocalIpAddress();
-                int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
 
-                // Record sent packet
-                Pcap.RecordPacket(ntpData, localIp, localPort, endPoint.Address.ToString(), 123, true);
-
-                await client.SendAsync(ntpData, ntpData.Length, endPoint);
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(2000, token);
-
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
+                return await Task.Run<(bool success, DateTime? time)>(() =>
                 {
-                    var result = await receiveTask;
-                    // Record received packet
-                    Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), 123, localIp, localPort, true);
-                    // Validate: length >= 48 and Mode field (bits 0-2 of byte 0) == 4 (server)
-                    if (result.Buffer.Length >= 48 && (result.Buffer[0] & 0x07) == 4)
+                    using var client = new UdpClient(0);
+                    try
                     {
-                        ulong intPart = (ulong)result.Buffer[40] << 24 | (ulong)result.Buffer[41] << 16 | (ulong)result.Buffer[42] << 8 | (ulong)result.Buffer[43];
-                        ulong fractPart = (ulong)result.Buffer[44] << 24 | (ulong)result.Buffer[45] << 16 | (ulong)result.Buffer[46] << 8 | (ulong)result.Buffer[47];
-
-                        var networkDateTime = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-                            .AddSeconds((double)intPart)
-                            .AddSeconds((double)fractPart / 0x100000000L);
-
-                        return (true, networkDateTime);
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
                     }
-                }
-                else
-                {
-                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                }
-                return (false, null);
+                    catch { }
+
+                    int localPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
+
+                    // Record sent packet
+                    Pcap.RecordPacket(ntpData, localIp, localPort, endPoint.Address.ToString(), 123, true);
+
+                    try
+                    {
+                        client.Client.SendTo(ntpData, endPoint);
+                        if (client.Client.Poll(2_000_000, SelectMode.SelectRead))
+                        {
+                            byte[] recvBuffer = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int bytesRead = client.Client.ReceiveFrom(recvBuffer, ref senderEp);
+
+                            byte[] packetData = new byte[bytesRead];
+                            Buffer.BlockCopy(recvBuffer, 0, packetData, 0, bytesRead);
+
+                            Pcap.RecordPacket(packetData, endPoint.Address.ToString(), 123, localIp, localPort, true);
+                            if (packetData.Length >= 48 && (packetData[0] & 0x07) == 4)
+                            {
+                                ulong intPart = (ulong)packetData[40] << 24 | (ulong)packetData[41] << 16 | (ulong)packetData[42] << 8 | (ulong)packetData[43];
+                                ulong fractPart = (ulong)packetData[44] << 24 | (ulong)packetData[45] << 16 | (ulong)packetData[46] << 8 | (ulong)packetData[47];
+
+                                var networkDateTime = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                                    .AddSeconds((double)intPart)
+                                    .AddSeconds((double)fractPart / 0x100000000L);
+
+                                return (true, networkDateTime);
+                            }
+                        }
+                    }
+                    catch { }
+                    return (false, null);
+                }, token);
             }
             catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
             {
@@ -1413,38 +1438,40 @@ namespace agilicomsptoolkit
         private async Task<int> CountPrivateHopsAsync(string targetIp, int maxHops)
         {
             var seenPrivateIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using var ping = new Ping();
-            var options = new PingOptions(1, true);
 
-            for (int ttl = 1; ttl <= maxHops; ttl++)
+            return await Task.Run(() =>
             {
-                options.Ttl = ttl;
-                try
+                for (int ttl = 1; ttl <= maxHops; ttl++)
                 {
-                    var reply = await ping.SendPingAsync(targetIp, 1000, new byte[32], options);
-                    if (reply.Status == IPStatus.TtlExpired || reply.Status == IPStatus.Success)
+                    try
                     {
-                        var addr = reply.Address;
-                        if (addr != null)
+                        using var ping = new Ping();
+                        var options = new PingOptions(ttl, true);
+                        var reply = ping.Send(targetIp, 800, new byte[32], options);
+                        if (reply != null && (reply.Status == IPStatus.TtlExpired || reply.Status == IPStatus.Success))
                         {
-                            if (IsPrivateIp(addr))
+                            var addr = reply.Address;
+                            if (addr != null)
                             {
-                                seenPrivateIps.Add(addr.ToString());
-                            }
-                            else
-                            {
-                                // Hit a public router
-                                break;
+                                if (IsPrivateIp(addr))
+                                {
+                                    seenPrivateIps.Add(addr.ToString());
+                                }
+                                else
+                                {
+                                    // Hit a public router
+                                    break;
+                                }
                             }
                         }
                     }
+                    catch
+                    {
+                        // Ignore and try next hop
+                    }
                 }
-                catch
-                {
-                    // Ignore and try next hop
-                }
-            }
-            return seenPrivateIps.Count;
+                return seenPrivateIps.Count;
+            });
         }
 
         private async Task<bool> RunNatPortRandomnessTestAsync(CancellationToken token)
@@ -1565,79 +1592,91 @@ namespace agilicomsptoolkit
                     if (addresses.Length == 0) continue;
                     
                     var endpoint = new IPEndPoint(addresses[0], 5060);
-                    using var udpClient = new UdpClient(0);
-                    udpClient.Client.SendTimeout = 3000;
-                    udpClient.Client.ReceiveTimeout = 3000;
-                    
-                    int localPort = ((IPEndPoint)udpClient.Client.LocalEndPoint!).Port;
-                    string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
-                    string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
-                    string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
-                    
-                    // We use a generic internal IP to force the ALG to translate it if active
-                    string fakeLocalIp = "192.168.1.100";
-                    
-                    string sipOptions = $"OPTIONS sip:{server} SIP/2.0\r\n" +
-                        $"Via: SIP/2.0/UDP {fakeLocalIp}:{localPort};rport;branch={branch}\r\n" +
-                        $"Max-Forwards: 70\r\n" +
-                        $"To: <sip:ping@{server}>\r\n" +
-                        $"From: <sip:ping@{fakeLocalIp}:{localPort}>;tag={tag}\r\n" +
-                        $"Call-ID: {callId}\r\n" +
-                        $"CSeq: 1 OPTIONS\r\n" +
-                        $"Contact: <sip:ping@{fakeLocalIp}:{localPort}>\r\n" +
-                        $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
-                        $"Content-Length: 0\r\n\r\n";
-                        
-                    byte[] bytes = Encoding.UTF8.GetBytes(sipOptions);
-                    
-                    // Record sent packet
-                    string actualLocalIp = GetLocalIpAddress();
-                    Pcap.RecordPacket(bytes, actualLocalIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
-                    
-                    Log($"Sending OPTIONS payload with dummy Via IP {fakeLocalIp}...");
-                    await udpClient.SendAsync(bytes, bytes.Length, endpoint);
-                    
-                    var receiveTask = udpClient.ReceiveAsync(token).AsTask();
-                    var delayTask = Task.Delay(3000, token);
-                    
-                    var completed = await Task.WhenAny(receiveTask, delayTask);
-                    if (completed == receiveTask)
+                    bool stepSuccess = await Task.Run(() =>
                     {
-                        var result = await receiveTask;
-                        responseReceived = true;
-                        
-                        Pcap.RecordPacket(result.Buffer, endpoint.Address.ToString(), endpoint.Port, actualLocalIp, localPort, true);
-                        string respStr = Encoding.UTF8.GetString(result.Buffer);
-                        Log($"Received response from {server}. Analysing Via headers...");
-                        
-                        bool viaFound = false;
-                        string[] lines = respStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                        
-                        foreach (var line in lines)
+                        using var udpClient = new UdpClient(0);
+                        try
                         {
-                            if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
+                            const int SIO_UDP_CONNRESET = -1744830452;
+                            udpClient.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                        }
+                        catch { }
+
+                        int localPort = ((IPEndPoint)udpClient.Client.LocalEndPoint!).Port;
+                        string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
+                        string tag = Guid.NewGuid().ToString("N").Substring(0, 10);
+                        string callId = Guid.NewGuid().ToString("N").Substring(0, 16) + "@hp2k.co.uk";
+                        
+                        // We use a generic internal IP to force the ALG to translate it if active
+                        string fakeLocalIp = "192.168.1.100";
+                        
+                        string sipOptions = $"OPTIONS sip:{server} SIP/2.0\r\n" +
+                            $"Via: SIP/2.0/UDP {fakeLocalIp}:{localPort};rport;branch={branch}\r\n" +
+                            $"Max-Forwards: 70\r\n" +
+                            $"To: <sip:ping@{server}>\r\n" +
+                            $"From: <sip:ping@{fakeLocalIp}:{localPort}>;tag={tag}\r\n" +
+                            $"Call-ID: {callId}\r\n" +
+                            $"CSeq: 1 OPTIONS\r\n" +
+                            $"Contact: <sip:ping@{fakeLocalIp}:{localPort}>\r\n" +
+                            $"User-Agent: Agilico Network Diagnostic Tool\r\n" +
+                            $"Content-Length: 0\r\n\r\n";
+                            
+                        byte[] bytes = Encoding.UTF8.GetBytes(sipOptions);
+                        
+                        // Record sent packet
+                        string actualLocalIp = GetLocalIpAddress();
+                        Pcap.RecordPacket(bytes, actualLocalIp, localPort, endpoint.Address.ToString(), endpoint.Port, true);
+                        
+                        Log($"Sending OPTIONS payload with dummy Via IP {fakeLocalIp}...");
+                        udpClient.Client.SendTo(bytes, endpoint);
+                        
+                        if (udpClient.Client.Poll(2_500_000, SelectMode.SelectRead))
+                        {
+                            byte[] recvBuf = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int read = udpClient.Client.ReceiveFrom(recvBuf, ref senderEp);
+                            
+                            byte[] packetData = new byte[read];
+                            Buffer.BlockCopy(recvBuf, 0, packetData, 0, read);
+
+                            Pcap.RecordPacket(packetData, endpoint.Address.ToString(), endpoint.Port, actualLocalIp, localPort, true);
+                            string respStr = Encoding.UTF8.GetString(packetData);
+                            Log($"Received response from {server}. Analysing Via headers...");
+                            
+                            bool viaFound = false;
+                            string[] lines = respStr.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                            
+                            foreach (var line in lines)
                             {
-                                viaFound = true;
-                                Log($"Returned {line}");
-                                // If the router modified our hardcoded fake IP to its WAN IP, SIP ALG is doing deep inspection!
-                                if (!line.Contains(fakeLocalIp))
+                                if (line.StartsWith("Via:", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    sipAlgDetected = true;
+                                    viaFound = true;
+                                    Log($"Returned {line}");
+                                    // If the router modified our hardcoded fake IP to its WAN IP, SIP ALG is doing deep inspection!
+                                    if (!line.Contains(fakeLocalIp))
+                                    {
+                                        sipAlgDetected = true;
+                                    }
                                 }
                             }
+                            
+                            if (!viaFound)
+                            {
+                                Log("No Via header returned in response.");
+                            }
+                            return true;
                         }
-                        
-                        if (!viaFound)
+                        else
                         {
-                            Log("No Via header returned in response.");
+                            Log($"Request to {server} timed out.");
+                            return false;
                         }
-                        
-                        if (responseReceived) break;
-                    }
-                    else
+                    }, token);
+
+                    if (stepSuccess)
                     {
-                        _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                        Log($"Request to {server} timed out.");
+                        responseReceived = true;
+                        break;
                     }
                 }
                 catch (Exception ex)
@@ -1926,8 +1965,12 @@ namespace agilicomsptoolkit
                 if (client == null)
                 {
                     client = new UdpClient(queryPort);
-                    client.Client.SendTimeout = 1500;
-                    client.Client.ReceiveTimeout = 1500;
+                    try
+                    {
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                    }
+                    catch { }
                 }
 
                 var ipAddresses = await Dns.GetHostAddressesAsync(server, token);
@@ -1944,31 +1987,36 @@ namespace agilicomsptoolkit
                 // Record sent packet
                 Pcap.RecordPacket(stunRequest, localIp, localPort, endPoint.Address.ToString(), port, true);
 
-                await client.SendAsync(stunRequest, stunRequest.Length, endPoint);
-
-                using var queryCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                queryCts.CancelAfter(1500);
-
-                try
+                return await Task.Run<(bool success, string? publicIp, int mappedPort)>(() =>
                 {
-                    var result = await client.ReceiveAsync(queryCts.Token);
-                    // Record received packet
-                    Pcap.RecordPacket(result.Buffer, endPoint.Address.ToString(), port, localIp, localPort, true);
-                    if (ValidateStunResponse(result.Buffer, transactionId))
+                    try
                     {
-                        var (ip, mPort) = ParseStunResponse(result.Buffer);
-                        if (ip != null)
+                        client.Client.SendTo(stunRequest, endPoint);
+
+                        // Use non-blocking Socket.Poll (1500ms timeout = 1,500,000 microseconds)
+                        if (client.Client.Poll(1_500_000, SelectMode.SelectRead))
                         {
-                            return (true, ip.ToString(), mPort);
+                            byte[] recvBuffer = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int bytesRead = client.Client.ReceiveFrom(recvBuffer, ref senderEp);
+
+                            byte[] packetData = new byte[bytesRead];
+                            Buffer.BlockCopy(recvBuffer, 0, packetData, 0, bytesRead);
+
+                            Pcap.RecordPacket(packetData, endPoint.Address.ToString(), port, localIp, localPort, true);
+                            if (ValidateStunResponse(packetData, transactionId))
+                            {
+                                var (ip, mPort) = ParseStunResponse(packetData);
+                                if (ip != null)
+                                {
+                                    return (true, ip.ToString(), mPort);
+                                }
+                            }
                         }
                     }
-                }
-                catch (OperationCanceledException) when (!token.IsCancellationRequested)
-                {
-                    // Timeout on this STUN endpoint
+                    catch { }
                     return (false, null, 0);
-                }
-                return (false, null, 0);
+                }, token);
             }
             catch (Exception ex) when (ex is OperationCanceledException || token.IsCancellationRequested)
             {
