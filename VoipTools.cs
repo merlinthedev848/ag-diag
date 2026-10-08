@@ -90,38 +90,45 @@ namespace agilicomsptoolkit
             var records = new List<SrvRecord>();
             try
             {
-                using var client = new UdpClient(0);
-                client.Client.SendTimeout = 3000;
-                client.Client.ReceiveTimeout = 3000;
-
                 ushort txId = (ushort)Random.Shared.Next(1, 65535);
                 byte[] query = BuildSrvQuery(service, domain, txId);
                 
                 var ipAddress = IPAddress.Parse(dnsServer);
                 var endpoint = new IPEndPoint(ipAddress, 53);
 
-                await client.SendAsync(query, query.Length, endpoint);
-
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(3000, token);
-
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
+                return await Task.Run(() =>
                 {
-                    var result = await receiveTask;
-                    if (result.Buffer.Length > 12)
+                    using var client = new UdpClient(0);
+                    try
                     {
-                        ushort respTxId = (ushort)((result.Buffer[0] << 8) | result.Buffer[1]);
-                        if (respTxId == txId)
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        client.Client.SendTo(query, endpoint);
+                        if (client.Client.Poll(2_500_000, SelectMode.SelectRead))
                         {
-                            records = ParseSrvResponse(result.Buffer);
+                            byte[] recvBuf = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int read = client.Client.ReceiveFrom(recvBuf, ref senderEp);
+                            if (read > 12)
+                            {
+                                ushort respTxId = (ushort)((recvBuf[0] << 8) | recvBuf[1]);
+                                if (respTxId == txId)
+                                {
+                                    byte[] respData = new byte[read];
+                                    Buffer.BlockCopy(recvBuf, 0, respData, 0, read);
+                                    return ParseSrvResponse(respData);
+                                }
+                            }
                         }
                     }
-                }
-                else
-                {
-                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                }
+                    catch { }
+                    return records;
+                }, token);
             }
             catch { }
 
@@ -386,10 +393,6 @@ namespace agilicomsptoolkit
                 var targetIp = addresses[0];
                 var endpoint = new IPEndPoint(targetIp, port);
 
-                using var client = new UdpClient(0);
-                client.Client.SendTimeout = 1500;
-                client.Client.ReceiveTimeout = 1500;
-
                 byte[] payload;
                 if (port == 3478) // STUN
                 {
@@ -407,58 +410,69 @@ namespace agilicomsptoolkit
                     payload = new byte[] { 0x0D, 0x0A, 0x0D, 0x0A };
                 }
 
-                await client.SendAsync(payload, payload.Length, endpoint);
-
-                var receiveTask = client.ReceiveAsync(token).AsTask();
-                var delayTask = Task.Delay(1500, token);
-
-                var completed = await Task.WhenAny(receiveTask, delayTask);
-                if (completed == receiveTask)
+                await Task.Run(() =>
                 {
-                    var response = await receiveTask;
-                    sw.Stop();
-
-                    if (port == 3478)
+                    using var client = new UdpClient(0);
+                    try
                     {
-                        if (response.Buffer.Length >= 20 && (response.Buffer[0] << 8 | response.Buffer[1]) == 0x0101)
+                        const int SIO_UDP_CONNRESET = -1744830452;
+                        client.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        client.Client.SendTo(payload, endpoint);
+                        if (client.Client.Poll(1_500_000, SelectMode.SelectRead))
                         {
-                            result.Status = "Open";
+                            byte[] recvBuf = new byte[2048];
+                            EndPoint senderEp = new IPEndPoint(IPAddress.Any, 0);
+                            int read = client.Client.ReceiveFrom(recvBuf, ref senderEp);
+                            sw.Stop();
+
+                            if (port == 3478)
+                            {
+                                if (read >= 20 && (recvBuf[0] << 8 | recvBuf[1]) == 0x0101)
+                                {
+                                    result.Status = "Open";
+                                }
+                            }
+                            else if (port == 5060 || port == 5061)
+                            {
+                                string respStr = Encoding.UTF8.GetString(recvBuf, 0, read);
+                                if (respStr.Contains("SIP/2.0"))
+                                {
+                                    result.Status = "Open";
+                                }
+                            }
+                            else
+                            {
+                                result.Status = "Open";
+                            }
+
+                            result.RttMs = sw.Elapsed.TotalMilliseconds;
+                        }
+                        else
+                        {
+                            result.Status = treatTimeoutAsOpen ? "Open" : "Unresponsive";
                         }
                     }
-                    else if (port == 5060 || port == 5061)
+                    catch (SocketException ex)
                     {
-                        string respStr = Encoding.UTF8.GetString(response.Buffer);
-                        if (respStr.Contains("SIP/2.0"))
+                        if (ex.SocketErrorCode == SocketError.ConnectionReset || ex.SocketErrorCode == SocketError.ConnectionRefused)
                         {
-                            result.Status = "Open";
+                            result.Status = "Open"; 
+                        }
+                        else
+                        {
+                            result.Status = "Blocked";
                         }
                     }
-                    else
+                    catch
                     {
-                        result.Status = "Open";
+                        result.Status = "Blocked";
                     }
-
-                    result.RttMs = sw.Elapsed.TotalMilliseconds;
-                }
-                else
-                {
-                    _ = receiveTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
-                    // UDP timeout is common if remote is not listening or ignores payload.
-                    // If no ICMP error was returned, we mark as Unresponsive (likely permitted outbound).
-                    result.Status = treatTimeoutAsOpen ? "Open" : "Unresponsive";
-                }
-            }
-            catch (SocketException ex)
-            {
-                if (ex.SocketErrorCode == SocketError.ConnectionReset || ex.SocketErrorCode == SocketError.ConnectionRefused)
-                {
-                    // ICMP Port Unreachable returned (outbound route is open!)
-                    result.Status = "Open"; 
-                }
-                else
-                {
-                    result.Status = "Blocked";
-                }
+                }, token);
             }
             catch
             {

@@ -58,8 +58,8 @@ namespace agilicomsptoolkit
                 };
                 
                 process.Start();
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
                 var errorTask = process.StandardError.ReadToEndAsync();
-                string output = await process.StandardOutput.ReadToEndAsync();
                 using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
                 try { await process.WaitForExitAsync(timeoutCts.Token); }
                 catch (OperationCanceledException)
@@ -67,6 +67,7 @@ namespace agilicomsptoolkit
                     try { if (!process.HasExited) process.Kill(true); } catch { }
                     throw new TimeoutException("Adapter query timed out after 30 seconds.");
                 }
+                string output = await stdoutTask;
                 _ = await errorTask;
 
                 if (!string.IsNullOrWhiteSpace(output) && (output.TrimStart().StartsWith("[") || output.TrimStart().StartsWith("{")))

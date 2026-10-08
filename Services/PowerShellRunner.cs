@@ -40,6 +40,7 @@ namespace agilicomsptoolkit.Services
         public async Task<(int exitCode, string stdout, string stderr)> ExecuteScriptAsync(string scriptContent, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
         {
             string scriptPath = Path.Combine(SecureTempDir, $"script_{Guid.NewGuid():N}.ps1");
+            Process? process = null;
             try
             {
                 await File.WriteAllTextAsync(scriptPath, scriptContent, cancellationToken).ConfigureAwait(false);
@@ -55,7 +56,7 @@ namespace agilicomsptoolkit.Services
                     RedirectStandardError = true
                 };
 
-                using var process = new Process { StartInfo = psi };
+                process = new Process { StartInfo = psi };
                 process.Start();
                 var stdoutTask = process.StandardOutput.ReadToEndAsync(linkedCts.Token);
                 var stderrTask = process.StandardError.ReadToEndAsync(linkedCts.Token);
@@ -68,14 +69,31 @@ namespace agilicomsptoolkit.Services
             }
             catch (OperationCanceledException)
             {
+                try
+                {
+                    if (process != null && !process.HasExited)
+                    {
+                        process.Kill(true);
+                    }
+                }
+                catch { }
                 return (-1, string.Empty, "Script execution timed out or was cancelled.");
             }
             catch (Exception ex)
             {
+                try
+                {
+                    if (process != null && !process.HasExited)
+                    {
+                        process.Kill(true);
+                    }
+                }
+                catch { }
                 return (-1, string.Empty, ex.Message);
             }
             finally
             {
+                process?.Dispose();
                 try
                 {
                     if (File.Exists(scriptPath)) File.Delete(scriptPath);

@@ -191,6 +191,7 @@ namespace agilicomsptoolkit
                                 }
                                 else
                                 {
+                                    _ = dnsTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                                     device.Hostname = "-";
                                 }
                             }
