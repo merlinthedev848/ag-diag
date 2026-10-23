@@ -538,7 +538,7 @@ namespace AgilicoDiagMac
 
         private void BtnTogglePcap_Click(object? sender, RoutedEventArgs e)
         {
-            if (_engine.Pcap.PacketCount > 0 && BtnTogglePcap.Content?.ToString() == "Stop PCAP Capture")
+            if (_engine.Pcap.IsCapturing)
             {
                 _engine.Pcap.Stop();
                 BtnTogglePcap.Content = "Start PCAP Capture";

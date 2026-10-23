@@ -30,6 +30,7 @@ namespace AgilicoDiagMac.Core
         private string? _ipFilter;
 
         public string? IpFilter { get { lock (_lock) return _ipFilter; } set { lock (_lock) _ipFilter = value; } }
+        public bool IsCapturing { get { lock (_lock) return _isWriting; } }
         public int PacketCount { get { lock (_lock) return _packetCount; } }
         public long TotalBytes { get { lock (_lock) return _totalBytes; } }
         public bool ContainsSyntheticPackets { get; private set; }

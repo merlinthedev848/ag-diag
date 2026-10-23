@@ -204,6 +204,66 @@ namespace AgilicoDiagMac.Tests
                 failed++;
             }
 
+            // Test 9: PCAP Capturer Lifecycle & IsCapturing State
+            try
+            {
+                using var pcapTest = new PcapCapturer();
+                bool initial = pcapTest.IsCapturing;
+                pcapTest.Start();
+                bool started = pcapTest.IsCapturing;
+                pcapTest.Stop();
+                bool stopped = pcapTest.IsCapturing;
+
+                if (!initial && started && !stopped)
+                {
+                    Console.WriteLine("[PASS] Test 9: PcapCapturer lifecycle state transitions verified (False -> True -> False).");
+                    passed++;
+                }
+                else
+                {
+                    Console.WriteLine($"[FAIL] Test 9: Invalid PcapCapturer states: initial={initial}, started={started}, stopped={stopped}");
+                    failed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FAIL] Test 9: {ex.Message}");
+                failed++;
+            }
+
+            // Test 10: Subnet Mask & Host Count Calculation Logic
+            try
+            {
+                byte[] ip = new byte[] { 192, 168, 1, 100 };
+                byte[] mask = new byte[] { 255, 255, 255, 0 };
+                byte[] net = new byte[4];
+                byte[] bcast = new byte[4];
+                for (int i = 0; i < 4; i++)
+                {
+                    net[i] = (byte)(ip[i] & mask[i]);
+                    bcast[i] = (byte)(ip[i] | ~mask[i]);
+                }
+                uint netAddr = (uint)(net[0] << 24 | net[1] << 16 | net[2] << 8 | net[3]);
+                uint bcastAddr = (uint)(bcast[0] << 24 | bcast[1] << 16 | bcast[2] << 8 | bcast[3]);
+                uint count = bcastAddr - netAddr - 1;
+
+                if (count == 254 && net[0] == 192 && net[1] == 168 && net[2] == 1 && net[3] == 0)
+                {
+                    Console.WriteLine("[PASS] Test 10: IPv4 /24 subnet arithmetic and 254-host range verified.");
+                    passed++;
+                }
+                else
+                {
+                    Console.WriteLine($"[FAIL] Test 10: Unexpected host count: {count}");
+                    failed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FAIL] Test 10: {ex.Message}");
+                failed++;
+            }
+
             Console.WriteLine("==========================================================");
             Console.WriteLine($"Test Suite Summary: {passed} Passed, {failed} Failed.");
             Console.WriteLine("==========================================================");

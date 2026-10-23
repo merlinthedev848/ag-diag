@@ -25,6 +25,7 @@ namespace AgilicoDiagMac.Core
 
     public class LanScanner : IDisposable
     {
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         [DllImport("iphlpapi.dll", ExactSpelling = true, SetLastError = true)]
         private static extern int SendARP(int DestIP, int SrcIP, byte[] pMacAddr, ref int PhyAddrLen);
 
@@ -275,6 +276,7 @@ namespace AgilicoDiagMac.Core
             return string.Join(":", parts.Select(p => p.PadLeft(2, '0').ToUpperInvariant()));
         }
 
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private string GetMacAddressWindows(string ipAddress)
         {
             try
