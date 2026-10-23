@@ -2171,6 +2171,11 @@ namespace agilicomsptoolkit
                     Log($"[{hubName}] Server returned 404 Not Found. This proves the client's network successfully routed the WebSocket request to the server.");
                     return (true, "Network OK (Server returned 404)");
                 }
+                if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log($"[{hubName}] Server returned 401 Unauthorized. This proves the client's network successfully routed the WebSocket request to the server.");
+                    return (true, "Network OK (Server returned 401)");
+                }
                 return (false, ex.Message);
             }
             finally

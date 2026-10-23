@@ -273,3 +273,65 @@ public class NetworkEngineTests
         Assert.IsTrue(engine.SelectedTests.All(t => t));
     }
 }
+
+[TestClass]
+public class DriverItemTests
+{
+    [TestMethod]
+    public void DriverItem_DriverDateDisplay_FormatsEightDigitDate()
+    {
+        var item = new agilicomsptoolkit.DriverItem
+        {
+            DeviceName = "Network Adapter",
+            DriverDate = "20240515000000.000000-000"
+        };
+        Assert.AreEqual("2024-05-15", item.DriverDateDisplay);
+    }
+
+    [TestMethod]
+    public void DriverItem_DriverDateDisplay_EmptyRawReturnsDash()
+    {
+        var item = new agilicomsptoolkit.DriverItem
+        {
+            DeviceName = "Audio Device",
+            DriverDate = ""
+        };
+        Assert.AreEqual("-", item.DriverDateDisplay);
+    }
+}
+
+[TestClass]
+public class DialogModelTests
+{
+    [TestMethod]
+    public void EventLogInfo_SetStatusStyle_SetsCorrectGlyphAndBrushes()
+    {
+        var log = new agilicomsptoolkit.EventLogInfo();
+        log.SetStatusStyle("Error", 1);
+        Assert.AreEqual("✖", log.IconGlyph);
+
+        log.SetStatusStyle("Warning", 2);
+        Assert.AreEqual("⚠", log.IconGlyph);
+
+        log.SetStatusStyle("Information", 4);
+        Assert.AreEqual("ℹ", log.IconGlyph);
+    }
+
+    [TestMethod]
+    public void FirewallProfileInfo_GlowAndStatus_ReflectsEnabledState()
+    {
+        var profileOn = new agilicomsptoolkit.FirewallProfileInfo
+        {
+            Name = "Domain",
+            StatusText = "ON"
+        };
+        Assert.AreEqual(System.Windows.Media.Color.FromRgb(0x10, 0xb9, 0x81), profileOn.GlowColor);
+
+        var profileOff = new agilicomsptoolkit.FirewallProfileInfo
+        {
+            Name = "Public",
+            StatusText = "OFF"
+        };
+        Assert.AreEqual(System.Windows.Media.Color.FromRgb(0xef, 0x44, 0x44), profileOff.GlowColor);
+    }
+}
