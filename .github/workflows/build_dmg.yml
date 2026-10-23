@@ -1,0 +1,42 @@
+name: Build macOS DMG Installers
+
+on:
+  push:
+    branches: [ "macos", "main" ]
+  pull_request:
+    branches: [ "macos", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Run Test Suite
+      run: |
+        dotnet run --project tests/EngineTests.csproj
+
+    - name: Build and Package DMGs
+      run: |
+        chmod +x build_macos.sh
+        ./build_macos.sh
+
+    - name: Upload Apple Silicon DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: Agilico_MSP_Toolkit_arm64.dmg
+        path: publish_output/Agilico_MSP_Toolkit_arm64.dmg
+
+    - name: Upload Intel Mac DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: Agilico_MSP_Toolkit_x64.dmg
+        path: publish_output/Agilico_MSP_Toolkit_x64.dmg

@@ -51,9 +51,18 @@ Copy-Item (Join-Path $x64Out "*") $x64MacOS -Recurse -Force
 Copy-Item (Join-Path $ProjectDir "Assets\Info.plist") $x64Contents -Force
 Copy-Item (Join-Path $ProjectDir "Assets\logo.png") (Join-Path $x64Resources "logo.png") -Force
 
+# 4. Generate macOS .dmg disk images
+Write-Host "[3/3] Creating macOS .dmg disk images..." -ForegroundColor Yellow
+$dmgScript = Join-Path $ProjectDir "build_dmg.ps1"
+if (Test-Path $dmgScript) {
+    & $dmgScript
+}
+
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host " macOS Build Complete!" -ForegroundColor Green
+Write-Host " macOS Build & DMG Creation Complete!" -ForegroundColor Green
 Write-Host " Output Directory: $OutputDir" -ForegroundColor Green
 Write-Host " - Apple Silicon App: $armApp" -ForegroundColor Green
 Write-Host " - Intel Mac App:     $x64App" -ForegroundColor Green
+Write-Host " - Apple Silicon DMG: $(Join-Path $OutputDir 'Agilico_MSP_Toolkit_arm64.dmg')" -ForegroundColor Green
+Write-Host " - Intel Mac DMG:     $(Join-Path $OutputDir 'Agilico_MSP_Toolkit_x64.dmg')" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green

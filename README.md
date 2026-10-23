@@ -58,23 +58,45 @@ Designed to verify local and outbound network readiness for the **Agilico Connec
 
 The toolkit compiles into self-contained macOS `.app` bundles for both Apple Silicon and Intel architectures:
 
-| Target Platform | Runtime Identifier | Bundle Name | Architecture |
-| :--- | :--- | :--- | :--- |
-| **Apple Silicon** | `osx-arm64` | `Agilico_MSP_Toolkit_arm64.app` | Apple M1/M2/M3/M4 |
-| **Intel Mac** | `osx-x64` | `Agilico_MSP_Toolkit_x64.app` | x86_64 Intel Macs |
+| Target Platform | Runtime Identifier | Bundle Name | DMG Installer | Architecture |
+| :--- | :--- | :--- | :--- | :--- |
+| **Apple Silicon** | `osx-arm64` | `Agilico_MSP_Toolkit_arm64.app` | `Agilico_MSP_Toolkit_arm64.dmg` | Apple M1/M2/M3/M4 |
+| **Intel Mac** | `osx-x64` | `Agilico_MSP_Toolkit_x64.app` | `Agilico_MSP_Toolkit_x64.dmg` | x86_64 Intel Macs |
 
-### Building from Source
+### Building & Packaging DMG Installers
 
-#### On Windows (Cross-compilation):
+#### On Windows:
+Builds both self-contained application bundles and generates macOS `.dmg` disk images in `publish_output/`:
 ```powershell
 .\build_macos.ps1
 ```
+Or to generate/repackage `.dmg` disk images from existing bundles:
+```powershell
+.\build_dmg.ps1
+```
 
-#### On macOS / Linux:
+#### On macOS:
+Builds the bundles and packages native Apple UDZO `.dmg` installers with `/Applications` drag-and-drop link:
 ```bash
 chmod +x ./build_macos.sh
 ./build_macos.sh
 ```
+Or use the standalone DMG packager:
+```bash
+chmod +x ./create_dmg.sh
+./create_dmg.sh
+```
+
+#### Automated GitHub Actions CI/CD:
+The repository includes `.github/workflows/build_dmg.yml` which automatically compiles and packages native Apple Silicon and Intel `.dmg` installers on GitHub's `macos-latest` runners whenever changes are pushed to `macos` or `main`.
+
+---
+
+## 💾 Installation & Usage on macOS
+
+1. Double-click the generated `.dmg` file (`Agilico_MSP_Toolkit_arm64.dmg` or `Agilico_MSP_Toolkit_x64.dmg`).
+2. Drag **Agilico MSP Toolkit** into the **Applications** folder shortcut.
+3. Launch **Agilico MSP Toolkit** from Applications or Spotlight.
 
 ---
 

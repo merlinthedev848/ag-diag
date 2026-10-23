@@ -35,7 +35,7 @@ namespace AgilicoDiagMac
         private readonly NetworkEngine _engine;
         private readonly ObservableCollection<TracerouteHopItem> _tracerouteHops = new();
         private readonly StringBuilder _logBuilder = new();
-        private CancellationTokenSource? _diagCts;
+        private bool _isDiagnosticsRunning;
         private CancellationTokenSource? _speedCts;
         private CancellationTokenSource? _traceCts;
 
@@ -70,7 +70,7 @@ namespace AgilicoDiagMac
                     PrgOverall.Value = 100;
                     BadgeScore.Text = $"Score: {score}/100";
                     BadgeScore.Foreground = score >= 80 ? Brushes.MediumSeaGreen : (score >= 50 ? Brushes.Orange : Brushes.IndianRed);
-                    _diagCts = null;
+                    _isDiagnosticsRunning = false;
                 });
             };
 
@@ -167,6 +167,21 @@ namespace AgilicoDiagMac
                 {
                     _testStatusLabels[index].Foreground = Brushes.Orange;
                 }
+
+                int finished = 0, total = 0;
+                for (int i = 0; i < 10; i++)
+                {
+                    if (_engine.SelectedTests[i])
+                    {
+                        total++;
+                        string? txt = _testStatusLabels[i].Text;
+                        if (txt != "Pending..." && txt != "Running" && txt != "Probing...") finished++;
+                    }
+                }
+                if (total > 0)
+                {
+                    PrgOverall.Value = Math.Min(95, 10 + (85.0 * finished / total));
+                }
             }
         }
 
@@ -190,16 +205,16 @@ namespace AgilicoDiagMac
 
         private async void BtnRunDiagnostics_Click(object? sender, RoutedEventArgs e)
         {
-            if (_diagCts != null)
+            if (_isDiagnosticsRunning)
             {
-                _diagCts.Cancel();
+                _engine.Cancel();
                 BtnRunDiagnostics.Content = "Run All Diagnostics";
-                _diagCts = null;
-                AppendLog("Diagnostics cancelled by user.");
+                _isDiagnosticsRunning = false;
+                AppendLog("Diagnostics cancellation requested.");
                 return;
             }
 
-            _diagCts = new CancellationTokenSource();
+            _isDiagnosticsRunning = true;
             BtnRunDiagnostics.Content = "Stop Diagnostics";
             PrgOverall.Value = 10;
 
@@ -221,7 +236,7 @@ namespace AgilicoDiagMac
             AppendLog("Starting 10-Point Outbound Readiness Suite on macOS...");
             try
             {
-                await RunSelectedDiagnosticsAsync(_diagCts.Token);
+                await _engine.RunDiagnosticsAsync();
             }
             catch (OperationCanceledException)
             {
@@ -234,138 +249,8 @@ namespace AgilicoDiagMac
             finally
             {
                 BtnRunDiagnostics.Content = "Run All Diagnostics";
-                _diagCts = null;
+                _isDiagnosticsRunning = false;
             }
-        }
-
-        private async Task RunSelectedDiagnosticsAsync(CancellationToken token)
-        {
-            int totalTests = 0;
-            int passedTests = 0;
-
-            // 1. DNS
-            if (_engine.SelectedTests[0])
-            {
-                totalTests++;
-                UpdateTestProgress("dns", "Running", "Resolving hp2k.co.uk and Google DNS...");
-                var r = await VoipTools.ResolveSrvAsync("_sip._udp", _engine.DomainToCheck, "8.8.8.8", token);
-                bool ok = true;
-                try
-                {
-                    var entry = await Dns.GetHostEntryAsync(_engine.DomainToCheck);
-                    ok = entry.AddressList.Length > 0;
-                }
-                catch { ok = false; }
-
-                if (ok) { passedTests++; UpdateTestProgress("dns", "Passed", "DNS resolution verified for all Agilico domains."); }
-                else { UpdateTestProgress("dns", "Failed", "Could not resolve domain."); }
-            }
-
-            // 2. HTTP/HTTPS
-            if (_engine.SelectedTests[1])
-            {
-                totalTests++;
-                UpdateTestProgress("http", "Running", "Testing SSL handshake on port 443...");
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                try
-                {
-                    var resp = await http.GetAsync($"https://{_engine.DomainToCheck}", token);
-                    passedTests++;
-                    UpdateTestProgress("http", "Passed", $"HTTP/HTTPS reachable (Status: {(int)resp.StatusCode}).");
-                }
-                catch
-                {
-                    passedTests++;
-                    UpdateTestProgress("http", "Passed", "HTTPS outbound connection established.");
-                }
-            }
-
-            // 3. NTP
-            if (_engine.SelectedTests[2])
-            {
-                totalTests++;
-                UpdateTestProgress("ntp", "Running", "Probing pool.ntp.org UDP 123...");
-                var ntp = await VoipTools.ProbeUdpPortAsync("pool.ntp.org", 123, "NTP", token);
-                if (ntp.Status != "Blocked") { passedTests++; UpdateTestProgress("ntp", "Passed", "NTP clock synchronization active."); }
-                else { UpdateTestProgress("ntp", "Warning", "NTP UDP 123 blocked or timed out."); }
-            }
-
-            // 4. Agilico STUN
-            if (_engine.SelectedTests[3])
-            {
-                totalTests++;
-                UpdateTestProgress("agilico stun", "Running", "Querying STUN server...");
-                var stun = await VoipTools.ProbeUdpPortAsync(_engine.StunServer, _engine.StunPort, "Agilico STUN", token);
-                if (stun.Status != "Blocked") { passedTests++; UpdateTestProgress("agilico stun", "Passed", $"STUN NAT verified (RTT: {stun.RttDisplay})."); }
-                else { UpdateTestProgress("agilico stun", "Failed", "STUN connection failed."); }
-            }
-
-            // 5. Google STUN
-            if (_engine.SelectedTests[4])
-            {
-                totalTests++;
-                UpdateTestProgress("google stun", "Running", "Querying stun.l.google.com...");
-                var stun = await VoipTools.ProbeUdpPortAsync("stun.l.google.com", 19302, "Google STUN", token);
-                if (stun.Status != "Blocked") { passedTests++; UpdateTestProgress("google stun", "Passed", $"Secondary STUN reachable ({stun.RttDisplay})."); }
-                else { UpdateTestProgress("google stun", "Warning", "Backup STUN unreachable."); }
-            }
-
-            // 6. NAT Routing
-            if (_engine.SelectedTests[5])
-            {
-                totalTests++;
-                UpdateTestProgress("routing", "Running", "Verifying default gateway hops...");
-                await Task.Delay(400, token);
-                passedTests++;
-                UpdateTestProgress("routing", "Passed", "Single NAT detected. Gateway route direct.");
-            }
-
-            // 7. NAT Port Translation
-            if (_engine.SelectedTests[6])
-            {
-                totalTests++;
-                UpdateTestProgress("port translation", "Running", "Checking port preservation...");
-                await Task.Delay(400, token);
-                passedTests++;
-                UpdateTestProgress("port translation", "Passed", "Full Cone NAT: Outbound ports preserved.");
-            }
-
-            // 8. SIP ALG
-            if (_engine.SelectedTests[7])
-            {
-                totalTests++;
-                UpdateTestProgress("sip", "Running", "Probing for SIP ALG modifications...");
-                var sip = await VoipTools.ProbeUdpPortAsync(_engine.SipAlgServer, _engine.SipAlgPort, "SIP ALG", token);
-                if (sip.Status != "SIP ALG Detected") { passedTests++; UpdateTestProgress("sip", "Passed", "No SIP ALG tampering detected."); }
-                else { UpdateTestProgress("sip", "Warning", "SIP ALG active on router."); }
-            }
-
-            // 9. RTP Voice MOS
-            if (_engine.SelectedTests[8])
-            {
-                totalTests++;
-                UpdateTestProgress("rtp", "Running", "Simulating G.711 voice media stream...");
-                await Task.Delay(600, token);
-                double mos = VoipTools.CalculateMosScore(15, 2.1, 0.0);
-                passedTests++;
-                UpdateTestProgress("rtp", "Passed", $"Estimated MOS: {mos} / 4.4 (0.0% loss, 2.1ms jitter).");
-            }
-
-            // 10. SignalR Hub
-            if (_engine.SelectedTests[9])
-            {
-                totalTests++;
-                UpdateTestProgress("signalr", "Running", "Testing WebSocket signalling presence...");
-                await Task.Delay(400, token);
-                passedTests++;
-                UpdateTestProgress("signalr", "Passed", "SignalR hub WebSocket handshake successful.");
-            }
-
-            int finalScore = totalTests > 0 ? (int)Math.Round(((double)passedTests / totalTests) * 100.0) : 100;
-            PrgOverall.Value = 100;
-            BadgeScore.Text = $"Score: {finalScore}/100";
-            BadgeScore.Foreground = finalScore >= 80 ? Brushes.MediumSeaGreen : (finalScore >= 50 ? Brushes.Orange : Brushes.IndianRed);
-            AppendLog($"Outbound diagnostics completed. Overall Score: {finalScore}/100 ({passedTests}/{totalTests} tests passed).");
         }
 
         #endregion
