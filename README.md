@@ -1,5 +1,9 @@
 # Agilico MSP Toolkit for macOS (v4.1.2)
 
+[![Build macOS DMG Installers](https://github.com/merlinthedev848/ag-diag/actions/workflows/build_dmg.yml/badge.svg?branch=macos)](https://github.com/merlinthedev848/ag-diag/actions/workflows/build_dmg.yml)
+[![.NET 8.0](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/)
+[![Avalonia UI 11.2](https://img.shields.io/badge/Avalonia-11.2.8-purple.svg)](https://avaloniaui.net/)
+
 An advanced cross-platform desktop diagnostic and voice engineering application built specifically for macOS (Apple Silicon M1/M2/M3/M4 & Intel Macs) using **Avalonia UI (v11)** and **.NET 8.0**.
 
 Designed to verify local and outbound network readiness for the **Agilico Connect** application on macOS, it performs deep packet inspection, network route tracing with GeoIP/ASN, port connectivity probing, speed testing, and VoIP simulation.
