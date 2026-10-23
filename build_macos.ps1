@@ -33,6 +33,9 @@ New-Item -ItemType Directory -Force -Path $armResources | Out-Null
 Copy-Item (Join-Path $armOut "*") $armMacOS -Recurse -Force
 Copy-Item (Join-Path $ProjectDir "Assets\Info.plist") $armContents -Force
 Copy-Item (Join-Path $ProjectDir "Assets\logo.png") (Join-Path $armResources "logo.png") -Force
+if (Test-Path (Join-Path $ProjectDir "Assets\logo.icns")) {
+    Copy-Item (Join-Path $ProjectDir "Assets\logo.icns") (Join-Path $armResources "logo.icns") -Force
+}
 
 # 3. Publish Intel Mac (osx-x64)
 Write-Host "[2/2] Publishing Intel Mac (osx-x64)..." -ForegroundColor Yellow
@@ -50,6 +53,9 @@ New-Item -ItemType Directory -Force -Path $x64Resources | Out-Null
 Copy-Item (Join-Path $x64Out "*") $x64MacOS -Recurse -Force
 Copy-Item (Join-Path $ProjectDir "Assets\Info.plist") $x64Contents -Force
 Copy-Item (Join-Path $ProjectDir "Assets\logo.png") (Join-Path $x64Resources "logo.png") -Force
+if (Test-Path (Join-Path $ProjectDir "Assets\logo.icns")) {
+    Copy-Item (Join-Path $ProjectDir "Assets\logo.icns") (Join-Path $x64Resources "logo.icns") -Force
+}
 
 # 4. Generate macOS .dmg disk images
 Write-Host "[3/3] Creating macOS .dmg disk images..." -ForegroundColor Yellow

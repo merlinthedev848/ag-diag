@@ -26,5 +26,9 @@
     <string>10.15</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 Agilico. All rights reserved.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Agilico MSP Toolkit requires audio access to inspect headset and microphone devices for VoIP readiness.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Agilico MSP Toolkit requires local network access to verify gateway reachability, LAN subnets, and VoIP signalling.</string>
 </dict>
 </plist>

@@ -316,7 +316,7 @@ namespace AgilicoDiagMac
                     PrgUpload.Value = (i / 20.0) * 100.0;
                 }
 
-                double finalUp = double.Parse(TxtUploadSpeed.Text);
+                double.TryParse(TxtUploadSpeed.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double finalUp);
                 AppendLog($"Upload test complete: {finalUp:F1} Mbps");
             }
             catch (OperationCanceledException)

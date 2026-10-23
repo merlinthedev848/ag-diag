@@ -258,23 +258,43 @@ namespace AgilicoDiagMac.Platform
             return list;
         }
 
-        public static async Task<string> RunBashCommandAsync(string command)
+        public static async Task<string> RunBashCommandAsync(string command, int timeoutMs = 8000)
         {
-            var psi = new ProcessStartInfo
+            try
             {
-                FileName = "/bin/bash",
-                Arguments = $"-c \"{command.Replace("\"", "\\\"")}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = $"-c \"{command.Replace("\"", "\\\"")}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-            using var process = new Process { StartInfo = psi };
-            process.Start();
-            string stdout = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            return stdout;
+                using var process = new Process { StartInfo = psi };
+                process.Start();
+
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+
+                var timeoutTask = Task.Delay(timeoutMs);
+                var completed = await Task.WhenAny(Task.WhenAll(stdoutTask, stderrTask), timeoutTask);
+
+                if (completed == timeoutTask)
+                {
+                    try { process.Kill(); } catch { }
+                    return string.Empty;
+                }
+
+                await process.WaitForExitAsync();
+                return await stdoutTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"RunBashCommand failed ({command}): {ex.Message}", ex, "MacSystemTools");
+                return string.Empty;
+            }
         }
     }
 }
