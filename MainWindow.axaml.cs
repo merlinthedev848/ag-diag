@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -20,24 +17,11 @@ using AgilicoDiagMac.Views;
 
 namespace AgilicoDiagMac
 {
-    public class TracerouteHopItem
-    {
-        public int Hop { get; set; }
-        public string IpAddress { get; set; } = "*";
-        public string LatencyDisplay { get; set; } = "*";
-        public string Hostname { get; set; } = "*";
-        public string Location { get; set; } = "-";
-        public string Asn { get; set; } = "-";
-    }
-
     public partial class MainWindow : Window
     {
         private readonly NetworkEngine _engine;
-        private readonly ObservableCollection<TracerouteHopItem> _tracerouteHops = new();
         private readonly StringBuilder _logBuilder = new();
         private bool _isDiagnosticsRunning;
-        private CancellationTokenSource? _speedCts;
-        private CancellationTokenSource? _traceCts;
 
         private readonly TextBlock[] _testStatusLabels = new TextBlock[10];
         private readonly TextBlock[] _testDescLabels = new TextBlock[10];
@@ -46,16 +30,10 @@ namespace AgilicoDiagMac
         public MainWindow()
         {
             InitializeComponent();
-#if LITE_VERSION
-            Title = "Agilico MSP Toolkit Lite (macOS)";
-            TxtAppTitle.Text = "Agilico MSP Toolkit Lite";
-            TxtAppSubtitle.Text = "macOS Network Diagnostics (Lite Edition) v4.1.2";
-            CardAudioConverter.IsVisible = false;
-#endif
+            Title = "Agilico MSP Toolkit";
+
             _engine = new NetworkEngine();
             InitTestControls();
-
-            GridTraceroute.ItemsSource = _tracerouteHops;
 
             _engine.OnLog += (msg, isErr) =>
             {
@@ -72,10 +50,18 @@ namespace AgilicoDiagMac
                 Dispatcher.UIThread.Post(() =>
                 {
                     BtnRunDiagnostics.IsEnabled = true;
-                    BtnRunDiagnostics.Content = "Run All Diagnostics";
                     PrgOverall.Value = 100;
                     BadgeScore.Text = $"Score: {score}/100";
                     BadgeScore.Foreground = score >= 80 ? Brushes.MediumSeaGreen : (score >= 50 ? Brushes.Orange : Brushes.IndianRed);
+                    
+                    if (PnlSummaryIdle != null) PnlSummaryIdle.IsVisible = false;
+                    if (PnlSummaryPass != null) PnlSummaryPass.IsVisible = true;
+
+                    if (_engine.LastDownloadMbps > 0)
+                        TxtDownloadSpeed.Text = $"{_engine.LastDownloadMbps:F1} Mbps";
+                    if (_engine.LastUploadMbps > 0)
+                        TxtUploadSpeed.Text = $"{_engine.LastUploadMbps:F1} Mbps";
+
                     _isDiagnosticsRunning = false;
                 });
             };
@@ -125,37 +111,23 @@ namespace AgilicoDiagMac
             SetNavActive(0);
         }
 
-        private void BtnNavNetTools_Click(object? sender, RoutedEventArgs e)
+        private void BtnNavHelp_Click(object? sender, RoutedEventArgs e)
         {
             PageCarousel.SelectedIndex = 1;
             SetNavActive(1);
         }
 
-        private void BtnNavConverter_Click(object? sender, RoutedEventArgs e)
+        private void BtnNavLogs_Click(object? sender, RoutedEventArgs e)
         {
             PageCarousel.SelectedIndex = 2;
             SetNavActive(2);
         }
 
-        private void BtnNavLogs_Click(object? sender, RoutedEventArgs e)
-        {
-            PageCarousel.SelectedIndex = 3;
-            SetNavActive(3);
-        }
-
-        private void BtnNavHelp_Click(object? sender, RoutedEventArgs e)
-        {
-            PageCarousel.SelectedIndex = 4;
-            SetNavActive(4);
-        }
-
         private void SetNavActive(int index)
         {
             StripeDashboard.IsVisible = (index == 0);
-            StripeNetTools.IsVisible = (index == 1);
-            StripeConverter.IsVisible = (index == 2);
-            StripeLogs.IsVisible = (index == 3);
-            StripeHelp.IsVisible = (index == 4);
+            StripeHelp.IsVisible = (index == 1);
+            StripeLogs.IsVisible = (index == 2);
         }
 
         private async Task ProbeInitialNetworkAsync()
@@ -163,18 +135,15 @@ namespace AgilicoDiagMac
             try
             {
                 string local = LanScanner.GetLocalIpAddress();
-                BadgeLocalIp.Text = $"Local IP: {local}";
                 TxtLocalIpDisplay.Text = local;
 
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
                 string pub = (await client.GetStringAsync("https://api.ipify.org")).Trim();
-                BadgePublicIp.Text = $"Public IP: {pub}";
                 TxtPublicIpDisplay.Text = pub;
                 _engine.PublicIpAddress = pub;
             }
             catch
             {
-                BadgePublicIp.Text = "Public IP: Offline / Unknown";
                 TxtPublicIpDisplay.Text = "Offline / Unknown";
             }
         }
@@ -193,11 +162,7 @@ namespace AgilicoDiagMac
             int index = GetTestIndex(testName);
             if (index >= 0 && index < 10)
             {
-                _testStatusLabels[index].Text = status;
-                if (!string.IsNullOrEmpty(details))
-                {
-                    _testDescLabels[index].Text = details;
-                }
+                _testStatusLabels[index].Text = !string.IsNullOrEmpty(details) ? details : status;
 
                 if (status.Equals("Passed", StringComparison.OrdinalIgnoreCase) || status.Equals("Healthy", StringComparison.OrdinalIgnoreCase) || status.Equals("OK", StringComparison.OrdinalIgnoreCase))
                 {
@@ -216,6 +181,13 @@ namespace AgilicoDiagMac
                     _testStatusLabels[index].Foreground = Brushes.Orange;
                 }
 
+                if (index == 1 && _engine.LastDownloadMbps > 0)
+                {
+                    TxtDownloadSpeed.Text = $"{_engine.LastDownloadMbps:F1} Mbps";
+                    if (_engine.LastUploadMbps > 0)
+                        TxtUploadSpeed.Text = $"{_engine.LastUploadMbps:F1} Mbps";
+                }
+
                 int finished = 0, total = 0;
                 for (int i = 0; i < 10; i++)
                 {
@@ -223,7 +195,7 @@ namespace AgilicoDiagMac
                     {
                         total++;
                         string? txt = _testStatusLabels[i].Text;
-                        if (txt != "Pending..." && txt != "Running" && txt != "Probing...") finished++;
+                        if (txt != "Pending" && txt != "Pending..." && txt != "Running" && txt != "Probing...") finished++;
                     }
                 }
                 if (total > 0)
@@ -237,15 +209,15 @@ namespace AgilicoDiagMac
         {
             string lower = testName.ToLowerInvariant();
             if (lower.Contains("dns")) return 0;
-            if (lower.Contains("http") || lower.Contains("web")) return 1;
-            if (lower.Contains("ntp") || lower.Contains("clock")) return 2;
-            if (lower.Contains("agilico stun")) return 3;
-            if (lower.Contains("google stun")) return 4;
+            if (lower.Contains("bandwidth") || lower.Contains("speed")) return 1;
+            if (lower.Contains("http") || lower.Contains("web")) return 2;
+            if (lower.Contains("ntp") || lower.Contains("clock")) return 3;
+            if (lower.Contains("stun")) return 4;
             if (lower.Contains("routing") || lower.Contains("hop") || lower.Contains("gateway")) return 5;
-            if (lower.Contains("port translation") || lower.Contains("symmetric")) return 6;
-            if (lower.Contains("sip") || lower.Contains("alg")) return 7;
-            if (lower.Contains("rtp") || lower.Contains("jitter") || lower.Contains("mos")) return 8;
-            if (lower.Contains("signalr") || lower.Contains("presence") || lower.Contains("signalling")) return 9;
+            if (lower.Contains("randomization") || lower.Contains("port translation") || lower.Contains("rfc 6056")) return 6;
+            if (lower.Contains("sip alg") || lower.Contains("5060")) return 7;
+            if (lower.Contains("rtp") || lower.Contains("jitter") || lower.Contains("media")) return 8;
+            if (lower.Contains("signalling") || lower.Contains("presence") || lower.Contains("websocket")) return 9;
             return -1;
         }
 
@@ -256,23 +228,23 @@ namespace AgilicoDiagMac
             if (_isDiagnosticsRunning)
             {
                 _engine.Cancel();
-                BtnRunDiagnostics.Content = "Run All Diagnostics";
                 _isDiagnosticsRunning = false;
                 AppendLog("Diagnostics cancellation requested.");
                 return;
             }
 
             _isDiagnosticsRunning = true;
-            BtnRunDiagnostics.Content = "Stop Diagnostics";
             PrgOverall.Value = 10;
+            if (PnlSummaryIdle != null) PnlSummaryIdle.IsVisible = true;
+            if (PnlSummaryPass != null) PnlSummaryPass.IsVisible = false;
 
             for (int i = 0; i < 10; i++)
             {
                 _engine.SelectedTests[i] = _testCheckboxes[i].IsChecked == true;
                 if (_engine.SelectedTests[i])
                 {
-                    _testStatusLabels[i].Text = "Pending...";
-                    _testStatusLabels[i].Foreground = Brushes.Gray;
+                    _testStatusLabels[i].Text = "Pending";
+                    _testStatusLabels[i].Foreground = new SolidColorBrush(Color.Parse("#64748b"));
                 }
                 else
                 {
@@ -281,7 +253,7 @@ namespace AgilicoDiagMac
                 }
             }
 
-            AppendLog("Starting 10-Point Outbound Readiness Suite on macOS...");
+            AppendLog("Starting 10-Point Outbound Diagnostic Suite...");
             try
             {
                 await _engine.RunDiagnosticsAsync();
@@ -296,281 +268,27 @@ namespace AgilicoDiagMac
             }
             finally
             {
-                BtnRunDiagnostics.Content = "Run All Diagnostics";
                 _isDiagnosticsRunning = false;
             }
         }
 
-        #endregion
-
-        #region Speed Test
-
-        private async void BtnStartSpeedTest_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_speedCts != null)
-            {
-                _speedCts.Cancel();
-                BtnStartSpeedTest.Content = "Start Speed Test";
-                _speedCts = null;
-                return;
-            }
-
-            _speedCts = new CancellationTokenSource();
-            BtnStartSpeedTest.Content = "Stop Speed Test";
-            TxtDownloadSpeed.Text = "0.0";
-            TxtUploadSpeed.Text = "0.0";
-            PrgDownload.Value = 0;
-            PrgUpload.Value = 0;
-
-            try
-            {
-                var token = _speedCts.Token;
-                AppendLog("Initiating Speed Test on macOS (Cloudflare CDN)...");
-
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                string testUrl = "https://speed.cloudflare.com/__down?bytes=25000000";
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                
-                using var resp = await client.GetAsync(testUrl, HttpCompletionOption.ResponseHeadersRead, token);
-                using var stream = await resp.Content.ReadAsStreamAsync(token);
-                byte[] buffer = new byte[65536];
-                long totalRead = 0;
-                int read;
-
-                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
-                {
-                    totalRead += read;
-                    double elapsedSec = sw.Elapsed.TotalSeconds;
-                    if (elapsedSec > 0.1)
-                    {
-                        double mbps = (totalRead * 8.0) / (elapsedSec * 1000000.0);
-                        TxtDownloadSpeed.Text = $"{mbps:F1}";
-                        PrgDownload.Value = Math.Min(100, (totalRead / 25000000.0) * 100.0);
-                    }
-                    if (sw.Elapsed.TotalSeconds > 5.0) break;
-                }
-
-                double finalDl = sw.Elapsed.TotalSeconds > 0 ? (totalRead * 8.0) / (sw.Elapsed.TotalSeconds * 1000000.0) : 0;
-                TxtDownloadSpeed.Text = $"{finalDl:F1}";
-                PrgDownload.Value = 100;
-                AppendLog($"Download test complete: {finalDl:F1} Mbps");
-
-                AppendLog("Initiating parallel Upload stream...");
-                for (int i = 0; i <= 20; i++)
-                {
-                    await Task.Delay(150, token);
-                    double simulatedUp = finalDl * 0.35 + (Random.Shared.NextDouble() * 5.0);
-                    TxtUploadSpeed.Text = $"{simulatedUp:F1}";
-                    PrgUpload.Value = (i / 20.0) * 100.0;
-                }
-
-                double.TryParse(TxtUploadSpeed.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double finalUp);
-                AppendLog($"Upload test complete: {finalUp:F1} Mbps");
-            }
-            catch (OperationCanceledException)
-            {
-                AppendLog("Speed test cancelled.");
-            }
-            catch (Exception ex)
-            {
-                AppendLog($"Speed test error: {ex.Message}", true);
-            }
-            finally
-            {
-                BtnStartSpeedTest.Content = "Start Speed Test";
-                _speedCts = null;
-            }
-        }
-
-        #endregion
-
-        #region Traceroute
-
-        private async void BtnRunTrace_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_traceCts != null)
-            {
-                _traceCts.Cancel();
-                BtnRunTrace.Content = "Start Traceroute";
-                _traceCts = null;
-                return;
-            }
-
-            string target = TxtTraceTarget.Text?.Trim() ?? "customerportal.hp2k.co.uk";
-            _traceCts = new CancellationTokenSource();
-            BtnRunTrace.Content = "Stop Traceroute";
-            _tracerouteHops.Clear();
-            TxtTraceStatus.Text = $"Tracing route to {target}...";
-            AppendLog($"Initiating Traceroute with GeoIP & ASN lookup to {target}...");
-
-            try
-            {
-                var token = _traceCts.Token;
-                for (int hop = 1; hop <= 12; hop++)
-                {
-                    if (token.IsCancellationRequested) break;
-                    
-                    using var pinger = new Ping();
-                    var pingOptions = new PingOptions(hop, true);
-                    byte[] buffer = new byte[32];
-                    
-                    string hopIp = "*";
-                    string latency = "*";
-                    string hostname = "*";
-                    string loc = "-";
-                    string asn = "-";
-
-                    try
-                    {
-                        var reply = await pinger.SendPingAsync(target, 2000, buffer, pingOptions);
-                        if (reply.Status == IPStatus.Success || reply.Status == IPStatus.TtlExpired)
-                        {
-                            hopIp = reply.Address?.ToString() ?? "*";
-                            latency = $"{reply.RoundtripTime} ms";
-
-                            if (hopIp != "*")
-                            {
-                                try
-                                {
-                                    var host = await Dns.GetHostEntryAsync(hopIp);
-                                    hostname = host.HostName;
-                                }
-                                catch { hostname = hopIp; }
-
-                                if (hop == 1)
-                                {
-                                    loc = "Local Network";
-                                    asn = "LAN";
-                                }
-                                else
-                                {
-                                    loc = "United Kingdom (GB)";
-                                    asn = "AS2856 / BT-UK";
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-
-                    var hopItem = new TracerouteHopItem
-                    {
-                        Hop = hop,
-                        IpAddress = hopIp,
-                        LatencyDisplay = latency,
-                        Hostname = hostname,
-                        Location = loc,
-                        Asn = asn
-                    };
-
-                    _tracerouteHops.Add(hopItem);
-                    TxtTraceStatus.Text = $"Hop {hop}: {hopIp} ({latency})";
-                    await Task.Delay(100, token);
-                }
-
-                TxtTraceStatus.Text = "Traceroute completed.";
-                AppendLog("Traceroute completed.");
-            }
-            catch (OperationCanceledException)
-            {
-                TxtTraceStatus.Text = "Traceroute cancelled.";
-            }
-            catch (Exception ex)
-            {
-                TxtTraceStatus.Text = $"Error: {ex.Message}";
-            }
-            finally
-            {
-                BtnRunTrace.Content = "Start Traceroute";
-                _traceCts = null;
-            }
-        }
-
-        #endregion
-
-        #region macOS Voice & Network Tools
-
         private async void BtnQuickFix_Click(object? sender, RoutedEventArgs e)
         {
             bool confirm = await ModernMessageBox.ShowAsync(this,
-                "The One-Click Fix will:\n1. Flush macOS DNS cache (mDNSResponder)\n2. Clear Agilico Connect client cache folders\n3. Re-verify network routing.\n\nProceed with automated fix?",
-                "One-Click Automated Fix",
+                "The One-Click Reset will:\n1. Flush macOS DNS cache (mDNSResponder)\n2. Clear Agilico Connect client cache folders\n3. Re-verify network routing.\n\nProceed with reset?",
+                "Reset Connect",
                 true);
 
             if (confirm)
             {
-                AppendLog("Executing One-Click Automated Fix on macOS...");
+                AppendLog("Executing Reset Connect on macOS...");
                 var (dnsOk, dnsMsg) = await MacSystemTools.FlushDnsAsync();
                 AppendLog(dnsMsg);
 
                 var (cacheOk, cacheMsg) = await MacSystemTools.ClearClientCacheAndRestartAsync();
                 AppendLog(cacheMsg);
 
-                await ModernMessageBox.ShowAsync(this, "One-Click Fix completed successfully!\n\nmacOS DNS flushed and application cache cleaned.", "Fix Completed");
-            }
-        }
-
-        private async void BtnFlushDns_Click(object? sender, RoutedEventArgs e)
-        {
-            var (ok, msg) = await MacSystemTools.FlushDnsAsync();
-            AppendLog(msg);
-            await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
-        }
-
-        private async void BtnRenewDhcp_Click(object? sender, RoutedEventArgs e)
-        {
-            var (ok, msg) = await MacSystemTools.RenewDhcpAsync();
-            AppendLog(msg);
-            await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
-        }
-
-        private void BtnOpenWifiAnalyzer_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new WifiAnalyzerDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private void BtnOpenAudioDevices_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new AudioDeviceInspectorDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private void BtnOpenSockets_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new SocketsDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private void BtnOpenLanScanner_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new LanScannerDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private void BtnOpenPingTracker_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new PingTrackerDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private void BtnOpenAudioConverter_Click(object? sender, RoutedEventArgs e)
-        {
-            var dialog = new AudioConverterDialog();
-            dialog.ShowDialog(this);
-        }
-
-        private async void BtnResetClient_Click(object? sender, RoutedEventArgs e)
-        {
-            bool confirm = await ModernMessageBox.ShowAsync(this,
-                "This will terminate running Agilico Connect client processes and wipe local cache/temporary state.\n\nProceed?",
-                "Reset Agilico Connect Client",
-                true);
-
-            if (confirm)
-            {
-                var (ok, msg) = await MacSystemTools.ClearClientCacheAndRestartAsync();
-                AppendLog(msg);
-                await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
+                await ModernMessageBox.ShowAsync(this, "Reset Connect completed successfully!\n\nmacOS DNS flushed and application cache cleaned.", "Reset Complete");
             }
         }
 
@@ -584,7 +302,8 @@ namespace AgilicoDiagMac
             {
                 _engine.Pcap.Stop();
                 BtnTogglePcap.Content = "Start PCAP Capture";
-                BtnTogglePcap.Background = Brushes.DimGray;
+                BtnTogglePcap.Background = Brushes.White;
+                BtnTogglePcap.Foreground = new SolidColorBrush(Color.Parse("#1e293b"));
                 AppendLog("PCAP Packet capture stopped.");
             }
             else
@@ -592,6 +311,7 @@ namespace AgilicoDiagMac
                 _engine.Pcap.Start();
                 BtnTogglePcap.Content = "Stop PCAP Capture";
                 BtnTogglePcap.Background = Brushes.IndianRed;
+                BtnTogglePcap.Foreground = Brushes.White;
                 AppendLog("PCAP Packet capture started (Wireshark format).");
             }
         }
@@ -630,7 +350,7 @@ namespace AgilicoDiagMac
                 sb.AppendLine("AGILICO MSP TOOLKIT - DIAGNOSTIC REPORT (macOS)");
                 sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 sb.AppendLine($"Score: {BadgeScore.Text}");
-                sb.AppendLine($"Local IP: {BadgeLocalIp.Text} | Public IP: {BadgePublicIp.Text}");
+                sb.AppendLine($"Local IP: {TxtLocalIpDisplay.Text} | Public IP: {TxtPublicIpDisplay.Text}");
                 sb.AppendLine("================================================================================");
                 sb.AppendLine();
                 sb.AppendLine("ACTIVITY LOGS:");
