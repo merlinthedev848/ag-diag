@@ -96,7 +96,9 @@ Write-Host ""
 Write-Host "Building MSI Installers via WiX Toolset..."
 if (Get-Command wix -ErrorAction SilentlyContinue) {
     & wix build "$srcDir\Product.wxs" -arch x64 -o "$outDir\Agilico_MSP_Toolkit.msi"
+    if ($LASTEXITCODE -ne 0) { throw "WiX build for Product.wxs failed (exit $LASTEXITCODE)" }
     & wix build "$srcDir\ProductLite.wxs" -arch x64 -o "$outDir\Agilico_MSP_Toolkit_Lite.msi"
+    if ($LASTEXITCODE -ne 0) { throw "WiX build for ProductLite.wxs failed (exit $LASTEXITCODE)" }
     Write-Host "MSI Installers generated successfully:"
     Write-Host "   $outDir\Agilico_MSP_Toolkit.msi"
     Write-Host "   $outDir\Agilico_MSP_Toolkit_Lite.msi"
