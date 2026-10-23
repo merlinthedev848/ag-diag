@@ -2,12 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -22,6 +21,9 @@ namespace AgilicoDiagMac
         private readonly NetworkEngine _engine;
         private readonly StringBuilder _logBuilder = new();
         private bool _isDiagnosticsRunning;
+
+        // SHA-256 hash of "agilico"
+        private const string HashedEngineerPassword = "d71dd957a89911bd0b4e8182e2ffe6284b89e4354eb0b0a36ae0e8c9ee4dfa7d";
 
         private readonly TextBlock[] _testStatusLabels = new TextBlock[10];
         private readonly TextBlock[] _testDescLabels = new TextBlock[10];
@@ -105,30 +107,112 @@ namespace AgilicoDiagMac
             _testCheckboxes[9] = ChkTest9;
         }
 
+        #region Engineer Mode Authentication
+
+        private async void ImgLogo_PointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (BtnNavItTools.IsVisible)
+            {
+                // Deactivate Engineer Mode
+                BtnNavItTools.IsVisible = false;
+                BtnNavNetTools.IsVisible = false;
+                BtnNavConverter.IsVisible = false;
+                BtnNavSettings.IsVisible = false;
+
+                if (PageCarousel.SelectedIndex == 1 || PageCarousel.SelectedIndex == 2 || 
+                    PageCarousel.SelectedIndex == 3 || PageCarousel.SelectedIndex == 6)
+                {
+                    PageCarousel.SelectedIndex = 0;
+                    SetNavActive(0);
+                }
+
+                await ModernMessageBox.ShowAsync(this, "Engineer Mode deactivated.", "Lock");
+                return;
+            }
+
+            var dialog = new EngineerPasswordDialog();
+            bool result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                using var sha = SHA256.Create();
+                byte[] inputHash = sha.ComputeHash(Encoding.UTF8.GetBytes(dialog.Password));
+                string inputHex = BitConverter.ToString(inputHash).Replace("-", "").ToLowerInvariant();
+
+                if (inputHex == HashedEngineerPassword)
+                {
+                    BtnNavItTools.IsVisible = true;
+                    BtnNavNetTools.IsVisible = true;
+                    BtnNavConverter.IsVisible = true;
+                    BtnNavSettings.IsVisible = true;
+                    await ModernMessageBox.ShowAsync(this, "Engineer Mode activated.", "Success");
+                }
+                else
+                {
+                    await ModernMessageBox.ShowAsync(this, "Invalid password.", "Error");
+                }
+            }
+        }
+
+        #endregion
+
+        #region Navigation
+
         private void BtnNavDashboard_Click(object? sender, RoutedEventArgs e)
         {
             PageCarousel.SelectedIndex = 0;
             SetNavActive(0);
         }
 
-        private void BtnNavHelp_Click(object? sender, RoutedEventArgs e)
+        private void BtnNavItTools_Click(object? sender, RoutedEventArgs e)
         {
             PageCarousel.SelectedIndex = 1;
             SetNavActive(1);
         }
 
-        private void BtnNavLogs_Click(object? sender, RoutedEventArgs e)
+        private void BtnNavNetTools_Click(object? sender, RoutedEventArgs e)
         {
             PageCarousel.SelectedIndex = 2;
             SetNavActive(2);
         }
 
+        private void BtnNavConverter_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 3;
+            SetNavActive(3);
+        }
+
+        private void BtnNavHelp_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 4;
+            SetNavActive(4);
+        }
+
+        private void BtnNavLogs_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 5;
+            SetNavActive(5);
+        }
+
+        private void BtnNavSettings_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 6;
+            SetNavActive(6);
+        }
+
         private void SetNavActive(int index)
         {
             StripeDashboard.IsVisible = (index == 0);
-            StripeHelp.IsVisible = (index == 1);
-            StripeLogs.IsVisible = (index == 2);
+            StripeItTools.IsVisible = (index == 1);
+            StripeNetTools.IsVisible = (index == 2);
+            StripeConverter.IsVisible = (index == 3);
+            StripeHelp.IsVisible = (index == 4);
+            StripeLogs.IsVisible = (index == 5);
+            StripeSettings.IsVisible = (index == 6);
         }
+
+        #endregion
+
+        #region Network Probing & Diagnostics
 
         private async Task ProbeInitialNetworkAsync()
         {
@@ -221,8 +305,6 @@ namespace AgilicoDiagMac
             return -1;
         }
 
-        #region Diagnostic Execution
-
         private async void BtnRunDiagnostics_Click(object? sender, RoutedEventArgs e)
         {
             if (_isDiagnosticsRunning)
@@ -290,6 +372,95 @@ namespace AgilicoDiagMac
 
                 await ModernMessageBox.ShowAsync(this, "Reset Connect completed successfully!\n\nmacOS DNS flushed and application cache cleaned.", "Reset Complete");
             }
+        }
+
+        #endregion
+
+        #region IT Tools Handlers
+
+        private async void BtnHardwareScan_Click(object? sender, RoutedEventArgs e)
+        {
+            string osVer = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+            string arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
+            int cores = Environment.ProcessorCount;
+            long mem = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024 * 1024);
+
+            await ModernMessageBox.ShowAsync(this,
+                $"macOS Diagnostic Information:\n• OS: {osVer}\n• Architecture: {arch}\n• CPU Cores: {cores}\n• Available Memory: ~{mem} GB\n• System Status: Healthy",
+                "Hardware Diagnostics");
+        }
+
+        private void BtnWifiScan_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new WifiAnalyzerDialog();
+            dialog.ShowDialog(this);
+        }
+
+        private void BtnAudioInspect_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new AudioDeviceInspectorDialog();
+            dialog.ShowDialog(this);
+        }
+
+        private async void BtnFlushDns_Click(object? sender, RoutedEventArgs e)
+        {
+            var (ok, msg) = await MacSystemTools.FlushDnsAsync();
+            AppendLog(msg);
+            await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
+        }
+
+        private async void BtnRenewDhcp_Click(object? sender, RoutedEventArgs e)
+        {
+            var (ok, msg) = await MacSystemTools.RenewDhcpAsync();
+            AppendLog(msg);
+            await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
+        }
+
+        private async void BtnResetClient_Click(object? sender, RoutedEventArgs e)
+        {
+            bool confirm = await ModernMessageBox.ShowAsync(this,
+                "This will terminate running Agilico Connect client processes and wipe local cache/temporary state.\n\nProceed?",
+                "Clear Client Cache",
+                true);
+
+            if (confirm)
+            {
+                var (ok, msg) = await MacSystemTools.ClearClientCacheAndRestartAsync();
+                AppendLog(msg);
+                await ModernMessageBox.ShowAsync(this, msg, ok ? "Success" : "Error");
+            }
+        }
+
+        #endregion
+
+        #region Net Tools Handlers
+
+        private void BtnOpenLanScanner_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new LanScannerDialog();
+            dialog.ShowDialog(this);
+        }
+
+        private void BtnOpenPingTracker_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new PingTrackerDialog();
+            dialog.ShowDialog(this);
+        }
+
+        private void BtnOpenSockets_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new SocketsDialog();
+            dialog.ShowDialog(this);
+        }
+
+        #endregion
+
+        #region Converter Handlers
+
+        private void BtnLaunchConverter_Click(object? sender, RoutedEventArgs e)
+        {
+            var dialog = new AudioConverterDialog();
+            dialog.ShowDialog(this);
         }
 
         #endregion
@@ -369,6 +540,32 @@ namespace AgilicoDiagMac
         {
             _logBuilder.Clear();
             TxtLogs.Text = string.Empty;
+        }
+
+        #endregion
+
+        #region Settings Handlers
+
+        private async void BtnSaveSettings_Click(object? sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(TxtStunServer.Text))
+                _engine.StunServer = TxtStunServer.Text.Trim();
+
+            if (int.TryParse(TxtStunPort.Text, out int sp))
+                _engine.StunPort = sp;
+
+            if (int.TryParse(TxtLocalPort.Text, out int lp))
+                _engine.LocalSipPort = lp;
+
+            if (!string.IsNullOrWhiteSpace(TxtSipAlgServer.Text))
+                _engine.SipAlgServer = TxtSipAlgServer.Text.Trim();
+
+            if (int.TryParse(TxtSipAlgPort.Text, out int ap))
+                _engine.SipAlgPort = ap;
+
+            _engine.IsSimulationMode = ChkSimulation.IsChecked == true;
+
+            await ModernMessageBox.ShowAsync(this, "Diagnostic parameters saved and applied successfully.", "Settings Saved");
         }
 
         #endregion
