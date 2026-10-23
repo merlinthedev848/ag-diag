@@ -61,4 +61,5 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        gh release view v4.1.2 >/dev/null 2>&1 || gh release create v4.1.2 --title "v4.1.2 - Agilico MSP Toolkit" --notes "Agilico MSP Toolkit v4.1.2 macOS DMG Installers (Full & Lite Editions for Apple Silicon & Intel Mac)"
         gh release upload v4.1.2 publish_output/*.dmg --clobber
