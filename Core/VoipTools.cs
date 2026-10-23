@@ -128,7 +128,7 @@ namespace AgilicoDiagMac.Core
             return records;
         }
 
-        private static byte[] BuildSrvQuery(string service, string domain, ushort transactionId)
+        public static byte[] BuildSrvQuery(string service, string domain, ushort transactionId)
         {
             var packet = new List<byte>();
 
@@ -557,7 +557,7 @@ namespace AgilicoDiagMac.Core
             return result;
         }
 
-        private static byte[] BuildStunRequest(byte[] transactionId)
+        public static byte[] BuildStunRequest(byte[] transactionId)
         {
             byte[] packet = new byte[20];
             packet[0] = 0x00;
@@ -570,7 +570,7 @@ namespace AgilicoDiagMac.Core
             return packet;
         }
 
-        private static byte[] BuildSipOptionsRequest(string host, int port)
+        public static byte[] BuildSipOptionsRequest(string host, int port)
         {
             string branch = "z9hG4bK" + Guid.NewGuid().ToString("N").Substring(0, 10);
             string tag = Guid.NewGuid().ToString("N").Substring(0, 10);

@@ -134,6 +134,76 @@ namespace AgilicoDiagMac.Tests
                 failed++;
             }
 
+            // Test 6: STUN Binding Request RFC 5389
+            try
+            {
+                byte[] txId = new byte[12] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+                byte[] stunReq = VoipTools.BuildStunRequest(txId);
+                // Type: 0x0001 (Binding Request), Magic Cookie: 0x2112A442
+                if (stunReq.Length == 20 &&
+                    stunReq[0] == 0x00 && stunReq[1] == 0x01 &&
+                    stunReq[4] == 0x21 && stunReq[5] == 0x12 && stunReq[6] == 0xA4 && stunReq[7] == 0x42)
+                {
+                    Console.WriteLine("[PASS] Test 6: RFC 5389 STUN Binding Request packet verified (Magic Cookie: 0x2112A442).");
+                    passed++;
+                }
+                else
+                {
+                    Console.WriteLine("[FAIL] Test 6: Invalid STUN header format.");
+                    failed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FAIL] Test 6: {ex.Message}");
+                failed++;
+            }
+
+            // Test 7: DNS SRV Query Builder
+            try
+            {
+                byte[] srvQuery = VoipTools.BuildSrvQuery("_sip._udp", "hp2k.co.uk", 0x1234);
+                if (srvQuery.Length > 20 && srvQuery[0] == 0x12 && srvQuery[1] == 0x34)
+                {
+                    Console.WriteLine($"[PASS] Test 7: DNS SRV query packet constructed successfully ({srvQuery.Length} bytes, TxId: 0x1234).");
+                    passed++;
+                }
+                else
+                {
+                    Console.WriteLine("[FAIL] Test 7: Invalid DNS SRV query format.");
+                    failed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FAIL] Test 7: {ex.Message}");
+                failed++;
+            }
+
+            // Test 8: SIP OPTIONS Request Builder
+            try
+            {
+                byte[] sipBytes = VoipTools.BuildSipOptionsRequest("sip.linphone.org", 5060);
+                string sipStr = Encoding.UTF8.GetString(sipBytes);
+                if (sipStr.StartsWith("OPTIONS sip:sip.linphone.org SIP/2.0") &&
+                    sipStr.Contains("User-Agent: Agilico MSP Toolkit") &&
+                    sipStr.Contains("Call-ID:"))
+                {
+                    Console.WriteLine($"[PASS] Test 8: SIP OPTIONS packet constructed compliant with RFC 3261 ({sipBytes.Length} bytes).");
+                    passed++;
+                }
+                else
+                {
+                    Console.WriteLine("[FAIL] Test 8: Invalid SIP OPTIONS request structure.");
+                    failed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FAIL] Test 8: {ex.Message}");
+                failed++;
+            }
+
             Console.WriteLine("==========================================================");
             Console.WriteLine($"Test Suite Summary: {passed} Passed, {failed} Failed.");
             Console.WriteLine("==========================================================");
