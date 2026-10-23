@@ -119,21 +119,63 @@ namespace AgilicoDiagMac
             _testCheckboxes[9] = ChkTest9;
         }
 
+        private void BtnNavDashboard_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 0;
+            SetNavActive(0);
+        }
+
+        private void BtnNavNetTools_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 1;
+            SetNavActive(1);
+        }
+
+        private void BtnNavConverter_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 2;
+            SetNavActive(2);
+        }
+
+        private void BtnNavLogs_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 3;
+            SetNavActive(3);
+        }
+
+        private void BtnNavHelp_Click(object? sender, RoutedEventArgs e)
+        {
+            PageCarousel.SelectedIndex = 4;
+            SetNavActive(4);
+        }
+
+        private void SetNavActive(int index)
+        {
+            StripeDashboard.IsVisible = (index == 0);
+            StripeNetTools.IsVisible = (index == 1);
+            StripeConverter.IsVisible = (index == 2);
+            StripeLogs.IsVisible = (index == 3);
+            StripeHelp.IsVisible = (index == 4);
+        }
+
         private async Task ProbeInitialNetworkAsync()
         {
             try
             {
                 string local = LanScanner.GetLocalIpAddress();
                 BadgeLocalIp.Text = $"Local IP: {local}";
+                TxtLocalIpDisplay.Text = local;
 
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
                 string pub = (await client.GetStringAsync("https://api.ipify.org")).Trim();
                 BadgePublicIp.Text = $"Public IP: {pub}";
+                TxtPublicIpDisplay.Text = pub;
                 _engine.PublicIpAddress = pub;
             }
             catch
             {
                 BadgePublicIp.Text = "Public IP: Offline / Unknown";
+                TxtPublicIpDisplay.Text = "Offline / Unknown";
             }
         }
 
