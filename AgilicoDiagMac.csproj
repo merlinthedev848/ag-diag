@@ -18,6 +18,16 @@
     <Version>4.1.2</Version>
     <AssemblyVersion>4.1.2.0</AssemblyVersion>
     <FileVersion>4.1.2.0</FileVersion>
+    <IsFullVersion Condition="'$(IsFullVersion)' == ''">true</IsFullVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsFullVersion)' == 'true'">
+    <DefineConstants>$(DefineConstants);FULL_VERSION</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsFullVersion)' == 'false'">
+    <DefineConstants>$(DefineConstants);LITE_VERSION</DefineConstants>
+    <Product>Agilico MSP Toolkit Lite for macOS</Product>
   </PropertyGroup>
 
   <ItemGroup>

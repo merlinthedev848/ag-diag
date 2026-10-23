@@ -24,19 +24,31 @@ jobs:
       run: |
         dotnet run --project tests/EngineTests.csproj
 
-    - name: Build and Package DMGs
+    - name: Build and Package Full & Lite DMGs
       run: |
         chmod +x build_macos.sh
-        ./build_macos.sh
+        ./build_macos.sh all
 
-    - name: Upload Apple Silicon DMG
+    - name: Upload Full Apple Silicon DMG
       uses: actions/upload-artifact@v4
       with:
         name: Agilico_MSP_Toolkit_arm64.dmg
         path: publish_output/Agilico_MSP_Toolkit_arm64.dmg
 
-    - name: Upload Intel Mac DMG
+    - name: Upload Full Intel Mac DMG
       uses: actions/upload-artifact@v4
       with:
         name: Agilico_MSP_Toolkit_x64.dmg
         path: publish_output/Agilico_MSP_Toolkit_x64.dmg
+
+    - name: Upload Lite Apple Silicon DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: Agilico_MSP_Toolkit_Lite_arm64.dmg
+        path: publish_output/Agilico_MSP_Toolkit_Lite_arm64.dmg
+
+    - name: Upload Lite Intel Mac DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: Agilico_MSP_Toolkit_Lite_x64.dmg
+        path: publish_output/Agilico_MSP_Toolkit_Lite_x64.dmg

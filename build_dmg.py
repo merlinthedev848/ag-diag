@@ -2,11 +2,11 @@
 """
 Agilico MSP Toolkit - macOS DMG Package Generator
 Cross-platform disk image builder using Rock Ridge ISO with POSIX permissions and /Applications symlink.
+Supports both Standard Full and Lite editions.
 """
 
 import os
 import sys
-import shutil
 
 try:
     import pycdlib
@@ -15,7 +15,7 @@ except ImportError:
     sys.exit(1)
 
 
-def build_dmg(app_source_dir, output_dmg_path, volume_name="Agilico MSP"):
+def build_dmg(app_source_dir, output_dmg_path, volume_name="Agilico MSP", app_folder_name=None):
     """
     Packages a macOS .app directory into a mountable .dmg disk image.
     Preserves POSIX executable permissions and includes a symlink to /Applications.
@@ -30,8 +30,14 @@ def build_dmg(app_source_dir, output_dmg_path, volume_name="Agilico MSP"):
     if os.path.exists(output_dmg_path):
         os.remove(output_dmg_path)
 
+    if app_folder_name is None:
+        if "lite" in os.path.basename(app_source_dir).lower():
+            app_folder_name = "Agilico MSP Toolkit Lite.app"
+        else:
+            app_folder_name = "Agilico MSP Toolkit.app"
+
     print(f"[*] Packaging {app_source_dir} -> {output_dmg_path}")
-    print(f"    Volume Name: {volume_name}")
+    print(f"    Volume Name: {volume_name} | App Name: {app_folder_name}")
 
     iso = pycdlib.PyCdlib()
     # Rock Ridge 1.09 provides POSIX permissions, symlinks, and long filenames
@@ -40,8 +46,7 @@ def build_dmg(app_source_dir, output_dmg_path, volume_name="Agilico MSP"):
     # Map directories to ISO 8.3 unique paths
     dir_iso_map = {"": "/"}
     
-    # Root level app folder inside the DMG (named "Agilico MSP Toolkit.app")
-    app_folder_name = "Agilico MSP Toolkit.app"
+    # Root level app folder inside the DMG
     iso.add_directory("/APP", rr_name=app_folder_name)
     dir_iso_map["."] = "/APP"
     
@@ -93,20 +98,22 @@ def main():
     publish_dir = os.path.join(base_dir, "publish_output")
 
     targets = [
-        ("Agilico_MSP_Toolkit_arm64.app", "Agilico_MSP_Toolkit_arm64.dmg", "Agilico MSP ARM64"),
-        ("Agilico_MSP_Toolkit_x64.app", "Agilico_MSP_Toolkit_x64.dmg", "Agilico MSP x64"),
+        # Full Standalone Editions
+        ("Agilico_MSP_Toolkit_arm64.app", "Agilico_MSP_Toolkit_arm64.dmg", "Agilico MSP ARM64", "Agilico MSP Toolkit.app"),
+        ("Agilico_MSP_Toolkit_x64.app", "Agilico_MSP_Toolkit_x64.dmg", "Agilico MSP x64", "Agilico MSP Toolkit.app"),
+        # Lite Editions
+        ("Agilico_MSP_Toolkit_Lite_arm64.app", "Agilico_MSP_Toolkit_Lite_arm64.dmg", "Agilico Lite ARM", "Agilico MSP Toolkit Lite.app"),
+        ("Agilico_MSP_Toolkit_Lite_x64.app", "Agilico_MSP_Toolkit_Lite_x64.dmg", "Agilico Lite x64", "Agilico MSP Toolkit Lite.app"),
     ]
 
     built_any = False
-    for app_name, dmg_name, vol_name in targets:
+    for app_name, dmg_name, vol_name, app_folder in targets:
         app_path = os.path.join(publish_dir, app_name)
         dmg_path = os.path.join(publish_dir, dmg_name)
 
         if os.path.isdir(app_path):
-            build_dmg(app_path, dmg_path, vol_name)
+            build_dmg(app_path, dmg_path, vol_name, app_folder)
             built_any = True
-        else:
-            print(f"[!] App bundle not found: {app_path} (run build_macos script first)")
 
     if not built_any:
         print("[ERROR] No app bundles found in publish_output to package into DMG.")

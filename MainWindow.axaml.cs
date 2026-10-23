@@ -46,6 +46,12 @@ namespace AgilicoDiagMac
         public MainWindow()
         {
             InitializeComponent();
+#if LITE_VERSION
+            Title = "Agilico MSP Toolkit Lite (macOS)";
+            TxtAppTitle.Text = "Agilico MSP Toolkit Lite";
+            TxtAppSubtitle.Text = "macOS Network Diagnostics (Lite Edition) v4.1.2";
+            CardAudioConverter.IsVisible = false;
+#endif
             _engine = new NetworkEngine();
             InitTestControls();
 

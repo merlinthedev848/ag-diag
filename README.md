@@ -54,41 +54,48 @@ Designed to verify local and outbound network readiness for the **Agilico Connec
 
 ---
 
-## 🛠️ Multi-Architecture Builds
+## 🛠️ Multi-Architecture Editions & Builds
 
-The toolkit compiles into self-contained macOS `.app` bundles for both Apple Silicon and Intel architectures:
+The toolkit provides two build editions for macOS:
+- **Full Standalone Edition**: Self-contained runtime requiring zero host dependencies.
+- **Lite Edition**: Framework-dependent distribution (~28 MB DMG vs ~104 MB Full) focused on rapid deployment and core network diagnostics.
 
-| Target Platform | Runtime Identifier | Bundle Name | DMG Installer | Architecture |
-| :--- | :--- | :--- | :--- | :--- |
-| **Apple Silicon** | `osx-arm64` | `Agilico_MSP_Toolkit_arm64.app` | `Agilico_MSP_Toolkit_arm64.dmg` | Apple M1/M2/M3/M4 |
-| **Intel Mac** | `osx-x64` | `Agilico_MSP_Toolkit_x64.app` | `Agilico_MSP_Toolkit_x64.dmg` | x86_64 Intel Macs |
+| Edition | Target Platform | Bundle Name | DMG Installer | Size | Architecture |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Full** | Apple Silicon | `Agilico_MSP_Toolkit_arm64.app` | `Agilico_MSP_Toolkit_arm64.dmg` | ~104.7 MB | Apple M1/M2/M3/M4 |
+| **Full** | Intel Mac | `Agilico_MSP_Toolkit_x64.app` | `Agilico_MSP_Toolkit_x64.dmg` | ~98.2 MB | x86_64 Intel Macs |
+| **Lite** | Apple Silicon | `Agilico_MSP_Toolkit_Lite_arm64.app` | `Agilico_MSP_Toolkit_Lite_arm64.dmg` | ~28.8 MB | Apple M1/M2/M3/M4 |
+| **Lite** | Intel Mac | `Agilico_MSP_Toolkit_Lite_x64.app` | `Agilico_MSP_Toolkit_Lite_x64.dmg` | ~28.8 MB | x86_64 Intel Macs |
 
 ### Building & Packaging DMG Installers
 
 #### On Windows:
-Builds both self-contained application bundles and generates macOS `.dmg` disk images in `publish_output/`:
+Build all editions (Full + Lite):
 ```powershell
-.\build_macos.ps1
+.\build_macos.ps1 -Edition All
 ```
-Or to generate/repackage `.dmg` disk images from existing bundles:
+Or build only the Lite edition:
+```powershell
+.\build_macos.ps1 -Edition Lite
+```
+Or repackage `.dmg` disk images from existing bundles:
 ```powershell
 .\build_dmg.ps1
 ```
 
 #### On macOS:
-Builds the bundles and packages native Apple UDZO `.dmg` installers with `/Applications` drag-and-drop link:
+Build all editions with native Apple `hdiutil` UDZO disk images:
 ```bash
 chmod +x ./build_macos.sh
-./build_macos.sh
+./build_macos.sh all
 ```
-Or use the standalone DMG packager:
+Or build only the Lite edition:
 ```bash
-chmod +x ./create_dmg.sh
-./create_dmg.sh
+./build_macos.sh lite
 ```
 
 #### Automated GitHub Actions CI/CD:
-The repository includes `.github/workflows/build_dmg.yml` which automatically compiles and packages native Apple Silicon and Intel `.dmg` installers on GitHub's `macos-latest` runners whenever changes are pushed to `macos` or `main`.
+The repository includes `.github/workflows/build_dmg.yml` which automatically compiles and packages all 4 DMG installers (Full & Lite for Apple Silicon and Intel) on GitHub's `macos-latest` runners.
 
 ---
 

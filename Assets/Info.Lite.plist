@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIconFile</key>
+    <string>logo.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.agilico.diagtoolkit.lite</string>
+    <key>CFBundleName</key>
+    <string>Agilico MSP Toolkit Lite</string>
+    <key>CFBundleDisplayName</key>
+    <string>Agilico MSP Toolkit Lite</string>
+    <key>CFBundleVersion</key>
+    <string>4.1.2</string>
+    <key>CFBundleShortVersionString</key>
+    <string>4.1.2</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleExecutable</key>
+    <string>AgilicoDiagMac</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Agilico. All rights reserved.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Agilico MSP Toolkit requires audio access to inspect headset and microphone devices for VoIP readiness.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Agilico MSP Toolkit requires local network access to verify gateway reachability, LAN subnets, and VoIP signalling.</string>
+</dict>
+</plist>
