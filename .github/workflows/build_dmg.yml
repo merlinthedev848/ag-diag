@@ -7,6 +7,9 @@ on:
     branches: [ "macos", "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -52,3 +55,10 @@ jobs:
       with:
         name: Agilico_MSP_Toolkit_Lite_x64.dmg
         path: publish_output/Agilico_MSP_Toolkit_Lite_x64.dmg
+
+    - name: Publish DMGs to GitHub Release
+      if: github.ref == 'refs/heads/macos' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release upload v4.1.2 publish_output/*.dmg --clobber
